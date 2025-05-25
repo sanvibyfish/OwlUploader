@@ -139,7 +139,7 @@
 
 1. 查看 [Issues](https://github.com/yourusername/OwlUploader/issues) 中是否已有相关问题
 2. 创建新的 Issue 详细描述问题或建议
-3. 联系开发者：[您的邮箱]
+3. 联系开发者：sanvibyfish@gmail.com
 
 ---
 

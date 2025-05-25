@@ -139,7 +139,7 @@ If you encounter issues or have feature suggestions during use, please:
 
 1. Check [Issues](https://github.com/yourusername/OwlUploader/issues) for existing related problems
 2. Create a new Issue with detailed description of the problem or suggestion
-3. Contact developer: [Your Email]
+3. Contact developer: sanvibyfish@gmail.com
 
 ---
 
