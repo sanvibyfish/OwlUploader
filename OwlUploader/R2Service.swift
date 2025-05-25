@@ -36,6 +36,7 @@ enum R2ServiceError: Error, LocalizedError {
     case uploadFailed(String, Error)
     case downloadFailed(String, Error)
     case createFolderFailed(String, Error)
+    case deleteFileFailed(String, Error)
     case permissionDenied(String)
     case storageQuotaExceeded
     case invalidFileSize(String)
@@ -75,6 +76,8 @@ enum R2ServiceError: Error, LocalizedError {
             return "下载文件 '\(fileName)' 失败：\(error.localizedDescription)"
         case .createFolderFailed(let folderName, let error):
             return "创建文件夹 '\(folderName)' 失败：\(error.localizedDescription)"
+        case .deleteFileFailed(let fileName, let error):
+            return "删除文件 '\(fileName)' 失败：\(error.localizedDescription)"
         case .permissionDenied(let operation):
             return "权限不足，无法执行 '\(operation)' 操作。请检查您的账户权限。"
         case .storageQuotaExceeded:
@@ -139,7 +142,7 @@ enum R2ServiceError: Error, LocalizedError {
              .bucketNotFound, .fileNotFound, .invalidFileName, .permissionDenied, 
              .storageQuotaExceeded, .invalidFileSize, .fileAccessDenied:
             return false
-        case .uploadFailed, .downloadFailed, .createFolderFailed:
+        case .uploadFailed, .downloadFailed, .createFolderFailed, .deleteFileFailed:
             return true
         case .connectionTimeout, .dnsResolutionFailed, .endpointNotReachable:
             return true
@@ -995,6 +998,57 @@ class R2Service: ObservableObject {
         }
     }
     
+    /// 删除指定的文件对象
+    /// - Parameters:
+    ///   - bucket: 存储桶名称
+    ///   - key: 要删除的对象键（完整路径）
+    func deleteObject(bucket: String, key: String) async throws {
+        guard let s3Client = s3Client else {
+            print("❌ S3客户端未初始化")
+            throw R2ServiceError.accountNotConfigured
+        }
+        
+        let fileName = (key as NSString).lastPathComponent
+        print("🗑️ 开始删除文件...")
+        print("   存储桶: \(bucket)")
+        print("   对象键: \(key)")
+        print("   文件名: \(fileName)")
+        
+        isLoading = true
+        lastError = nil
+        
+        do {
+            // 创建 DeleteObject 请求
+            print("🔧 正在创建删除请求...")
+            let input = DeleteObjectInput(
+                bucket: bucket,
+                key: key
+            )
+            
+            print("🚀 开始执行文件删除...")
+            let _ = try await s3Client.deleteObject(input: input)
+            
+            isLoading = false
+            print("✅ 文件删除成功完成")
+            
+        } catch {
+            isLoading = false
+            print("❌ 文件删除过程中发生错误:")
+            print("   错误类型: \(type(of: error))")
+            print("   错误描述: \(error.localizedDescription)")
+            
+            // 详细分析错误
+            let serviceError = mapDeleteError(error, fileName: fileName)
+            print("   映射后的服务错误: \(serviceError)")
+            if let suggestion = serviceError.suggestedAction {
+                print("   建议操作: \(suggestion)")
+            }
+            
+            lastError = serviceError
+            throw serviceError
+        }
+    }
+    
     /// 断开连接
     func disconnect() {
         // 清理 S3 客户端和账户信息
@@ -1455,6 +1509,50 @@ class R2Service: ObservableObject {
         }
         
         return .createFolderFailed(folderName, error)
+    }
+    
+    /// 将删除文件错误映射为服务错误
+    /// - Parameters:
+    ///   - error: 原始错误
+    ///   - fileName: 文件名
+    /// - Returns: 映射后的服务错误
+    private func mapDeleteError(_ error: Error, fileName: String) -> R2ServiceError {
+        if let r2Error = error as? R2ServiceError {
+            return r2Error
+        }
+        
+        // 检查错误描述中的关键信息
+        let errorDescription = error.localizedDescription.lowercased()
+        
+        // 检查权限相关错误
+        if errorDescription.contains("access denied") ||
+           errorDescription.contains("forbidden") ||
+           errorDescription.contains("permission") {
+            return .permissionDenied("删除文件 '\(fileName)'")
+        }
+        
+        // 检查文件不存在错误
+        if errorDescription.contains("not found") ||
+           errorDescription.contains("no such key") ||
+           errorDescription.contains("does not exist") {
+            return .fileNotFound(fileName)
+        }
+        
+        // 检查网络相关错误
+        if errorDescription.contains("network") ||
+           errorDescription.contains("connection") ||
+           errorDescription.contains("timeout") {
+            return .networkError(error)
+        }
+        
+        // 检查存储桶相关错误
+        if errorDescription.contains("bucket") &&
+           (errorDescription.contains("not found") || errorDescription.contains("not exist")) {
+            return .bucketNotFound("存储桶不存在或无访问权限")
+        }
+        
+        // 默认为删除失败错误
+        return .deleteFileFailed(fileName, error)
     }
     
     /// 将系统错误映射为服务错误

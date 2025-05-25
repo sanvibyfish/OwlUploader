@@ -41,6 +41,12 @@ struct FileListView: View {
     /// 是否显示诊断信息
     @State private var showingDiagnostics: Bool = false
     
+    /// 要删除的文件对象（用于确认对话框）
+    @State private var fileToDelete: FileObject?
+    
+    /// 是否显示删除确认对话框
+    @State private var showingDeleteConfirmation: Bool = false
+    
     /// 文件来源枚举
     private enum FileSource {
         case fileImporter  // 文件选择器
@@ -92,6 +98,21 @@ struct FileListView: View {
         }
         .sheet(isPresented: $showingDiagnostics) {
             DiagnosticsView(r2Service: r2Service)
+        }
+        .alert("确认删除文件", isPresented: $showingDeleteConfirmation) {
+            Button("取消", role: .cancel) {
+                fileToDelete = nil
+            }
+            Button("删除", role: .destructive) {
+                if let fileToDelete = fileToDelete {
+                    deleteFile(fileToDelete)
+                    self.fileToDelete = nil
+                }
+            }
+        } message: {
+            if let fileToDelete = fileToDelete {
+                Text("确定要删除文件 '\(fileToDelete.name)' 吗？此操作无法撤销。")
+            }
         }
     }
     
@@ -479,7 +500,10 @@ struct FileListView: View {
                         fileObject: fileObject,
                         r2Service: r2Service,
                         bucketName: r2Service.selectedBucket?.name,
-                        messageManager: messageManager
+                        messageManager: messageManager,
+                        onDeleteFile: { fileToDelete in
+                            requestDeleteFile(fileToDelete)
+                        }
                     )
                     .onTapGesture {
                         handleItemTap(fileObject)
@@ -928,6 +952,62 @@ struct FileListView: View {
                 print("🧹 已清理临时文件: \(fileURL.lastPathComponent)")
             } catch {
                 print("⚠️ 清理临时文件失败: \(error)")
+            }
+        }
+    }
+    
+    /// 请求删除文件（显示确认对话框）
+    /// - Parameter fileObject: 要删除的文件对象
+    private func requestDeleteFile(_ fileObject: FileObject) {
+        // 只允许删除文件，不允许删除文件夹
+        guard !fileObject.isDirectory else {
+            messageManager.showError("无法删除", description: "不支持删除文件夹")
+            return
+        }
+        
+        print("🗑️ 请求删除文件: \(fileObject.name)")
+        fileToDelete = fileObject
+        showingDeleteConfirmation = true
+    }
+    
+    /// 执行文件删除操作
+    /// - Parameter fileObject: 要删除的文件对象
+    private func deleteFile(_ fileObject: FileObject) {
+        guard canLoadFiles else {
+            messageManager.showError("无法删除", description: "服务未准备就绪，请先连接账户并选择存储桶")
+            return
+        }
+        
+        guard let bucket = r2Service.selectedBucket else {
+            messageManager.showError("无法删除", description: "请先选择一个存储桶")
+            return
+        }
+        
+        print("🗑️ 开始删除文件: \(fileObject.name)")
+        print("   存储桶: \(bucket.name)")
+        print("   对象键: \(fileObject.key)")
+        
+        Task {
+            do {
+                try await r2Service.deleteObject(bucket: bucket.name, key: fileObject.key)
+                
+                await MainActor.run {
+                    print("✅ 文件删除成功: \(fileObject.name)")
+                    messageManager.showSuccess("删除成功", description: "文件 '\(fileObject.name)' 已成功删除")
+                    
+                    // 刷新文件列表以移除已删除的文件
+                    loadFileList()
+                }
+            } catch {
+                await MainActor.run {
+                    print("❌ 文件删除失败: \(error)")
+                    
+                    if let r2Error = error as? R2ServiceError {
+                        messageManager.showError(r2Error)
+                    } else {
+                        messageManager.showError("删除失败", description: "文件 '\(fileObject.name)' 删除失败: \(error.localizedDescription)")
+                    }
+                }
             }
         }
     }

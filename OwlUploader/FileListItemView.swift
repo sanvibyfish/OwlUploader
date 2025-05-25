@@ -22,6 +22,9 @@ struct FileListItemView: View {
     /// 消息管理器（可选，用于显示复制成功消息）
     var messageManager: MessageManager?
     
+    /// 删除文件回调（可选，用于处理删除操作）
+    var onDeleteFile: ((FileObject) -> Void)?
+    
     var body: some View {
         HStack(spacing: 12) {
             // 文件/文件夹图标
@@ -88,6 +91,19 @@ struct FileListItemView: View {
                     }
                     .buttonStyle(PlainButtonStyle())
                     .help("复制文件链接")
+                }
+                
+                // 删除按钮（仅对文件显示）
+                if !fileObject.isDirectory, let onDeleteFile = onDeleteFile {
+                    Button(action: {
+                        onDeleteFile(fileObject)
+                    }) {
+                        Image(systemName: "trash")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .help("删除文件")
                 }
                 
                 // 文件夹箭头指示器
@@ -167,7 +183,8 @@ struct FileListItemView: View {
         ),
         r2Service: R2Service(),
         bucketName: "test-bucket",
-        messageManager: MessageManager()
+        messageManager: MessageManager(),
+        onDeleteFile: { _ in print("删除文件") }
     )
     .padding()
 }
@@ -183,7 +200,8 @@ struct FileListItemView: View {
         ),
         r2Service: R2Service(),
         bucketName: "test-bucket",
-        messageManager: MessageManager()
+        messageManager: MessageManager(),
+        onDeleteFile: { _ in print("删除文件") }
     )
     .padding()
 }
@@ -194,7 +212,8 @@ struct FileListItemView: View {
             fileObject: fileObject,
             r2Service: R2Service(),
             bucketName: "test-bucket",
-            messageManager: MessageManager()
+            messageManager: MessageManager(),
+            onDeleteFile: { _ in print("删除文件") }
         )
     }
     .listStyle(PlainListStyle())

@@ -21,7 +21,7 @@ A clean and efficient **Cloudflare R2 Object Storage Management Tool** designed 
 - **File Download**: One-click download to local storage
 - **File Deletion**: Batch deletion operations
 - **Folder Management**: Create and organize folder structures
-- **File Preview**: Support for common file type previews
+- **File Preview**: Support for common file type previews(Not Finish)
 
 ### 🎨 User Experience
 - Native macOS design language
