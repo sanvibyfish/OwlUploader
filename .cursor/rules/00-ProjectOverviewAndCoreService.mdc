@@ -1,0 +1,36 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# 规则 00: 项目概述与核心服务
+
+## 项目目标
+OwlUploader 是一个用于上传文件到 Cloudflare R2 存储服务的 macOS 应用。它旨在提供一个用户友好的界面来管理 R2 存储桶和文件。
+
+## 核心服务: R2Service
+`R2Service.swift` 是应用的核心服务类，负责所有与 Cloudflare R2 API 的交互。
+
+### 主要功能
+- 初始化 R2 客户端
+- 账户连接与验证
+- 列出存储桶 (在权限允许的情况下)
+- **手动选择和验证指定存储桶 (新功能)**: 允许用户在没有 `listBuckets` 权限时，通过直接输入存储桶名称来访问。这是为了支持权限受限的 API Token。参考 `selectBucketDirectly(_ bucketName: String)` 方法。
+- 列出存储桶中的对象 (文件和文件夹)
+- 创建文件夹
+- 上传文件
+- 删除文件/文件夹
+- **权限检测 (新功能)**: 添加了 `checkListBucketsPermission()` 方法来检测当前 API Token 是否拥有 `listBuckets` 权限，以便 UI 层做出相应调整。
+
+### 近期重要变更 (参考 [docs/dev/DEV-2025-05-25.md](mdc:docs/dev/DEV-2025-05-25.md))
+- **解决了 `listBuckets` API 权限不足的问题**: 通过添加手动指定存储桶的功能，应用现在可以更好地适配只授予特定存储桶访问权限的 API Token。
+- **优化了错误处理**: 特别是针对 `AccessDenied` 错误，提供了更详细的诊断信息和解决建议。
+- **移除了 `listBuckets` 的强制依赖**: 应用现在可以不依赖 `listBuckets` API 调用，改为手动输入存储桶名称。
+- **文件夹创建逻辑修复**: 解决了文件夹名称验证、路径提取和 R2 平台兼容性相关的多个 BUG。
+- **上传文件错误诊断增强**: 改进了上传错误分类和诊断逻辑，包括对 macOS 文件权限错误的处理。
+
+### 关键文件
+- 主要实现: [OwlUploader/R2Service.swift](mdc:OwlUploader/R2Service.swift)
+- 开发日志: [docs/dev/DEV-2025-05-25.md](mdc:docs/dev/DEV-2025-05-25.md)
+
+这个规则文件提供了项目的高层概览和核心服务 `R2Service` 的关键信息，帮助 AI 理解其主要职责和最近的开发重点。

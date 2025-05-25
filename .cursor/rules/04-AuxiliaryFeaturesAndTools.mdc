@@ -1,0 +1,53 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# 规则 04: 辅助功能与工具
+
+## 概述
+本规则介绍了 OwlUploader 应用中使用的一些辅助功能模块和工具类，它们为核心功能提供支持或增强用户体验。
+
+## 诊断工具: DiagnosticsView
+`DiagnosticsView.swift` 提供了一个用户界面，允许用户主动检查应用与 R2 服务的连接状态和配置的健康状况。
+
+### 主要功能
+- 显示当前的连接状态、账户配置信息、选定的存储桶等。
+- 执行一系列诊断检查，如：
+    - 验证 R2 服务连接。
+    - 检查账户配置的完整性。
+    - 验证 API Token 权限（概念性，实际权限检查在 `R2Service`）。
+    - 检查端点 URL 格式。
+    - 确认存储桶选择状态。
+- 提供诊断结果和潜在问题的解决建议。
+
+### 近期重要变更 (参考 [docs/dev/DEV-2025-05-25.md](mdc:docs/dev/DEV-2025-05-25.md))
+- **macOS 兼容性修复**: 移除了 iOS 特有的修饰符 (`navigationBarTitleDisplayMode`, `navigationBarTrailing`)，调整了工具栏按钮位置，修复了中文引号导致的字符串解析错误，使其能在 macOS 上正确编译和显示。
+- **界面尺寸优化**: 多次调整了 `DiagnosticsView` 的 frame 参数，以确保其内容（特别是较长的诊断信息文本）能够完整显示，解决了因外部 frame 覆盖导致内部尺寸设置无效的问题。
+- **上传问题诊断集成**: 诊断视图现在也用于帮助用户排查文件上传失败的问题，提供系统性的前置条件检查。
+
+## 消息提示: MessageBanner
+`MessageBanner.swift` 实现了一个通用的消息横幅组件，用于在应用顶部显示成功、错误或信息性提示。
+
+### 主要功能
+- 支持不同类型的消息（成功、错误、信息、警告）。
+- 消息可以自动消失，也可以手动关闭。
+- 通过 `MessageManager`（一个 `ObservableObject`）在应用各处触发显示。
+
+## Keychain服务: KeychainService
+`KeychainService.swift` 封装了与 macOS Keychain 的交互，用于安全地存储和读取敏感数据，如 R2 账户的 Secret Access Key。
+
+### 主要功能
+- 保存数据到 Keychain。
+- 从 Keychain 读取数据。
+- 从 Keychain 删除数据。
+- 更新 Keychain 中的数据。
+- 为应用的账户管理 (`R2AccountManager`) 提供底层的安全存储能力。
+
+### 关键文件
+- 诊断工具界面: [OwlUploader/DiagnosticsView.swift](mdc:OwlUploader/DiagnosticsView.swift)
+- 消息横幅组件: [OwlUploader/MessageBanner.swift](mdc:OwlUploader/MessageBanner.swift)
+- Keychain 服务封装: [OwlUploader/KeychainService.swift](mdc:OwlUploader/KeychainService.swift)
+- 开发日志: [docs/dev/DEV-2025-05-25.md](mdc:docs/dev/DEV-2025-05-25.md)
+
+这些辅助工具对于提升应用的健壮性、易用性和安全性起到了重要作用。
