@@ -6,11 +6,6 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		2CC90DE22DE31EE100052E06 /* AWSS3 in Frameworks */ = {isa = PBXBuildFile; productRef = 2CD4A3F02DE31DB800AC18B1 /* AWSS3 */; };
-		2CC90DE32DE31EE100052E06 /* AWSClientRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = 2CD4A3F12DE31DB800AC18B1 /* AWSClientRuntime */; };
-/* End PBXBuildFile section */
-
 /* Begin PBXContainerItemProxy section */
 		2CD4A36C2DE3011900AC18B1 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -57,8 +52,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2CC90DE32DE31EE100052E06 /* AWSClientRuntime in Frameworks */,
-				2CC90DE22DE31EE100052E06 /* AWSS3 in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -119,8 +112,6 @@
 			);
 			name = OwlUploader;
 			packageProductDependencies = (
-				2CD4A3F02DE31DB800AC18B1 /* AWSS3 */,
-				2CD4A3F12DE31DB800AC18B1 /* AWSClientRuntime */,
 			);
 			productName = OwlUploader;
 			productReference = 2CD4A35D2DE3011800AC18B1 /* OwlUploader.app */;
@@ -205,7 +196,7 @@
 			mainGroup = 2CD4A3542DE3011800AC18B1;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				2CD4A3EF2DE31DB800AC18B1 /* XCRemoteSwiftPackageReference "aws-sdk-swift" */,
+				2CD4A3882DE302BF00AC18B1 /* XCRemoteSwiftPackageReference "aws-sdk-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 2CD4A35E2DE3011800AC18B1 /* Products */;
@@ -406,7 +397,6 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = OwlUploader/OwlUploader.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -434,7 +424,6 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = OwlUploader/OwlUploader.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -567,7 +556,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		2CD4A3EF2DE31DB800AC18B1 /* XCRemoteSwiftPackageReference "aws-sdk-swift" */ = {
+		2CD4A3882DE302BF00AC18B1 /* XCRemoteSwiftPackageReference "aws-sdk-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/awslabs/aws-sdk-swift";
 			requirement = {
@@ -576,19 +565,6 @@
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		2CD4A3F02DE31DB800AC18B1 /* AWSS3 */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 2CD4A3EF2DE31DB800AC18B1 /* XCRemoteSwiftPackageReference "aws-sdk-swift" */;
-			productName = AWSS3;
-		};
-		2CD4A3F12DE31DB800AC18B1 /* AWSClientRuntime */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 2CD4A3EF2DE31DB800AC18B1 /* XCRemoteSwiftPackageReference "aws-sdk-swift" */;
-			productName = AWSClientRuntime;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 2CD4A3552DE3011800AC18B1 /* Project object */;
 }
