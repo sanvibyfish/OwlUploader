@@ -41,6 +41,12 @@ struct FileListView: View {
     /// 是否显示诊断信息
     @State private var showingDiagnostics: Bool = false
     
+    /// 文件来源枚举
+    private enum FileSource {
+        case fileImporter  // 文件选择器
+        case dragDrop     // 拖拽上传
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             // 顶部状态栏
@@ -78,7 +84,7 @@ struct FileListView: View {
                 
                 // 文件选择器使用文件名作为原始文件名
                 let originalFileName = fileURL.lastPathComponent
-                uploadFileImmediately(fileURL: fileURL, originalFileName: originalFileName)
+                uploadFileImmediately(fileURL: fileURL, originalFileName: originalFileName, source: .fileImporter)
                 
             case .failure(let error):
                 messageManager.showError("文件选择失败", description: error.localizedDescription)
@@ -377,7 +383,7 @@ struct FileListView: View {
                 isEnabled: canLoadFiles && !isUploading && !r2Service.isLoading,
                 onFileDrop: { [self] fileURL, originalFileName in
                     print("🎯 空列表区域拖拽上传: \(originalFileName)")
-                    uploadFileImmediately(fileURL: fileURL, originalFileName: originalFileName)
+                    uploadFileImmediately(fileURL: fileURL, originalFileName: originalFileName, source: .dragDrop)
                 },
                 onError: { [self] title, description in
                     messageManager.showError(title, description: description)
@@ -458,7 +464,7 @@ struct FileListView: View {
                 isEnabled: canLoadFiles && !isUploading && !r2Service.isLoading,
                 onFileDrop: { [self] fileURL, originalFileName in
                     print("🎯 文件列表区域拖拽上传: \(originalFileName)")
-                    uploadFileImmediately(fileURL: fileURL, originalFileName: originalFileName)
+                    uploadFileImmediately(fileURL: fileURL, originalFileName: originalFileName, source: .dragDrop)
                 },
                 onError: { [self] title, description in
                     messageManager.showError(title, description: description)
@@ -635,19 +641,22 @@ struct FileListView: View {
     /// - Parameters:
     ///   - fileURL: 本地文件 URL
     ///   - originalFileName: 原始文件名
-    private func uploadFileImmediately(fileURL: URL, originalFileName: String) {
+    ///   - source: 文件来源
+    private func uploadFileImmediately(fileURL: URL, originalFileName: String, source: FileSource = .dragDrop) {
         print("🎯 uploadFileImmediately 被调用，文件路径: \(fileURL.path)")
         print("📤 上传文件: \(originalFileName)")
+        print("📍 文件来源: \(source)")
         
-        // 直接上传文件，不再区分来源
-        actuallyUpload(fileURL: fileURL, originalFileName: originalFileName)
+        // 根据来源调用不同的上传方法
+        actuallyUpload(fileURL: fileURL, originalFileName: originalFileName, source: source)
     }
     
     /// 实际执行文件上传的方法
     /// - Parameters:
     ///   - fileURL: 本地文件 URL
     ///   - originalFileName: 原始文件名
-    private func actuallyUpload(fileURL: URL, originalFileName: String) {
+    ///   - source: 文件来源
+    private func actuallyUpload(fileURL: URL, originalFileName: String, source: FileSource) {
         guard canLoadFiles else { 
             print("❌ canLoadFiles = false，无法上传")
             messageManager.showError("无法上传", description: "服务未准备就绪，请先连接账户并选择存储桶")
@@ -670,12 +679,22 @@ struct FileListView: View {
             print("   原始文件名: \(originalFileName)")
         }
         
+        // 根据文件来源决定是否需要处理沙盒权限
+        var needsSecurityScope = false
+        if source == .fileImporter {
+            needsSecurityScope = fileURL.startAccessingSecurityScopedResource()
+            print("🔐 文件选择器来源，安全作用域权限: \(needsSecurityScope ? "已获取" : "获取失败")")
+        }
+        
         // 立即验证文件访问和读取数据
         let fileData: Data
         do {
             // 先检查文件存在性
             guard FileManager.default.fileExists(atPath: fileURL.path) else {
                 print("❌ 文件不存在: \(fileURL.path)")
+                if needsSecurityScope {
+                    fileURL.stopAccessingSecurityScopedResource()
+                }
                 messageManager.showError("文件不存在", description: "找不到文件 '\(originalFileName)'，请重新选择")
                 return
             }
@@ -687,6 +706,9 @@ struct FileListView: View {
             // 检查文件大小限制
             let maxSize: Int64 = 5 * 1024 * 1024 * 1024 // 5GB
             if fileData.count > maxSize {
+                if needsSecurityScope {
+                    fileURL.stopAccessingSecurityScopedResource()
+                }
                 let formatter = ByteCountFormatter()
                 formatter.allowedUnits = [.useGB, .useMB]
                 formatter.countStyle = .file
@@ -704,6 +726,11 @@ struct FileListView: View {
             print("📊 文件大小检查通过: \(fileName) (\(fileSizeString))")
             
         } catch {
+            // 出错时立即释放权限
+            if needsSecurityScope {
+                fileURL.stopAccessingSecurityScopedResource()
+            }
+            
             print("❌ 无法读取文件数据: \(error)")
             // 特殊处理权限错误
             if let nsError = error as? NSError, nsError.domain == "NSCocoaErrorDomain", nsError.code == 257 {
@@ -744,6 +771,12 @@ struct FileListView: View {
                 )
                 
                 await MainActor.run {
+                    // 上传成功后立即释放权限
+                    if needsSecurityScope {
+                        fileURL.stopAccessingSecurityScopedResource()
+                        print("🔓 已释放安全作用域权限")
+                    }
+                    
                     // 上传成功
                     isUploading = false
                     uploadMessage = ""
@@ -758,6 +791,12 @@ struct FileListView: View {
                 }
             } catch {
                 await MainActor.run {
+                    // 上传失败后立即释放权限
+                    if needsSecurityScope {
+                        fileURL.stopAccessingSecurityScopedResource()
+                        print("🔓 已释放安全作用域权限（上传失败）")
+                    }
+                    
                     // 上传失败
                     isUploading = false
                     uploadMessage = ""
@@ -846,8 +885,6 @@ struct FileListView: View {
         
         return true
     }
-    
-
     
     /// 根据文件扩展名获取MIME类型
     /// - Parameter fileName: 文件名
