@@ -271,8 +271,11 @@ struct FileListView: View {
             // 错误状态
             errorView(error)
         } else if fileObjects.isEmpty && !r2Service.isLoading {
-            // 空列表状态
+            // 空列表状态 - 添加拖拽支持
             emptyListView
+                .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+                    handleFileDrop(providers: providers)
+                }
         } else {
             // 正常文件列表
             fileListView
@@ -405,7 +408,7 @@ struct FileListView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "plus.circle.fill")
                         .foregroundColor(.blue)
-                    Text("上传文件")
+                    Text("点击\"上传文件\"按钮")
                         .font(.subheadline)
                         .foregroundColor(.primary)
                 }
@@ -413,7 +416,15 @@ struct FileListView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "folder.badge.plus")
                         .foregroundColor(.green)
-                    Text("创建新文件夹")
+                    Text("点击\"新建文件夹\"按钮")
+                        .font(.subheadline)
+                        .foregroundColor(.primary)
+                }
+                
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.down.circle.dotted")
+                        .foregroundColor(.purple)
+                    Text("或直接拖拽文件到此区域上传")
                         .font(.subheadline)
                         .foregroundColor(.primary)
                 }
@@ -441,6 +452,9 @@ struct FileListView: View {
             }
         }
         .listStyle(PlainListStyle())
+        .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+            handleFileDrop(providers: providers)
+        }
         .overlay(
             // 加载中或上传中的覆盖层
             Group {
@@ -751,6 +765,76 @@ struct FileListView: View {
         case "mp3": return "audio/mpeg"
         default: return "application/octet-stream"
         }
+    }
+    
+    /// 处理文件拖拽上传
+    /// - Parameter providers: 拖拽提供的文件提供者
+    /// - Returns: 是否接受拖拽
+    private func handleFileDrop(providers: [NSItemProvider]) -> Bool {
+        print("🎯 handleFileDrop 被调用，提供者数量: \(providers.count)")
+        
+        // 检查是否可以上传
+        guard canLoadFiles else {
+            print("❌ canLoadFiles = false，拒绝拖拽")
+            messageManager.showError("无法上传", description: "服务未准备就绪，请先连接账户并选择存储桶")
+            return false
+        }
+        
+        // 检查是否正在上传或加载
+        guard !isUploading && !r2Service.isLoading else {
+            print("❌ 正在上传或加载中，拒绝拖拽")
+            messageManager.showError("上传忙碌", description: "当前正在处理其他操作，请稍后再试")
+            return false
+        }
+        
+        // 只处理第一个文件（简化处理，后续可扩展为多文件）
+        guard let provider = providers.first else {
+            print("❌ 没有有效的文件提供者")
+            return false
+        }
+        
+        // 检查是否有文件URL
+        guard provider.hasItemConformingToTypeIdentifier("public.file-url") else {
+            print("❌ 拖拽项不是文件URL")
+            messageManager.showError("无效拖拽", description: "只支持拖拽文件，不支持其他内容")
+            return false
+        }
+        
+        print("✅ 接受拖拽，准备处理文件")
+        
+        // 异步加载文件URL
+        provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { (item, error) in
+            DispatchQueue.main.async {
+                
+                if let error = error {
+                    print("❌ 加载拖拽文件失败: \(error)")
+                    messageManager.showError("拖拽失败", description: "无法获取拖拽的文件: \(error.localizedDescription)")
+                    return
+                }
+                
+                guard let fileURL = item as? URL else {
+                    print("❌ 拖拽项不是有效的文件URL")
+                    messageManager.showError("拖拽失败", description: "拖拽的内容不是有效的文件")
+                    return
+                }
+                
+                print("🎯 获取到拖拽文件URL: \(fileURL.path)")
+                
+                // 检查是否是文件（不是文件夹）
+                var isDirectory: ObjCBool = false
+                guard FileManager.default.fileExists(atPath: fileURL.path, isDirectory: &isDirectory),
+                      !isDirectory.boolValue else {
+                    print("❌ 拖拽的是文件夹，不是文件")
+                    messageManager.showError("不支持文件夹", description: "只支持拖拽单个文件，不支持文件夹")
+                    return
+                }
+                
+                // 调用现有的上传方法
+                uploadFileImmediately(fileURL)
+            }
+        }
+        
+        return true
     }
 }
 
