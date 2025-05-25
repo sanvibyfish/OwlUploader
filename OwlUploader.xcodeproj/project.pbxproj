@@ -1,0 +1,556 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXContainerItemProxy section */
+		2CD4A36C2DE3011900AC18B1 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 2CD4A3552DE3011800AC18B1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 2CD4A35C2DE3011800AC18B1;
+			remoteInfo = OwlUploader;
+		};
+		2CD4A3762DE3011900AC18B1 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 2CD4A3552DE3011800AC18B1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 2CD4A35C2DE3011800AC18B1;
+			remoteInfo = OwlUploader;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		2CD4A35D2DE3011800AC18B1 /* OwlUploader.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OwlUploader.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2CD4A36B2DE3011900AC18B1 /* OwlUploaderTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OwlUploaderTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		2CD4A3752DE3011900AC18B1 /* OwlUploaderUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OwlUploaderUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		2CD4A35F2DE3011800AC18B1 /* OwlUploader */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = OwlUploader;
+			sourceTree = "<group>";
+		};
+		2CD4A36E2DE3011900AC18B1 /* OwlUploaderTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = OwlUploaderTests;
+			sourceTree = "<group>";
+		};
+		2CD4A3782DE3011900AC18B1 /* OwlUploaderUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = OwlUploaderUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		2CD4A35A2DE3011800AC18B1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2CD4A3682DE3011900AC18B1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2CD4A3722DE3011900AC18B1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		2CD4A3542DE3011800AC18B1 = {
+			isa = PBXGroup;
+			children = (
+				2CD4A35F2DE3011800AC18B1 /* OwlUploader */,
+				2CD4A36E2DE3011900AC18B1 /* OwlUploaderTests */,
+				2CD4A3782DE3011900AC18B1 /* OwlUploaderUITests */,
+				2CD4A35E2DE3011800AC18B1 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		2CD4A35E2DE3011800AC18B1 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				2CD4A35D2DE3011800AC18B1 /* OwlUploader.app */,
+				2CD4A36B2DE3011900AC18B1 /* OwlUploaderTests.xctest */,
+				2CD4A3752DE3011900AC18B1 /* OwlUploaderUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		2CD4A35C2DE3011800AC18B1 /* OwlUploader */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2CD4A37F2DE3011900AC18B1 /* Build configuration list for PBXNativeTarget "OwlUploader" */;
+			buildPhases = (
+				2CD4A3592DE3011800AC18B1 /* Sources */,
+				2CD4A35A2DE3011800AC18B1 /* Frameworks */,
+				2CD4A35B2DE3011800AC18B1 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				2CD4A35F2DE3011800AC18B1 /* OwlUploader */,
+			);
+			name = OwlUploader;
+			packageProductDependencies = (
+			);
+			productName = OwlUploader;
+			productReference = 2CD4A35D2DE3011800AC18B1 /* OwlUploader.app */;
+			productType = "com.apple.product-type.application";
+		};
+		2CD4A36A2DE3011900AC18B1 /* OwlUploaderTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2CD4A3822DE3011900AC18B1 /* Build configuration list for PBXNativeTarget "OwlUploaderTests" */;
+			buildPhases = (
+				2CD4A3672DE3011900AC18B1 /* Sources */,
+				2CD4A3682DE3011900AC18B1 /* Frameworks */,
+				2CD4A3692DE3011900AC18B1 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				2CD4A36D2DE3011900AC18B1 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				2CD4A36E2DE3011900AC18B1 /* OwlUploaderTests */,
+			);
+			name = OwlUploaderTests;
+			packageProductDependencies = (
+			);
+			productName = OwlUploaderTests;
+			productReference = 2CD4A36B2DE3011900AC18B1 /* OwlUploaderTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		2CD4A3742DE3011900AC18B1 /* OwlUploaderUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2CD4A3852DE3011900AC18B1 /* Build configuration list for PBXNativeTarget "OwlUploaderUITests" */;
+			buildPhases = (
+				2CD4A3712DE3011900AC18B1 /* Sources */,
+				2CD4A3722DE3011900AC18B1 /* Frameworks */,
+				2CD4A3732DE3011900AC18B1 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				2CD4A3772DE3011900AC18B1 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				2CD4A3782DE3011900AC18B1 /* OwlUploaderUITests */,
+			);
+			name = OwlUploaderUITests;
+			packageProductDependencies = (
+			);
+			productName = OwlUploaderUITests;
+			productReference = 2CD4A3752DE3011900AC18B1 /* OwlUploaderUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		2CD4A3552DE3011800AC18B1 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1630;
+				LastUpgradeCheck = 1630;
+				TargetAttributes = {
+					2CD4A35C2DE3011800AC18B1 = {
+						CreatedOnToolsVersion = 16.3;
+					};
+					2CD4A36A2DE3011900AC18B1 = {
+						CreatedOnToolsVersion = 16.3;
+						TestTargetID = 2CD4A35C2DE3011800AC18B1;
+					};
+					2CD4A3742DE3011900AC18B1 = {
+						CreatedOnToolsVersion = 16.3;
+						TestTargetID = 2CD4A35C2DE3011800AC18B1;
+					};
+				};
+			};
+			buildConfigurationList = 2CD4A3582DE3011800AC18B1 /* Build configuration list for PBXProject "OwlUploader" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 2CD4A3542DE3011800AC18B1;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 2CD4A35E2DE3011800AC18B1 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				2CD4A35C2DE3011800AC18B1 /* OwlUploader */,
+				2CD4A36A2DE3011900AC18B1 /* OwlUploaderTests */,
+				2CD4A3742DE3011900AC18B1 /* OwlUploaderUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		2CD4A35B2DE3011800AC18B1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2CD4A3692DE3011900AC18B1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2CD4A3732DE3011900AC18B1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		2CD4A3592DE3011800AC18B1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2CD4A3672DE3011900AC18B1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2CD4A3712DE3011900AC18B1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		2CD4A36D2DE3011900AC18B1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 2CD4A35C2DE3011800AC18B1 /* OwlUploader */;
+			targetProxy = 2CD4A36C2DE3011900AC18B1 /* PBXContainerItemProxy */;
+		};
+		2CD4A3772DE3011900AC18B1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 2CD4A35C2DE3011800AC18B1 /* OwlUploader */;
+			targetProxy = 2CD4A3762DE3011900AC18B1 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		2CD4A37D2DE3011900AC18B1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = C3NL524YS6;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.4;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		2CD4A37E2DE3011900AC18B1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = C3NL524YS6;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.4;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		2CD4A3802DE3011900AC18B1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = OwlUploader/OwlUploader.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = C3NL524YS6;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sanvi.OwlUploader;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		2CD4A3812DE3011900AC18B1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = OwlUploader/OwlUploader.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = C3NL524YS6;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sanvi.OwlUploader;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		2CD4A3832DE3011900AC18B1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = C3NL524YS6;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sanvi.OwlUploaderTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OwlUploader.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/OwlUploader";
+			};
+			name = Debug;
+		};
+		2CD4A3842DE3011900AC18B1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = C3NL524YS6;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sanvi.OwlUploaderTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OwlUploader.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/OwlUploader";
+			};
+			name = Release;
+		};
+		2CD4A3862DE3011900AC18B1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = C3NL524YS6;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sanvi.OwlUploaderUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = OwlUploader;
+			};
+			name = Debug;
+		};
+		2CD4A3872DE3011900AC18B1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = C3NL524YS6;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sanvi.OwlUploaderUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = OwlUploader;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		2CD4A3582DE3011800AC18B1 /* Build configuration list for PBXProject "OwlUploader" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2CD4A37D2DE3011900AC18B1 /* Debug */,
+				2CD4A37E2DE3011900AC18B1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		2CD4A37F2DE3011900AC18B1 /* Build configuration list for PBXNativeTarget "OwlUploader" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2CD4A3802DE3011900AC18B1 /* Debug */,
+				2CD4A3812DE3011900AC18B1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		2CD4A3822DE3011900AC18B1 /* Build configuration list for PBXNativeTarget "OwlUploaderTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2CD4A3832DE3011900AC18B1 /* Debug */,
+				2CD4A3842DE3011900AC18B1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		2CD4A3852DE3011900AC18B1 /* Build configuration list for PBXNativeTarget "OwlUploaderUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2CD4A3862DE3011900AC18B1 /* Debug */,
+				2CD4A3872DE3011900AC18B1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 2CD4A3552DE3011800AC18B1 /* Project object */;
+}
