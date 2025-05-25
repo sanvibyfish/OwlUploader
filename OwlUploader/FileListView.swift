@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// 文件列表视图
 /// 用于显示选定存储桶中的文件和文件夹列表
@@ -70,13 +71,14 @@ struct FileListView: View {
             allowedContentTypes: [.data, .item], // 允许所有文件类型
             allowsMultipleSelection: false
         ) { result in
-            // 👇 立即在回调中处理文件上传，不缓存 fileURL
+            // 立即在回调中处理文件上传
             switch result {
             case .success(let urls):
                 guard let fileURL = urls.first else { return }
                 
-                // 立即进行所有验证和上传操作
-                uploadFileImmediately(fileURL)
+                // 文件选择器使用文件名作为原始文件名
+                let originalFileName = fileURL.lastPathComponent
+                uploadFileImmediately(fileURL: fileURL, originalFileName: originalFileName)
                 
             case .failure(let error):
                 messageManager.showError("文件选择失败", description: error.localizedDescription)
@@ -271,13 +273,10 @@ struct FileListView: View {
             // 错误状态
             errorView(error)
         } else if fileObjects.isEmpty && !r2Service.isLoading {
-            // 空列表状态 - 添加拖拽支持
+            // 空列表状态 - 使用新的拖拽视图
             emptyListView
-                .onDrop(of: [.fileURL], isTargeted: nil) { providers in
-                    handleFileDrop(providers: providers)
-                }
         } else {
-            // 正常文件列表
+            // 正常文件列表 - 使用新的拖拽视图
             fileListView
         }
     }
@@ -372,116 +371,144 @@ struct FileListView: View {
     
     /// 空列表视图
     private var emptyListView: some View {
-        VStack(spacing: 20) {
-            // 图标
-            ZStack {
-                Circle()
-                    .fill(Color.blue.opacity(0.1))
-                    .frame(width: 80, height: 80)
-                
-                Image(systemName: currentPrefix.isEmpty ? "externaldrive" : "folder")
-                    .font(.system(size: 32, weight: .light))
-                    .foregroundColor(.blue)
-            }
-            
-            // 标题和描述
-            VStack(spacing: 8) {
-                Text("文件夹为空")
-                    .font(.title2)
-                    .fontWeight(.medium)
-                
-                if currentPrefix.isEmpty {
-                    Text("此存储桶中暂无文件或文件夹\n使用上方的按钮来上传文件或创建文件夹")
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                } else {
-                    Text("此文件夹中暂无文件或文件夹\n使用上方的按钮来上传文件或创建文件夹")
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
+        ZStack {
+            // 拖拽区域背景
+            FileDropView(
+                isEnabled: canLoadFiles && !isUploading && !r2Service.isLoading,
+                onFileDrop: { [self] fileURL, originalFileName in
+                    print("🎯 空列表区域拖拽上传: \(originalFileName)")
+                    uploadFileImmediately(fileURL: fileURL, originalFileName: originalFileName)
+                },
+                onError: { [self] title, description in
+                    messageManager.showError(title, description: description)
                 }
-            }
+            )
             
-            // 操作提示
-            VStack(spacing: 12) {
-                HStack(spacing: 8) {
-                    Image(systemName: "plus.circle.fill")
+            // 前景内容
+            VStack(spacing: 20) {
+                // 图标
+                ZStack {
+                    Circle()
+                        .fill(Color.blue.opacity(0.1))
+                        .frame(width: 80, height: 80)
+                    
+                    Image(systemName: currentPrefix.isEmpty ? "externaldrive" : "folder")
+                        .font(.system(size: 32, weight: .light))
                         .foregroundColor(.blue)
-                    Text("点击\"上传文件\"按钮")
-                        .font(.subheadline)
-                        .foregroundColor(.primary)
                 }
                 
-                HStack(spacing: 8) {
-                    Image(systemName: "folder.badge.plus")
-                        .foregroundColor(.green)
-                    Text("点击\"新建文件夹\"按钮")
-                        .font(.subheadline)
-                        .foregroundColor(.primary)
+                // 标题和描述
+                VStack(spacing: 8) {
+                    Text("文件夹为空")
+                        .font(.title2)
+                        .fontWeight(.medium)
+                    
+                    if currentPrefix.isEmpty {
+                        Text("此存储桶中暂无文件或文件夹\n使用上方的按钮来上传文件或创建文件夹\n或直接拖拽文件到此区域上传")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    } else {
+                        Text("此文件夹中暂无文件或文件夹\n使用上方的按钮来上传文件或创建文件夹\n或直接拖拽文件到此区域上传")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
                 }
                 
-                HStack(spacing: 8) {
-                    Image(systemName: "arrow.down.circle.dotted")
-                        .foregroundColor(.purple)
-                    Text("或直接拖拽文件到此区域上传")
-                        .font(.subheadline)
-                        .foregroundColor(.primary)
+                // 操作提示
+                VStack(spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundColor(.blue)
+                        Text("点击\"上传文件\"按钮")
+                            .font(.subheadline)
+                            .foregroundColor(.primary)
+                    }
+                    
+                    HStack(spacing: 8) {
+                        Image(systemName: "folder.badge.plus")
+                            .foregroundColor(.green)
+                        Text("点击\"新建文件夹\"按钮")
+                            .font(.subheadline)
+                            .foregroundColor(.primary)
+                    }
+                    
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.down.circle.dotted")
+                            .foregroundColor(.purple)
+                        Text("或直接拖拽文件到此区域上传")
+                            .font(.subheadline)
+                            .foregroundColor(.primary)
+                    }
                 }
+                .padding(.top, 8)
             }
-            .padding(.top, 8)
+            .padding(.horizontal, 40)
+            .padding(.vertical, 20)
+            .allowsHitTesting(false) // 让触摸事件穿透到背景的拖拽视图
         }
-        .padding(.horizontal, 40)
-        .padding(.vertical, 20)
     }
     
     /// 文件列表视图
     private var fileListView: some View {
-        List {
-            // 文件和文件夹列表
-            ForEach(fileObjects, id: \.key) { fileObject in
-                FileListItemView(
-                    fileObject: fileObject,
-                    r2Service: r2Service,
-                    bucketName: r2Service.selectedBucket?.name,
-                    messageManager: messageManager
-                )
-                .onTapGesture {
-                    handleItemTap(fileObject)
+        ZStack {
+            // 拖拽区域背景
+            FileDropView(
+                isEnabled: canLoadFiles && !isUploading && !r2Service.isLoading,
+                onFileDrop: { [self] fileURL, originalFileName in
+                    print("🎯 文件列表区域拖拽上传: \(originalFileName)")
+                    uploadFileImmediately(fileURL: fileURL, originalFileName: originalFileName)
+                },
+                onError: { [self] title, description in
+                    messageManager.showError(title, description: description)
+                }
+            )
+            
+            // 文件列表前景
+            List {
+                // 文件和文件夹列表
+                ForEach(fileObjects, id: \.key) { fileObject in
+                    FileListItemView(
+                        fileObject: fileObject,
+                        r2Service: r2Service,
+                        bucketName: r2Service.selectedBucket?.name,
+                        messageManager: messageManager
+                    )
+                    .onTapGesture {
+                        handleItemTap(fileObject)
+                    }
                 }
             }
-        }
-        .listStyle(PlainListStyle())
-        .onDrop(of: [.fileURL], isTargeted: nil) { providers in
-            handleFileDrop(providers: providers)
-        }
-        .overlay(
-            // 加载中或上传中的覆盖层
-            Group {
-                if (r2Service.isLoading && !isInitialLoading) || isUploading {
-                    Rectangle()
-                        .fill(Color.black.opacity(0.1))
-                        .overlay(
-                            VStack(spacing: 8) {
-                                ProgressView()
-                                    .scaleEffect(1.2)
-                                
-                                if isUploading {
-                                    Text(uploadMessage)
-                                        .font(.caption)
-                                        .foregroundColor(.primary)
+            .listStyle(PlainListStyle())
+            .overlay(
+                // 加载中或上传中的覆盖层
+                Group {
+                    if (r2Service.isLoading && !isInitialLoading) || isUploading {
+                        Rectangle()
+                            .fill(Color.black.opacity(0.1))
+                            .overlay(
+                                VStack(spacing: 8) {
+                                    ProgressView()
+                                        .scaleEffect(1.2)
+                                    
+                                    if isUploading {
+                                        Text(uploadMessage)
+                                            .font(.caption)
+                                            .foregroundColor(.primary)
+                                    }
                                 }
-                            }
-                            .padding()
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color(NSColor.controlBackgroundColor))
-                                    .shadow(radius: 2)
+                                .padding()
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color(NSColor.controlBackgroundColor))
+                                        .shadow(radius: 2)
+                                )
                             )
-                        )
+                    }
                 }
-            }
-        )
+            )
+        }
     }
     
     /// 是否可以加载文件
@@ -604,12 +631,23 @@ struct FileListView: View {
         }
     }
     
-    /// 立即上传文件（在 fileImporter 回调中使用）
-    /// 必须在 fileImporter 回调的上下文中调用，以确保有文件访问权限
-    /// - Parameter fileURL: 本地文件 URL
-    private func uploadFileImmediately(_ fileURL: URL) {
+    /// 立即上传文件（支持文件选择器和拖拽上传）
+    /// - Parameters:
+    ///   - fileURL: 本地文件 URL
+    ///   - originalFileName: 原始文件名
+    private func uploadFileImmediately(fileURL: URL, originalFileName: String) {
         print("🎯 uploadFileImmediately 被调用，文件路径: \(fileURL.path)")
+        print("📤 上传文件: \(originalFileName)")
         
+        // 直接上传文件，不再区分来源
+        actuallyUpload(fileURL: fileURL, originalFileName: originalFileName)
+    }
+    
+    /// 实际执行文件上传的方法
+    /// - Parameters:
+    ///   - fileURL: 本地文件 URL
+    ///   - originalFileName: 原始文件名
+    private func actuallyUpload(fileURL: URL, originalFileName: String) {
         guard canLoadFiles else { 
             print("❌ canLoadFiles = false，无法上传")
             messageManager.showError("无法上传", description: "服务未准备就绪，请先连接账户并选择存储桶")
@@ -621,29 +659,24 @@ struct FileListView: View {
             return 
         }
         
-        let fileName = fileURL.lastPathComponent
-        print("📄 准备上传文件: \(fileName)")
+        // 使用传入的原始文件名
+        let fileName = sanitizeFileName(originalFileName)
+        print("📄 准备上传文件: \(originalFileName) -> \(fileName)")
         
-        // 🔐 立即启用安全作用域资源访问
-        guard fileURL.startAccessingSecurityScopedResource() else {
-            print("❌ 无法获取文件安全作用域权限: \(fileName)")
-            messageManager.showError("权限不足", description: "无法获取文件 '\(fileName)' 的访问权限。请尝试将文件移动到文档文件夹或桌面后再试。")
-            return
+        // 检查是否是临时文件名被替换的情况
+        if originalFileName != fileURL.lastPathComponent {
+            print("🔄 使用原始文件名替换文件URL名:")
+            print("   文件URL名: \(fileURL.lastPathComponent)")
+            print("   原始文件名: \(originalFileName)")
         }
         
-        // 确保在方法结束时释放权限
-        defer {
-            fileURL.stopAccessingSecurityScopedResource()
-            print("🔓 已释放文件权限: \(fileName)")
-        }
-        
-        // 立即验证文件访问和读取数据（在权限上下文中）
+        // 立即验证文件访问和读取数据
         let fileData: Data
         do {
             // 先检查文件存在性
             guard FileManager.default.fileExists(atPath: fileURL.path) else {
                 print("❌ 文件不存在: \(fileURL.path)")
-                messageManager.showError("文件不存在", description: "找不到文件 '\(fileName)'，请重新选择")
+                messageManager.showError("文件不存在", description: "找不到文件 '\(originalFileName)'，请重新选择")
                 return
             }
             
@@ -659,7 +692,7 @@ struct FileListView: View {
                 formatter.countStyle = .file
                 let fileSizeString = formatter.string(fromByteCount: Int64(fileData.count))
                 print("❌ 文件过大: \(fileSizeString)")
-                messageManager.showError("文件过大", description: "文件 '\(fileName)' 大小为 \(fileSizeString)，超过 5GB 限制")
+                messageManager.showError("文件过大", description: "文件 '\(originalFileName)' 大小为 \(fileSizeString)，超过 5GB 限制")
                 return
             }
             
@@ -674,9 +707,9 @@ struct FileListView: View {
             print("❌ 无法读取文件数据: \(error)")
             // 特殊处理权限错误
             if let nsError = error as? NSError, nsError.domain == "NSCocoaErrorDomain", nsError.code == 257 {
-                messageManager.showError("文件权限被拒绝", description: "无法访问文件 '\(fileName)'。应用没有读取此文件的权限。建议：1) 将文件移动到文档文件夹或桌面；2) 检查文件权限设置；3) 重新选择文件进行上传。")
+                messageManager.showError("文件权限被拒绝", description: "无法访问文件 '\(originalFileName)'。应用没有读取此文件的权限。建议：1) 将文件移动到文档文件夹或桌面；2) 检查文件权限设置；3) 重新选择文件进行上传。")
             } else {
-                messageManager.showError("文件读取失败", description: "无法读取文件 '\(fileName)': \(error.localizedDescription)")
+                messageManager.showError("文件读取失败", description: "无法读取文件 '\(originalFileName)': \(error.localizedDescription)")
             }
             return
         }
@@ -695,7 +728,7 @@ struct FileListView: View {
         
         // 立即更新 UI 状态
         isUploading = true
-        uploadMessage = "正在上传 '\(fileName)'..."
+        uploadMessage = "正在上传 '\(originalFileName)'..."
         
         // 👇 立即执行上传，使用已读取的数据，避免异步权限问题
         Task {
@@ -715,7 +748,11 @@ struct FileListView: View {
                     isUploading = false
                     uploadMessage = ""
                     print("✅ 文件上传成功: \(objectKey)")
-                    messageManager.showSuccess("上传成功", description: "文件 '\(fileName)' 已成功上传到 \(bucket.name)")
+                    messageManager.showSuccess("上传成功", description: "文件 '\(originalFileName)' 已成功上传到 \(bucket.name)")
+                    
+                    // 清理临时复制的文件
+                    self.cleanupTempFile(fileURL)
+                    
                     // 刷新文件列表以显示新上传的文件
                     loadFileList()
                 }
@@ -725,6 +762,9 @@ struct FileListView: View {
                     isUploading = false
                     uploadMessage = ""
                     print("❌ 文件上传失败: \(error)")
+                    
+                    // 清理临时复制的文件
+                    self.cleanupTempFile(fileURL)
                     
                     if let r2Error = error as? R2ServiceError {
                         // 提供更详细的错误诊断
@@ -736,12 +776,78 @@ struct FileListView: View {
                     } else {
                         // 处理其他未知错误
                         print("🔍 其他错误类型: \(type(of: error))")
-                        messageManager.showError("上传失败", description: "文件 '\(fileName)' 上传失败: \(error.localizedDescription)")
+                        messageManager.showError("上传失败", description: "文件 '\(originalFileName)' 上传失败: \(error.localizedDescription)")
                     }
                 }
             }
         }
     }
+    
+    /// 清理文件名，确保符合 S3/R2 对象键要求
+    /// - Parameter fileName: 原始文件名
+    /// - Returns: 清理后的文件名
+    private func sanitizeFileName(_ fileName: String) -> String {
+        // 如果文件名已经是有效的，直接返回
+        if isValidObjectKey(fileName) {
+            return fileName
+        }
+        
+        print("⚠️ 文件名包含特殊字符，正在清理: \(fileName)")
+        
+        // 分离文件名和扩展名
+        let fileNameWithoutExt = (fileName as NSString).deletingPathExtension
+        let fileExtension = (fileName as NSString).pathExtension
+        
+        // 清理文件名主体
+        var sanitized = fileNameWithoutExt
+        
+        // 替换不安全的字符为下划线
+        let unsafeCharacters = CharacterSet(charactersIn: "\\/:*?\"<>|{}[]")
+        sanitized = sanitized.components(separatedBy: unsafeCharacters).joined(separator: "_")
+        
+        // 移除连续的下划线
+        while sanitized.contains("__") {
+            sanitized = sanitized.replacingOccurrences(of: "__", with: "_")
+        }
+        
+        // 移除开头和结尾的下划线和空格
+        sanitized = sanitized.trimmingCharacters(in: CharacterSet(charactersIn: "_ "))
+        
+        // 如果清理后为空，使用默认名称
+        if sanitized.isEmpty {
+            sanitized = "文件"
+        }
+        
+        // 重新组合文件名
+        let result = fileExtension.isEmpty ? sanitized : "\(sanitized).\(fileExtension)"
+        
+        print("✅ 文件名清理完成: \(fileName) -> \(result)")
+        return result
+    }
+    
+    /// 检查是否为有效的 S3/R2 对象键
+    /// - Parameter key: 对象键
+    /// - Returns: 是否有效
+    private func isValidObjectKey(_ key: String) -> Bool {
+        // 基本检查
+        guard !key.isEmpty else { return false }
+        guard key.count <= 1024 else { return false } // S3 对象键最大长度限制
+        
+        // 检查是否包含不安全字符
+        let unsafeCharacters = CharacterSet(charactersIn: "\\:*?\"<>|{}[]")
+        if key.rangeOfCharacter(from: unsafeCharacters) != nil {
+            return false
+        }
+        
+        // 不能以 / 开头
+        if key.hasPrefix("/") {
+            return false
+        }
+        
+        return true
+    }
+    
+
     
     /// 根据文件扩展名获取MIME类型
     /// - Parameter fileName: 文件名
@@ -767,74 +873,26 @@ struct FileListView: View {
         }
     }
     
-    /// 处理文件拖拽上传
-    /// - Parameter providers: 拖拽提供的文件提供者
-    /// - Returns: 是否接受拖拽
-    private func handleFileDrop(providers: [NSItemProvider]) -> Bool {
-        print("🎯 handleFileDrop 被调用，提供者数量: \(providers.count)")
-        
-        // 检查是否可以上传
-        guard canLoadFiles else {
-            print("❌ canLoadFiles = false，拒绝拖拽")
-            messageManager.showError("无法上传", description: "服务未准备就绪，请先连接账户并选择存储桶")
-            return false
+    /// 清理临时文件
+    /// 删除应用documents/uploads目录中的临时复制文件
+    /// - Parameter fileURL: 要清理的文件URL
+    private func cleanupTempFile(_ fileURL: URL) {
+        // 检查是否是应用的uploads目录中的文件
+        guard let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return
         }
         
-        // 检查是否正在上传或加载
-        guard !isUploading && !r2Service.isLoading else {
-            print("❌ 正在上传或加载中，拒绝拖拽")
-            messageManager.showError("上传忙碌", description: "当前正在处理其他操作，请稍后再试")
-            return false
-        }
+        let uploadsURL = documentsURL.appendingPathComponent("uploads")
         
-        // 只处理第一个文件（简化处理，后续可扩展为多文件）
-        guard let provider = providers.first else {
-            print("❌ 没有有效的文件提供者")
-            return false
-        }
-        
-        // 检查是否有文件URL
-        guard provider.hasItemConformingToTypeIdentifier("public.file-url") else {
-            print("❌ 拖拽项不是文件URL")
-            messageManager.showError("无效拖拽", description: "只支持拖拽文件，不支持其他内容")
-            return false
-        }
-        
-        print("✅ 接受拖拽，准备处理文件")
-        
-        // 异步加载文件URL
-        provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { (item, error) in
-            DispatchQueue.main.async {
-                
-                if let error = error {
-                    print("❌ 加载拖拽文件失败: \(error)")
-                    messageManager.showError("拖拽失败", description: "无法获取拖拽的文件: \(error.localizedDescription)")
-                    return
-                }
-                
-                guard let fileURL = item as? URL else {
-                    print("❌ 拖拽项不是有效的文件URL")
-                    messageManager.showError("拖拽失败", description: "拖拽的内容不是有效的文件")
-                    return
-                }
-                
-                print("🎯 获取到拖拽文件URL: \(fileURL.path)")
-                
-                // 检查是否是文件（不是文件夹）
-                var isDirectory: ObjCBool = false
-                guard FileManager.default.fileExists(atPath: fileURL.path, isDirectory: &isDirectory),
-                      !isDirectory.boolValue else {
-                    print("❌ 拖拽的是文件夹，不是文件")
-                    messageManager.showError("不支持文件夹", description: "只支持拖拽单个文件，不支持文件夹")
-                    return
-                }
-                
-                // 调用现有的上传方法
-                uploadFileImmediately(fileURL)
+        // 确保文件在uploads目录中才删除
+        if fileURL.path.starts(with: uploadsURL.path) {
+            do {
+                try FileManager.default.removeItem(at: fileURL)
+                print("🧹 已清理临时文件: \(fileURL.lastPathComponent)")
+            } catch {
+                print("⚠️ 清理临时文件失败: \(error)")
             }
         }
-        
-        return true
     }
 }
 
