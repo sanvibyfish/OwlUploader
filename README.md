@@ -45,6 +45,14 @@
 
 ## 🚀 安装和使用
 
+### 📥 下载
+
+👉 [点击下载 OwlUploader for macOS (.dmg)](https://github.com/sanvibyfish/OwlUploader/releases/download/v1.0.0/OwlUploader.dmg)
+
+- **最新版本**：v1.0.0
+- **文件大小**：约 15MB
+- **系统要求**：macOS 13.0 (Ventura) 及以上
+
 ### 从源码构建
 
 1. **克隆仓库**

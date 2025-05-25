@@ -45,6 +45,14 @@ A clean and efficient **Cloudflare R2 Object Storage Management Tool** designed 
 
 ## 🚀 Installation and Usage
 
+### 📥 Download
+
+👉 [Click to Download OwlUploader for macOS (.dmg)](https://github.com/sanvibyfish/OwlUploader/releases/download/v1.0.0/OwlUploader.dmg)
+
+- **Latest Version**: v1.0.0
+- **File Size**: ~15MB
+- **System Requirements**: macOS 13.0 (Ventura) and later
+
 ### Build from Source
 
 1. **Clone Repository**
