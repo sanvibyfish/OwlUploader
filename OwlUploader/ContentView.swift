@@ -33,106 +33,12 @@ struct ContentView: View {
     
     var body: some View {
         NavigationView {
-            // 侧边栏
-            List(selection: $selectedView) {
-                NavigationLink(value: MainViewSelection.welcome) {
-                    Label("欢迎", systemImage: "house")
-                }
-                
-                NavigationLink(value: MainViewSelection.settings) {
-                    Label("账户设置", systemImage: "gear")
-                }
-                
-                Button(action: {
-                    if r2Service.isConnected {
-                        selectedView = .buckets
-                        print("🎯 手动导航到存储桶页面")
-                    }
-                }) {
-                    HStack {
-                        Label("存储桶", systemImage: "externaldrive")
-                        
-                        Spacer()
-                        
-                        // 连接状态指示器
-                        Circle()
-                            .fill(r2Service.isConnected ? .green : .gray)
-                            .frame(width: 6, height: 6)
-                        
-                    }
-                }
-                .buttonStyle(.plain)
-                .foregroundColor(r2Service.isConnected ? .primary : .secondary)
-                
-                Button(action: {
-                    if r2Service.selectedBucket != nil {
-                        selectedView = .files
-                        print("🎯 手动导航到文件管理页面")
-                    }
-                }) {
-                    HStack {
-                        Label("文件管理", systemImage: "folder")
-                        
-                        Spacer()
-                        
-                        // 存储桶选择状态指示器
-                        Circle()
-                            .fill(r2Service.selectedBucket != nil ? .green : .gray)
-                            .frame(width: 6, height: 6)
-                    }
-                }
-                .buttonStyle(.plain)
-                .foregroundColor(r2Service.selectedBucket != nil ? .primary : .secondary)
-                
-                Spacer()
-                
-                // 连接状态管理区域
-                VStack(spacing: 12) {
-                    Divider()
-                        .padding(.horizontal, -8)
-                    
-                    // 连接状态显示
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(r2Service.isConnected ? .green : .gray)
-                            .frame(width: 8, height: 8)
-                        
-                        Text(r2Service.isConnected ? "已连接" : "未连接")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        
-                        Spacer()
-                    }
-                    
-                    // 连接管理按钮
-                    if r2Service.isConnected {
-                        Button(action: {
-                            showDisconnectConfirmation = true
-                        }) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "power")
-                                    .font(.caption2)
-                                Text("断开连接")
-                                    .font(.caption)
-                            }
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 6)
-                            .padding(.horizontal, 8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(Color.red.opacity(0.8))
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 8)
-                .padding(.bottom, 8)
-            }
-            .listStyle(SidebarListStyle())
-            .navigationTitle("OwlUploader")
-            .frame(minWidth: 220, idealWidth: 250, maxWidth: 300)
+            // 使用新的侧边栏组件
+            SidebarView(
+                selectedView: $selectedView,
+                r2Service: r2Service,
+                accountManager: accountManager
+            )
             
             // 主内容区域
             Group {

@@ -808,9 +808,12 @@ class R2Service: ObservableObject {
             print("   最终路径: '\(finalFolderPath)'")
             
             // 创建 PutObject 请求，上传一个空对象来表示文件夹
+            // 使用 application/x-directory 作为 Content-Type 确保 R2 识别为文件夹
             let input = PutObjectInput(
                 body: .data(Data()), // 空内容
                 bucket: bucket,
+                contentLength: 0,
+                contentType: "application/x-directory",
                 key: finalFolderPath
             )
             
@@ -997,7 +1000,89 @@ class R2Service: ObservableObject {
             throw serviceError
         }
     }
-    
+
+    /// 下载文件到本地临时路径
+    /// - Parameters:
+    ///   - bucket: 存储桶名称
+    ///   - key: 对象键
+    ///   - to: 本地保存路径
+    func downloadObject(bucket: String, key: String, to localURL: URL) async throws {
+        guard let s3Client = s3Client else {
+            print("❌ S3客户端未初始化")
+            throw R2ServiceError.accountNotConfigured
+        }
+
+        let fileName = (key as NSString).lastPathComponent
+        print("📥 开始下载文件: \(key)")
+        print("   存储桶: \(bucket)")
+        print("   目标路径: \(localURL.path)")
+
+        isLoading = true
+        lastError = nil
+
+        do {
+            // 创建 GetObject 请求
+            let input = GetObjectInput(bucket: bucket, key: key)
+
+            print("🔧 正在创建下载请求...")
+            let response = try await s3Client.getObject(input: input)
+
+            // 读取响应 body
+            guard let body = response.body else {
+                print("❌ 响应体为空")
+                throw R2ServiceError.downloadFailed(fileName, NSError(
+                    domain: "R2Service",
+                    code: -1,
+                    userInfo: [NSLocalizedDescriptionKey: "响应体为空"]
+                ))
+            }
+
+            // 读取数据
+            print("📖 正在读取文件数据...")
+            let data = try await body.readData()
+
+            guard let fileData = data else {
+                print("❌ 文件数据为空")
+                throw R2ServiceError.downloadFailed(fileName, NSError(
+                    domain: "R2Service",
+                    code: -2,
+                    userInfo: [NSLocalizedDescriptionKey: "文件数据为空"]
+                ))
+            }
+
+            // 格式化文件大小用于显示
+            let formatter = ByteCountFormatter()
+            formatter.allowedUnits = [.useGB, .useMB, .useKB, .useBytes]
+            formatter.countStyle = .file
+            let fileSizeString = formatter.string(fromByteCount: Int64(fileData.count))
+            print("📏 文件大小: \(fileSizeString)")
+
+            // 写入本地文件
+            print("💾 正在写入本地文件...")
+            try fileData.write(to: localURL)
+
+            isLoading = false
+            print("✅ 文件下载完成: \(localURL.path)")
+
+        } catch {
+            isLoading = false
+            print("❌ 下载过程中发生错误:")
+            print("   错误类型: \(type(of: error))")
+            print("   错误描述: \(error.localizedDescription)")
+
+            // 如果已经是 R2ServiceError，直接抛出
+            if let r2Error = error as? R2ServiceError {
+                lastError = r2Error
+                throw r2Error
+            }
+
+            // 映射其他错误
+            let serviceError = R2ServiceError.downloadFailed(fileName, error)
+            lastError = serviceError
+            throw serviceError
+        }
+    }
+
     /// 删除指定的文件对象
     /// - Parameters:
     ///   - bucket: 存储桶名称
@@ -1044,6 +1129,121 @@ class R2Service: ObservableObject {
                 print("   建议操作: \(suggestion)")
             }
             
+            lastError = serviceError
+            throw serviceError
+        }
+    }
+    
+    /// 批量删除文件
+    /// - Parameters:
+    ///   - bucket: 存储桶名称
+    ///   - keys: 要删除的对象键列表
+    /// - Returns: 删除失败的文件列表
+    func deleteObjects(bucket: String, keys: [String]) async throws -> [String] {
+        guard let s3Client = s3Client else {
+            throw R2ServiceError.accountNotConfigured
+        }
+        
+        guard !keys.isEmpty else { return [] }
+        
+        print("🗑️ 开始批量删除 \(keys.count) 个文件...")
+        
+        isLoading = true
+        lastError = nil
+        
+        var failedKeys: [String] = []
+        
+        // S3 DeleteObjects API 每次最多删除 1000 个对象
+        // 这里分批处理
+        let batchSize = 1000
+        for batch in stride(from: 0, to: keys.count, by: batchSize) {
+            let endIndex = min(batch + batchSize, keys.count)
+            let batchKeys = Array(keys[batch..<endIndex])
+            
+            do {
+                // 构建删除请求
+                let objectIdentifiers = batchKeys.map { key in
+                    S3ClientTypes.ObjectIdentifier(key: key)
+                }
+                
+                let deleteInput = S3ClientTypes.Delete(
+                    objects: objectIdentifiers,
+                    quiet: false
+                )
+                
+                let input = DeleteObjectsInput(
+                    bucket: bucket,
+                    delete: deleteInput
+                )
+                
+                let result = try await s3Client.deleteObjects(input: input)
+                
+                // 检查删除错误
+                if let errors = result.errors {
+                    for error in errors {
+                        if let key = error.key {
+                            failedKeys.append(key)
+                            print("❌ 删除失败: \(key) - \(error.message ?? "未知错误")")
+                        }
+                    }
+                }
+                
+                print("✅ 批量删除完成，成功: \(batchKeys.count - (result.errors?.count ?? 0))，失败: \(result.errors?.count ?? 0)")
+                
+            } catch {
+                // 如果整批失败，将所有键添加到失败列表
+                failedKeys.append(contentsOf: batchKeys)
+                print("❌ 批量删除请求失败: \(error.localizedDescription)")
+            }
+        }
+        
+        isLoading = false
+        return failedKeys
+    }
+    
+    /// 重命名文件（通过复制后删除实现）
+    /// - Parameters:
+    ///   - bucket: 存储桶名称
+    ///   - oldKey: 原对象键
+    ///   - newKey: 新对象键
+    func renameObject(bucket: String, oldKey: String, newKey: String) async throws {
+        guard let s3Client = s3Client else {
+            throw R2ServiceError.accountNotConfigured
+        }
+        
+        print("✏️ 重命名文件: \(oldKey) -> \(newKey)")
+        
+        isLoading = true
+        lastError = nil
+        
+        do {
+            // 1. 复制对象到新位置
+            let copySource = "\(bucket)/\(oldKey)"
+            let copyInput = CopyObjectInput(
+                bucket: bucket,
+                copySource: copySource,
+                key: newKey
+            )
+            
+            print("📋 步骤 1/2: 复制对象...")
+            let _ = try await s3Client.copyObject(input: copyInput)
+            
+            // 2. 删除原对象
+            print("🗑️ 步骤 2/2: 删除原对象...")
+            let deleteInput = DeleteObjectInput(
+                bucket: bucket,
+                key: oldKey
+            )
+            let _ = try await s3Client.deleteObject(input: deleteInput)
+            
+            isLoading = false
+            print("✅ 重命名完成")
+            
+        } catch {
+            isLoading = false
+            print("❌ 重命名失败: \(error.localizedDescription)")
+            let fileName = (oldKey as NSString).lastPathComponent
+            let serviceError = mapError(error)
             lastError = serviceError
             throw serviceError
         }

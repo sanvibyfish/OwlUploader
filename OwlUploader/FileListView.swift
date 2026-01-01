@@ -38,6 +38,9 @@ struct FileListView: View {
     /// 上传进度信息
     @State private var uploadMessage: String = ""
     
+    /// 上传队列管理器
+    @StateObject private var uploadQueueManager = UploadQueueManager()
+    
     /// 是否显示诊断信息
     @State private var showingDiagnostics: Bool = false
     
@@ -46,7 +49,16 @@ struct FileListView: View {
     
     /// 是否显示删除确认对话框
     @State private var showingDeleteConfirmation: Bool = false
-    
+
+    /// 搜索文本
+    @State private var searchText: String = ""
+
+    /// 筛选类型
+    @State private var filterType: FileFilterType = .all
+
+    /// 排序方式
+    @State private var sortOrder: FileSortOrder = .name
+
     /// 文件来源枚举
     private enum FileSource {
         case fileImporter  // 文件选择器
@@ -57,12 +69,29 @@ struct FileListView: View {
         VStack(spacing: 0) {
             // 顶部状态栏
             statusBarView
-            
+
             Divider()
-            
+
+            // 搜索筛选栏
+            SearchFilterBar(
+                searchText: $searchText,
+                filterType: $filterType,
+                sortOrder: $sortOrder
+            )
+
+            Divider()
+
             // 主内容区域
             mainContentView
+            
+            // 上传队列面板（当有任务时显示）
+            if uploadQueueManager.isQueuePanelVisible {
+                Divider()
+                UploadQueueView(queueManager: uploadQueueManager)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
+        .animation(.easeInOut(duration: 0.2), value: uploadQueueManager.isQueuePanelVisible)
         .navigationTitle("文件管理")
         .onAppear {
             loadFileList()
@@ -81,16 +110,23 @@ struct FileListView: View {
         .fileImporter(
             isPresented: $showingFileImporter,
             allowedContentTypes: [.data, .item], // 允许所有文件类型
-            allowsMultipleSelection: false
+            allowsMultipleSelection: true  // 支持多文件选择
         ) { result in
-            // 立即在回调中处理文件上传
+            // 处理多文件上传
             switch result {
             case .success(let urls):
-                guard let fileURL = urls.first else { return }
-                
-                // 文件选择器使用文件名作为原始文件名
-                let originalFileName = fileURL.lastPathComponent
-                uploadFileImmediately(fileURL: fileURL, originalFileName: originalFileName, source: .fileImporter)
+                if urls.count == 1 {
+                    // 单文件上传走原有逻辑
+                    guard let fileURL = urls.first else { return }
+                    let originalFileName = fileURL.lastPathComponent
+                    uploadFileImmediately(fileURL: fileURL, originalFileName: originalFileName, source: .fileImporter)
+                } else {
+                    // 多文件上传使用队列
+                    if let bucket = r2Service.selectedBucket {
+                        uploadQueueManager.configure(r2Service: r2Service, bucketName: bucket.name)
+                        uploadQueueManager.addFiles(urls, to: currentPrefix)
+                    }
+                }
                 
             case .failure(let error):
                 messageManager.showError("文件选择失败", description: error.localizedDescription)
@@ -494,8 +530,8 @@ struct FileListView: View {
             
             // 文件列表前景
             List {
-                // 文件和文件夹列表
-                ForEach(fileObjects, id: \.key) { fileObject in
+                // 应用搜索、筛选和排序后的文件列表
+                ForEach(fileObjects.filtered(by: searchText, filterType: filterType).sorted(by: sortOrder), id: \.key) { fileObject in
                     FileListItemView(
                         fileObject: fileObject,
                         r2Service: r2Service,
