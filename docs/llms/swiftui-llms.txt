@@ -1,0 +1,1441 @@
+### Configure SwiftUI DocumentLaunchView for Custom Document Types
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-documentlaunchview.md
+
+Demonstrates how to implement `DocumentLaunchView` in SwiftUI to support a custom document type (e.g., '.book'). It defines a `BookEditorLaunchView` that presents a 'Start New Book' button and an action to open a `BookEditor` for a given URL. The example also shows how to extend `UTType` for custom document identification, which is crucial for file system integration.
+
+```swift
+public import UniformTypeIdentifiers
+
+struct BookEditorLaunchView: View {
+
+    var body: some View {
+        DocumentLaunchView(for: [.book]) {
+            NewDocumentButton("Start New Book")
+        } onDocumentOpen: { url in
+            BookEditor(url)
+        }
+    }
+}
+
+struct BookEditor: View {
+    init(_ url: URL) { }
+}
+
+extension UTType {
+    static var book = UTType(exportedAs: "com.example.bookEditor")
+}
+```
+
+--------------------------------
+
+### SwiftUI Grid with Custom Spacing Example
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-grid-init(alignment:horizontalspacing:verticalspacing:content:).md
+
+This example demonstrates how to instantiate a SwiftUI `Grid` and configure its horizontal and vertical spacing. It illustrates the common pattern of using `ForEach` within the grid's `content` closure to dynamically generate its rows, providing a flexible way to populate the grid with views. Note that the provided example is truncated.
+
+```Swift
+Grid(horizontalSpacing: 30, verticalSpacing: 30) {
+    ForEach(0..
+```
+
+--------------------------------
+
+### SwiftUI Example: Applying Constant Offset with alignmentGuide
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-view-alignmentguide(_:computevalue:).md
+
+This SwiftUI example demonstrates how to use `alignmentGuide(_:computeValue:)` to apply a constant horizontal offset to an `HStack`. The `HStack` containing weather information is shifted 50 points to the right relative to its `center` alignment within the `VStack`.
+
+```SwiftUI
+VStack {
+    Text("Today's Weather")
+        .font(.title)
+        .border(.gray)
+    HStack {
+        Text("🌧")
+        Text("Rain & Thunderstorms")
+        Text("⛈")
+    }
+    .alignmentGuide(HorizontalAlignment.center) { _ in  50 }
+    .border(.gray)
+}
+.border(.gray)
+```
+
+--------------------------------
+
+### SwiftUI Example: Using preferredSubscriptionOffer with SubscriptionStoreView
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-view-preferredsubscriptionoffer(_:).md
+
+This Swift example demonstrates how to apply the `preferredSubscriptionOffer` modifier to a `SubscriptionStoreView`. It uses a closure to select the first available eligible offer for a product, importing both `SwiftUI` and `StoreKit`.
+
+```Swift
+import SwiftUI
+import StoreKit
+
+@available(iOS 18.0, macOS 15.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *)
+struct MyView: View {
+
+    var body: some View {
+        SubscriptionStoreView(groupID: groupIdentifier)
+            .preferredSubscriptionOffer { product, subscription, eligibleOffers in
+                // Determine the offer to use from the list of eligibleOffers.
+                // This example just uses the first offer.
+                return eligibleOffers.first
+            }
+    }
+}
+```
+
+--------------------------------
+
+### SwiftUI Shader Asynchronous Pre-Compilation Example
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-shader-compile(as:).md
+
+This example demonstrates how to asynchronously compile a SwiftUI Shader using a `Task`. It initializes a shader from `ShaderLibrary.example` with placeholder arguments and then calls `compile(as:)` with `.shapeStyle` to pre-compile it, avoiding potential rendering delays.
+
+```Swift
+Task {
+    let shader = ShaderLibrary.example(.color(.clear), .float(0))
+    try! await shader.compile(as: .shapeStyle)
+}
+```
+
+--------------------------------
+
+### SwiftUI Example: Applying tint(_:) to Buttons
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-view-tint(_:).md
+
+This SwiftUI example demonstrates the practical application of the `tint(_:)` modifier on `Button` elements. It shows how to assign distinct green and red tint colors to buttons, configured with the `.borderedProminent` style, within an `HStack`.
+
+```swift
+struct ControlTint: View {
+    var body: some View {
+        HStack {
+            Button {
+                // Answer the call
+            } label: {
+                Label("Answer", systemImage: "phone")
+            }
+            .tint(.green)
+            Button {
+                // Decline the call
+            } label: {
+                Label("Decline", systemImage: "phone.down")
+            }
+            .tint(.red)
+        }
+        .buttonStyle(.borderedProminent)
+        .padding()
+    }
+}
+```
+
+--------------------------------
+
+### Example Usage of New Document Action with Initial Content (Swift)
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-newdocumentaction-callasfunction(contenttype:preparedocument:).md
+
+Demonstrates how to use the `newDocument` action to create a new document with predefined content. This example shows creating a `TodoList` with several `TodoItem`s and inserting them into the `ModelContext` provided by the `prepareDocument` closure. This allows for initializing new documents, such as a sample prepopulated list for onboarding experiences.
+
+```Swift
+newDocument(contentType: .todoList) { modelContext in
+    let todoList = TodoList(
+        title: "🎬 Movie night",
+        items: [
+            TodoItem(title: "🍿 Buy popcorn"),
+            TodoItem(title: "🍨 Make some ice cream"),
+            TodoItem(title: "💡 Hang a string of lights")
+        ]
+    )
+    modelContext.insert(todoList)
+}
+```
+
+--------------------------------
+
+### SwiftUI Stepper Basic Usage Example
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-stepper-init(value:step:format:label:oneditingchanged:).md
+
+A SwiftUI `View` example demonstrating how to implement a `Stepper` with a bound integer value, a custom step amount (5), and a `.number` format style. The `Stepper` updates a `Text` view to display its current value and step.
+
+```Swift
+struct StepperView: View {
+    @State private var value = 1
+    let step = 5
+    var body: some View {
+        Stepper(value: $value,
+                step: step,
+                format: .number) {
+            Text("Current value: \(value), step: \(step)")
+        }
+            .padding(10)
+    }
+}
+```
+
+--------------------------------
+
+### Apply a SwiftUI Spring Animation Across SwiftUI, UIKit, and AppKit
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-appkit integration-unifying your app’s animations-animations.md
+
+These examples demonstrate how to create and apply a basic spring animation, defined using SwiftUI's `Animation.spring`, to UI elements across different Apple frameworks. The SwiftUI example shows native usage, while UIKit and AppKit examples illustrate how to integrate SwiftUI animations via `UIView.animate` and `NSAnimationContext.animate` respectively, providing a unified animation experience.
+
+```Swift
+struct ContentView: View {
+    @State private var position = CGPoint(x: 200, y: 200)
+    @State private var frame = CGSize(width: 100, height: 100)
+
+    var body: some View {
+        Rectangle()
+            .fill(Color.blue)
+            .frame(width: frame.width, height: frame.height)
+            .position(position)
+        Button("Animate") {
+            // Use a spring animation to animate the view to a new location.
+            let animation = Animation.spring(duration: 0.8)
+            withAnimation(animation) {
+                position = CGPoint(x: 100, y: 100)
+            }
+        }
+    }
+}
+```
+
+```Swift
+import SwiftUI
+
+let position = CGPoint(x: 200, y: 200)
+let frame = CGSize(width: 100, height: 100)
+let buttonPosition = CGPoint(x: 200, y: 400)
+let buttonFrame = CGSize(width: 100, height: 100)
+
+override func viewDidLoad() {
+    super.viewDidLoad()
+
+    let myView = UIView(frame: CGRect(origin: position, size: frame))
+    myView.backgroundColor = .systemBlue
+
+    let myButton = UIButton(primaryAction: UIAction(title: "Animate") { _ in
+        // Use a spring animation to animate the view to a new location.
+        let animation = SwiftUI.Animation.spring(duration: 0.8)
+        UIView.animate(animation) {
+            myView.center = CGPoint(x: 100, y: 100)
+        }
+    })
+    myButton.frame = CGRect(origin: buttonPosition, size: buttonFrame)
+
+    view.addSubview(myView)
+    view.addSubview(myButton)
+}
+```
+
+```Swift
+import SwiftUI
+
+let myView = NSView(frame: CGRect(origin: CGPoint(x: 50, y: 50), 
+                                  size: CGSize(width: 50, height: 50)))
+
+override func viewDidLoad() {
+    super.viewDidLoad()
+
+    let myButton = NSButton(title: "Animate", target: self, action: #selector(animateView))
+    view.addSubview(myButton)
+
+    myView.wantsLayer = true
+    myView.layer?.backgroundColor = NSColor.blue.cgColor
+    view.addSubview(myView)
+}
+
+@objc
+func animateView() {
+    // Use a spring animation to change the size of the view.
+    let animation = SwiftUI.Animation.spring(duration: 0.8)
+    NSAnimationContext.animate(animation) {
+        myView.frame.size = CGSize(width: 100, height: 100)
+    }
+}
+```
+
+--------------------------------
+
+### init(_:for:onDocumentOpen:backgroundAccessoryView:overlayAccessoryView:)
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-documentlaunchview-init(_:for:_:ondocumentopen:backgroundaccessoryview:overlayaccessoryview:).md
+
+Creates a view to present when launching document-related user experiences using a localized title, custom actions, and accessory views.
+
+```APIDOC
+## Initializer init(_:for:onDocumentOpen:backgroundAccessoryView:overlayAccessoryView:)
+
+### Description
+Creates a view to present when launching document-related user experiences using a localized title, custom actions, and accessory views.
+
+### Method
+Initializer
+
+### Endpoint
+DocumentLaunchView.init
+
+### Parameters
+#### Path Parameters
+(N/A)
+
+#### Query Parameters
+(N/A)
+
+#### Request Body
+- **_ title** (LocalizedStringKey) - Required - A title key to use for the view title.
+- **for contentTypes** ([UTType]) - Required - Content types that the view can open.
+- **_ actions** (() -> Actions) - Required - A view builder returning the view’s actions.
+- **onDocumentOpen** ((URL) -> DocumentView) - Required - A closure that handles an open file.
+- **backgroundAccessoryView** ((DocumentLaunchGeometryProxy) -> some View) - Required - A view builder for returning the view’s background accessory view.
+- **overlayAccessoryView** ((DocumentLaunchGeometryProxy) -> some View) - Required - A view builder for returning the view’s overlay accessory view.
+
+### Request Example
+{
+  "example": "N/A for initializer"
+}
+
+### Response
+#### Success Response (View Created)
+- **View** (DocumentLaunchView) - The created DocumentLaunchView instance.
+
+#### Response Example
+{
+  "example": "N/A for initializer"
+}
+```
+
+--------------------------------
+
+### Define SwiftUI Center Alignment Guide (Swift)
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-alignment-center.md
+
+This `static let` property defines the `center` alignment guide within SwiftUI's `Alignment` struct. It combines both horizontal and vertical center guides to precisely position content in the middle of a view. This guide is available across all Apple platforms starting iOS 13.0.
+
+```Swift
+static let center: Alignment
+```
+
+--------------------------------
+
+### Get Easing Bezier UnitCurves in SwiftUI
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-unitcurve.md
+
+Provides predefined Bezier curves for common easing animation profiles. `easeIn` starts slow and speeds up; `easeOut` starts fast and slows down; `easeInOut` starts slow, speeds up in the middle, then slows down again. These are static constants for convenient use in SwiftUI animations.
+
+```swift
+static let easeIn: UnitCurve
+static let easeOut: UnitCurve
+static let easeInOut: UnitCurve
+```
+
+--------------------------------
+
+### Define SwiftUI App Entry Point with @main
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-app organization-migrating to the swiftui life cycle-cycle.md
+
+This code snippet demonstrates how to create the main entry point for a SwiftUI application by defining a structure that conforms to the `App` protocol and is annotated with `@main`. It sets up a `WindowGroup` to display the initial `ContentView` of the application.
+
+```Swift
+import SwiftUI
+
+@main
+struct MyExampleApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+    }
+}
+```
+
+--------------------------------
+
+### SwiftUI Example of Gauge with Comprehensive Labels
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-gauge-init(value:in:label:currentvaluelabel:minimumvaluelabel:maximumvaluelabel:).md
+
+This SwiftUI example demonstrates how to use the `Gauge` initializer to create a gauge with dynamic current, minimum, and maximum values. It shows how to pass `Text` views as labels for the gauge's purpose, current value, minimum, and maximum bounds, providing a clear visual representation. The example uses `@State` variables to manage the gauge's values, allowing for interactive updates.
+
+```SwiftUI
+struct LabeledGauge: View {
+    @State private var current = 67.0
+    @State private var minValue = 0.0
+    @State private var maxValue = 170.0
+
+    var body: some View {
+        Gauge(value: current, in: minValue...maxValue) {
+            Text("BPM")
+        } currentValueLabel: {
+            Text("\(Int(current))")
+        } minimumValueLabel: {
+            Text("\(Int(minValue))")
+        } maximumValueLabel: {
+            Text("\(Int(maxValue))")
+        }
+    }
+}
+```
+
+--------------------------------
+
+### SwiftUI: Example Usage of grayscale(_:)
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-view-grayscale(_:).md
+
+This Swift code snippet provides an example of how to use the `grayscale(_:)` modifier within a SwiftUI `View`. It structures an `HStack` containing multiple views, likely intended to demonstrate varying grayscale intensities using a `ForEach` loop, though the provided example is truncated.
+
+```swift
+struct Saturation: View {
+    var body: some View {
+        HStack {
+            ForEach(0..
+```
+
+--------------------------------
+
+### SwiftUI Picker Initializer Signature with System Image
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-picker-init(_:systemimage:sources:selection:content:).md
+
+This code block presents the Swift signature for the `init(_:systemImage:sources:selection:content:)` initializer. It shows the parameters required to construct a `Picker` that operates on a `RandomAccessCollection` of `Binding`s, using a string for the title and a system image for the label, and a `KeyPath` to specify the selection.
+
+```swift
+nonisolated
+init(
+    _ title: S,
+    systemImage: String,
+    sources: C,
+    selection: KeyPath<C.Element.Value, SelectionValue>,
+    @ViewBuilder content: () -> Content
+) where C : RandomAccessCollection, S : StringProtocol, C.Element == Binding
+```
+
+--------------------------------
+
+### SwiftUI Custom Layout Horizontal Alignment Implementation Example
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-layout-explicitalignment(of:in:proposal:subviews:cache:).md
+
+Provides a concrete example of implementing `explicitAlignment` for a `BasicVStack` custom layout in SwiftUI. This code demonstrates how to override the leading alignment guide to be 10 points indented from the left edge of the allocated bounds, returning `nil` for other guides to use default merging behavior.
+
+```swift
+extension BasicVStack {
+    func explicitAlignment(
+        of guide: HorizontalAlignment,
+        in bounds: CGRect,
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) -> CGFloat? {
+        if guide == .leading {
+            return bounds.minX + 10
+        }
+        return nil
+    }
+}
+```
+
+--------------------------------
+
+### Access and adjust leading alignment guide in SwiftUI
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-viewdimensions-subscript(explicit:).md
+
+This example demonstrates how to use the `alignmentGuide` modifier to access and potentially adjust the value of a specific horizontal alignment guide, such as `.leading`. It shows accessing the current `.leading` guide's value from the `context` and subtracting 10 points.
+
+```Swift
+.alignmentGuide(.leading) { context in
+    context[.leading] - 10
+}
+```
+
+--------------------------------
+
+### Create SwiftUI ShaderLibrary from Data or URL
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-shaderlibrary-init(data:).md
+
+These initializers create a new Metal shader library in SwiftUI. `init(data:)` uses raw binary data, while `init(url:)` uses a file path. Functions compiled from the returned library are only cached as long as the library object exists. Requires iOS 17.0+, iPadOS 17.0+, Mac Catalyst 17.0+, macOS 14.0+, tvOS 17.0+, and visionOS 1.0+.
+
+```Swift
+init(data: Data)
+```
+
+```Swift
+init(url: URL)
+```
+
+--------------------------------
+
+### SwiftUI ViewDimensions Access HorizontalAlignment Guide Value
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-viewdimensions-subscript(_:).md
+
+This snippet provides the declaration for accessing `HorizontalAlignment` guide values via a subscript on `ViewDimensions`, along with an example demonstrating its use within an `alignmentGuide` modifier to offset a leading alignment.
+
+```swift
+subscript(guide: HorizontalAlignment) -> CGFloat { get }
+```
+
+```swift
+.alignmentGuide(.leading) { context in
+    context[.leading] - 10
+}
+```
+
+--------------------------------
+
+### Modify Custom Alignment Guide per View in SwiftUI
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-alignmentid.md
+
+This SwiftUI example shows how to use the `alignmentGuide(_:computeValue:)` modifier to override or alter the behavior of a custom alignment guide for a specific view within a layout. Here, the `.firstThird` alignment for one `HorizontalStripes` view is dynamically adjusted to align at two-thirds of its height, demonstrating per-view customization.
+
+```Swift
+struct StripesGroupModified: View {
+    var body: some View {
+        HStack(alignment: .firstThird, spacing: 1) {
+            HorizontalStripes().frame(height: 60)
+            HorizontalStripes().frame(height: 120)
+            HorizontalStripes().frame(height: 90)
+                .alignmentGuide(.firstThird) { context in
+                    2 * context.height / 3
+                }
+        }
+    }
+```
+
+--------------------------------
+
+### Create a SwiftUI TimelineView with a periodic schedule
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-timelineschedule-periodic(from:by:).md
+
+This example demonstrates how to initialize a `TimelineView` using the `periodic` schedule. It sets the `TimelineView` to update every three seconds, starting from a specified `startDate`, and displays the current date from the context.
+
+```swift
+TimelineView(.periodic(from: startDate, by: 3.0)) { context in
+    Text(context.date.description)
+}
+```
+
+--------------------------------
+
+### Implementing SwiftUI App Protocol `body`
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-app-body.md
+
+Illustrates the implementation of the `App` protocol's `body` property in a concrete app structure. This example shows how to define an app's main scene, using `WindowGroup` to present a simple 'Hello, world!' `Text` view.
+
+```swift
+@main
+struct MyApp: App {
+    var body: some Scene {
+        WindowGroup {
+            Text("Hello, world!")
+        }
+    }
+}
+```
+
+--------------------------------
+
+### Custom AlignmentID Implementation Example (Swift)
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-alignmentid-defaultvalue(in:).md
+
+An example of a custom `AlignmentID` conformance (`FirstThirdAlignment`) that implements the `defaultValue(in:)` method. This specific implementation calculates the default alignment guide value as one-third of the view's height using the provided `ViewDimensions` context.
+
+```swift
+private struct FirstThirdAlignment: AlignmentID {
+    static func defaultValue(in context: ViewDimensions) -> CGFloat {
+        context.height / 3
+    }
+}
+```
+
+--------------------------------
+
+### Initiate Live Activity for Order Preparation (SwiftUI)
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-food truck: building a swiftui multiplatform app.md
+
+This Swift code snippet demonstrates how to initiate a Live Activity to track order preparation time. It defines activity attributes, initial content state with a countdown timer, and requests the Live Activity using `Activity.request()`. This activity shows order details and a countdown on the iPhone lock screen and Dynamic Island.
+
+```swift
+let timerSeconds = 60
+let activityAttributes = TruckActivityAttributes(
+    orderID: String(order.id.dropFirst(6)),
+    order: order.donuts.map(\.id),
+    sales: order.sales,
+    activityName: "Order preparation activity."
+)
+
+let future = Date(timeIntervalSinceNow: Double(timerSeconds))
+
+let initialContentState = TruckActivityAttributes.ContentState(timerRange: Date.now...future)
+
+let activityContent = ActivityContent(state: initialContentState, staleDate: Calendar.current.date(byAdding: .minute, value: 2, to: Date())!)
+
+do {
+    let myActivity = try Activity<TruckActivityAttributes>.request(attributes: activityAttributes, content: activityContent,
+        pushType: nil)
+    print(" Requested MyActivity live activity. ID: \(myActivity.id)")
+    postNotification()
+} catch let error {
+    print("Error requesting live activity: \(error.localizedDescription)")
+}
+```
+
+--------------------------------
+
+### Get Circular Easing UnitCurves in SwiftUI
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-unitcurve.md
+
+Offers predefined circular curves that mimic common easing patterns. `circularEaseIn` starts slowly and accelerates; `circularEaseOut` begins quickly and decelerates; and `circularEaseInOut` starts slow, speeds up, then slows down again, based on a circular function for its curve shape.
+
+```swift
+static let circularEaseIn: UnitCurve
+static let circularEaseOut: UnitCurve
+static let circularEaseInOut: UnitCurve
+```
+
+--------------------------------
+
+### Add Document Browser Context Menu Actions (SwiftUI)
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-view.md
+
+Adds to a `DocumentLaunchView` actions that accept a list of selected files as their parameter.
+
+```Swift
+func documentBrowserContextMenu(([URL]?) -> some View) -> some View
+```
+
+--------------------------------
+
+### Get SwiftUI leadingLastTextBaseline Alignment Property
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-alignment-leadinglasttextbaseline.md
+
+This Swift property declaration defines `leadingLastTextBaseline`, a static variable of type `Alignment`. It provides a read-only guide for aligning views based on their leading edge and the last text baseline, useful in SwiftUI layouts for precise text positioning.
+
+```Swift
+static var leadingLastTextBaseline: Alignment { get }
+```
+
+--------------------------------
+
+### SwiftUI: Example of Setting Background Color with UIHostingConfiguration
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-uihostingconfiguration-background(_:).md
+
+Illustrates how to use the `background(_:)` modifier on a `UIHostingConfiguration` to set the cell's background to a `Color.blue`. This example demonstrates a common way to apply a simple background style using a built-in `ShapeStyle`.
+
+```swift
+UIHostingConfiguration {
+    Text("My Contents")
+}
+.background(Color.blue)
+```
+
+--------------------------------
+
+### SwiftUI: Example of defaultFocus for Initial Focus
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-view-defaultfocus(_:_:priority:).md
+
+This example demonstrates how to use the `defaultFocus` modifier on a `VStack` to automatically set the focus to the second `TextField` (identified by `.secondField`) when the `WindowGroup` content is first presented. This setup relies on a `@FocusState` variable to manage the current focus state within the view hierarchy.
+
+```swift
+WindowGroup {
+    VStack {
+        TextField(...)
+            .focused($focusedField, equals: .firstField)
+        TextField(...)
+            .focused($focusedField, equals: .secondField)
+    }
+    .defaultFocus($focusedField, .secondField)
+}
+```
+
+--------------------------------
+
+### Initialize SwiftUI HelpLink with Anchor and Book
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-helplink-init(anchor:book:).md
+
+This initializer constructs a new `HelpLink` instance that directs to a specific anchor within a particular help book. It is supported on macOS 14.0 and later.
+
+Parameters:
+- `anchor`: A `NSHelpManager.AnchorName` value that specifies the target anchor within the help book.
+- `book`: A `NSHelpManager.BookName` value that identifies the help book to be opened.
+
+```swift
+init(
+    anchor: NSHelpManager.AnchorName,
+    book: NSHelpManager.BookName
+)
+```
+
+--------------------------------
+
+### Define the Main Entry Point for a SwiftUI App
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-app-main().md
+
+This snippet shows the signature for the `main()` method in SwiftUI, which is automatically invoked by the system to initialize and run an app when the `@main` attribute is applied to the App conformer. SwiftUI provides a default implementation to manage the app launch process.
+
+```Swift
+@MainActor @preconcurrency
+static func main()
+```
+
+--------------------------------
+
+### SwiftUI View: Animating with Delayed Start
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-animation-delay(_:).md
+
+This SwiftUI example demonstrates how to apply a delayed start to an animation using the `delay(_:)` modifier. It shows two `Capsule` views animating their heights; the second capsule's animation is delayed by 0.5 seconds, creating a staggered effect. A button toggles the `adjustBy` state to trigger the animation.
+
+```Swift
+struct ContentView: View {
+    @State private var adjustBy = 100.0
+
+    var body: some View {
+        VStack(spacing: 40) {
+            HStack(alignment: .bottom) {
+                Capsule()
+                    .frame(width: 50, height: 175 - adjustBy)
+                    .animation(.easeInOut, value: adjustBy)
+                Capsule()
+                    .frame(width: 50, height: 175 + adjustBy)
+                    .animation(.easeInOut.delay(0.5), value: adjustBy)
+            }
+
+            Button("Animate") {
+                adjustBy *= -1
+            }
+        }
+    }
+}
+```
+
+--------------------------------
+
+### Get Subview Dimensions and Alignment Guides in SwiftUI
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-layoutsubview-dimensions(in:).md
+
+This Swift method, `dimensions(in:)`, is called on a subview from within custom SwiftUI `Layout` types. It queries the subview for its preferred dimensions and alignment guides, considering a `ProposedViewSize` parameter. The proposal can be `zero` for minimum size, `infinity` for maximum, or `unspecified` for ideal size, returning a `ViewDimensions` instance for layout calculations.
+
+```Swift
+func dimensions(in proposal: ProposedViewSize) -> ViewDimensions
+```
+
+--------------------------------
+
+### SwiftUI ProgressView Example with Time Interval and Filling Behavior
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-progressview-init(timerinterval:countsdown:).md
+
+Illustrates how to instantiate a `ProgressView` in SwiftUI using a `ClosedRange<Date>` for its interval. This example demonstrates setting the `countsDown` parameter to `false`, causing the progress view to fill up as time progresses from the start date to the end date, effectively showing completion over time.
+
+```Swift
+struct ContentView: View {
+    let start = Date().addingTimeInterval(-30)
+    let end = Date().addingTimeInterval(90)
+
+    var body: some View {
+        ProgressView(interval: start...end,
+                     countsDown: false)
+    }
+}
+```
+
+--------------------------------
+
+### Define Action for StoreKit Purchase Start in SwiftUI
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-view-oninapppurchasestart(perform:).md
+
+Registers an asynchronous action to be performed when a user initiates a purchase from a StoreKit view within the current SwiftUI view. The `action` closure receives the `Product` to be purchased. Providing `nil` removes any previously added actions from ancestor views.
+
+```Swift
+nonisolated
+func onInAppPurchaseStart(perform action: ((Product) async -> ())?) -> some View
+```
+
+--------------------------------
+
+### SwiftUI Example for modelContainer(_:) Usage
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-view-modelcontainer(_:).md
+
+This SwiftUI example demonstrates how to apply the `modelContainer(_:)` modifier to a view. It shows initializing a `ModelContainer` with `@State` and attaching it to a `RecipesList` view within a `ContentView`'s body.
+
+```swift
+struct ContentView: View {
+    @State private var container = ModelContainer(...)
+
+    var body: some Scene {
+        RecipesList()
+            .modelContainer(container)
+    }
+}
+```
+
+--------------------------------
+
+### Initialize SwiftUI HelpLink with Anchor or Action
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-helplink.md
+
+Shows two common ways to create a HelpLink: one using an "anchor" to link to specific in-app help content, and another using a closure for a custom "action", such as opening an external URL. This demonstrates flexible help access.
+
+```swift
+HelpLink(anchor: "accountSetupHelp")
+
+HelpLink {
+    openURL(onlineHelpURL)
+}
+```
+
+--------------------------------
+
+### SwiftUI Example: Managing Focus with focused(_:equals:)
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-view-focused(_:equals:).md
+
+This SwiftUI example demonstrates how to use the `focused(_:equals:)` modifier with an enumeration (`LoginForm.Field`) to manage the focus state of `TextField` and `SecureField` components within a login form. A custom `FocusState` is used, and a 'Sign In' button programmatically shifts focus to a `TextField` if its corresponding field is empty, guiding the user to complete the form.
+
+```swift
+struct LoginForm {
+    enum Field: Hashable {
+        case usernameField
+        case passwordField
+    }
+
+    @State private var username = ""
+    @State private var password = ""
+    @FocusState private var focusedField: Field?
+
+    var body: some View {
+        Form {
+            TextField("Username", text: $username)
+                .focused($focusedField, equals: .usernameField)
+
+            SecureField("Password", text: $password)
+                .focused($focusedField, equals: .passwordField)
+
+            Button("Sign In") {
+                if username.isEmpty {
+                    focusedField = .usernameField
+                } else if password.isEmpty {
+                    focusedField = .passwordField
+                } else {
+                    handleLogin(username, password)
+                }
+            }
+        }
+    }
+}
+```
+
+--------------------------------
+
+### Example: Creating SwiftUI Text with a Custom CTFont
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-font-init(_:).md
+
+This Swift example demonstrates how to create a `CTFont` using `CTFontCreateUIFontForLanguage` and then apply it to a SwiftUI `Text` view by initializing `Font` with the `CTFont` instance. It showcases bridging Core Text fonts into SwiftUI.
+
+```Swift
+// Use native Core Text API to create desired ctFont.
+let ctFont = CTFontCreateUIFontForLanguage(.system, 12, nil)!
+
+// Create SwiftUI Text with the CTFont instance.
+let text = Text("Hello").font(Font(ctFont))
+```
+
+--------------------------------
+
+### Initialize SwiftUI HelpLink with URL Destination
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-helplink-init(destination:).md
+
+Constructs a new SwiftUI HelpLink that opens a specified URL when the button is clicked. This initializer is ideal for linking to external websites or online documentation. It expects a 'URL' object as the destination.
+
+```Swift
+init(destination: URL)
+```
+
+--------------------------------
+
+### Get `shadowAbove` GraphicsContext ShadowOption in SwiftUI
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-graphicscontext-graphicscontext.shadowoptions-shadowabove.md
+
+This type property provides an option for `GraphicsContext.ShadowOptions` that causes the shadow filter to render the shadow above the object, rather than below it. It is available across various Apple platforms starting from iOS 15.0.
+
+```Swift
+static var shadowAbove: GraphicsContext.ShadowOptions { get }
+```
+
+--------------------------------
+
+### SwiftUI View Example with Color from UIKit
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-color-init(uicolor:).md
+
+This SwiftUI code snippet demonstrates the practical application of `Color(uiColor:)`. It defines a `Box` view that uses `UIColor.link` to set its background color, illustrating how SwiftUI automatically adapts the color to system appearance changes, such as Light and Dark Mode.
+
+```Swift
+struct Box: View {
+    var body: some View {
+        Color(uiColor: .link)
+            .frame(width: 200, height: 100)
+    }
+}
+```
+
+--------------------------------
+
+### Initialize TimelineView with a Periodic Schedule in SwiftUI
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-timelineschedule.md
+
+This SwiftUI example demonstrates how to create a `TimelineView` that updates its content periodically. It utilizes the built-in `.periodic(from:by:)` static method of `TimelineSchedule` to define a regular update frequency, starting from a specified `startDate`.
+
+```swift
+TimelineView(.periodic(from: startDate, by: 1.0)) { context in
+    // View content goes here.
+}
+```
+
+--------------------------------
+
+### Initializer: init(String, bundle: Bundle?)
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-image.md
+
+Creates a labeled image that you can use as content for controls.
+
+```APIDOC
+## Initializer: Image(String, bundle: Bundle?)
+
+### Description
+Creates a labeled image that you can use as content for controls.
+
+### Method
+Initializer
+
+### Endpoint
+Image(String, bundle: Bundle?)
+
+### Parameters
+#### Path Parameters
+(N/A for Initializers)
+
+#### Query Parameters
+(N/A for Initializers)
+
+#### Request Body
+- **_**: (String) - Required - The name of the image asset in the app's asset catalog or bundle.
+- **bundle**: (Bundle?) - Optional - The bundle where the
+```
+
+--------------------------------
+
+### Example: Configure NSHostingController for Toolbar Management (Swift)
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-nshostingcontroller-scenebridgingoptions.md
+
+This Swift example demonstrates how to configure an `NSHostingController` to manage its window's toolbar. By setting `sceneBridgingOptions` to `.toolbars`, the controller takes responsibility for populating the window's toolbar with content defined in the SwiftUI `RootView`.
+
+```swift
+struct RootView: View {
+    var body: some View {
+        ContentView()
+            .toolbar {
+                MyToolbarContent()
+            }
+    }
+}
+
+let controller = NSHostingController(rootView: RootView())
+controller.sceneBridgingOptions = [.toolbars]
+```
+
+--------------------------------
+
+### SwiftUI View Using Named Colors
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-color-init(_:bundle:).md
+
+An example SwiftUI `View` demonstrating how to instantiate and use named colors ('background' and 'foreground') within a view hierarchy. This code shows how `Color("name")` dynamically loads colors defined in an Asset Catalog, adapting to environment settings like appearance.
+
+```Swift
+struct Hello: View {
+    var body: some View {
+        ZStack {
+            Color("background")
+            Text("Hello, world!")
+                .foregroundStyle(Color("foreground"))
+        }
+        .frame(width: 200, height: 100)
+    }
+}
+```
+
+--------------------------------
+
+### Get immediately ScrollDismissesKeyboardMode in SwiftUI
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-scrolldismisseskeyboardmode-immediately.md
+
+This type property represents a `ScrollDismissesKeyboardMode` that configures the view to dismiss the keyboard immediately upon the start of a scroll operation. It is available on iOS, iPadOS, Mac Catalyst, macOS, tvOS, and watchOS platforms from version 16.0 and later.
+
+```Swift
+static var immediately: ScrollDismissesKeyboardMode { get }
+```
+
+--------------------------------
+
+### SwiftUI Form with TextField and SecureField Prompts
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-textfield.md
+
+This example shows how to create a Form containing a TextField and a SecureField in SwiftUI. Both fields are configured with explicit prompt views to indicate required input and use view builders for their labels, demonstrating how to guide users with placeholder text.
+
+```Swift
+Form {
+    TextField(text: $username, prompt: Text("Required")) {
+        Text("Username")
+    }
+    SecureField(text: $password, prompt: Text("Required")) {
+        Text("Password")
+    }
+}
+```
+
+--------------------------------
+
+### Apply accessibilityDropPoint modifier in SwiftUI View
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-modifiedcontent-accessibilitydroppoint(_:description:).md
+
+This SwiftUI example demonstrates how to use the `accessibilityDropPoint` modifier on a `FolderIcon` within a `FolderView`. It sets the drop point to the center and provides a dynamic description to guide users during drag interactions, indicating where to move an item.
+
+```swift
+struct FolderView: View {
+    var folderName: String
+
+    var body: some View {
+        FolderIcon(folderName: folderName)
+            .accessibilityDropPoint(.center, description: "Move to \(folderName)")
+    }
+}
+```
+
+--------------------------------
+
+### Create Static Data Tables in SwiftUI
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-table.md
+
+This SwiftUI example demonstrates building a `Table` with predefined, static rows. It calculates and displays varying tip amounts based on fixed prices, using `Table(of:columns:rows:)` and `TableRow` for data, and `TableColumn` with `Text` and `Decimal.FormatStyle.Currency` for formatting output. The data model `Purchase` is `Identifiable`.
+
+```Swift
+struct Purchase: Identifiable {
+    let price: Decimal
+    let id = UUID()
+}
+
+struct TipTable: View {
+    let currencyStyle = Decimal.FormatStyle.Currency(code: "USD")
+
+    var body: some View {
+        Table(of: Purchase.self) {
+            TableColumn("Base price") { purchase in
+                Text(purchase.price, format: currencyStyle)
+            }
+            TableColumn("With 15% tip") { purchase in
+                Text(purchase.price * 1.15, format: currencyStyle)
+            }
+            TableColumn("With 20% tip") { purchase in
+                Text(purchase.price * 1.2, format: currencyStyle)
+            }
+            TableColumn("With 25% tip") { purchase in
+                Text(purchase.price * 1.25, format: currencyStyle)
+            }
+        } rows: {
+            TableRow(Purchase(price: 20))
+            TableRow(Purchase(price: 50))
+            TableRow(Purchase(price: 75))
+        }
+    }
+}
+```
+
+--------------------------------
+
+### Get 3D Start Location of Drag Gesture in Swift (visionOS)
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-draggesture-draggesture.value-startlocation3d.md
+
+This Swift code snippet defines the `startLocation3D` instance property, which returns the initial 3D coordinate of a `DragGesture`. It is a read-only property returning a `Point3D` object, available on visionOS 1.0 and later.
+
+```Swift
+var startLocation3D: Point3D { get }
+```
+
+--------------------------------
+
+### Initialize SwiftUI `TimelineView` with `everyMinute` schedule
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-timelineschedule-everyminute.md
+
+This Swift example demonstrates how to use the `everyMinute` schedule to update a `TimelineView`. The `TimelineView`'s content, here a `Text` view displaying the date, will refresh at the beginning of each minute, with `context.date` reflecting the current minute's start.
+
+```Swift
+TimelineView(.everyMinute) { context in
+    Text(context.date.description)
+}
+```
+
+--------------------------------
+
+### Initialize SwiftUI Button with various labels and actions
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-button.md
+
+These initializers provide different ways to create a basic SwiftUI 'Button'. You can define its action using a closure and provide its label either through a custom view, a localized string key, or a system image name.
+
+```Swift
+init(action: () -> Void, label: () -> Label)
+```
+
+```Swift
+init(_:action:)
+```
+
+```Swift
+init(_:image:action:)
+```
+
+```Swift
+init(_:systemImage:action:)
+```
+
+--------------------------------
+
+### SwiftUI Example: Importing Strings with `importableFromServices`
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-view-importablefromservices(for:action:).md
+
+Demonstrates how to use the `importableFromServices` modifier to accept `String` items from system services. The example updates a `@State` variable with the first imported string and returns `true` if the import was successful, making a `Color` view react to imported data.
+
+```Swift
+@State private var title: String
+var body: some View {
+    Color.pink
+        .frame(width: 400, height: 400)
+        .importableFromServices(for: String.self) { titles
+            title = titles.first ?? title
+            return !titles.isEmpty
+        }
+}
+```
+
+--------------------------------
+
+### Anchor ScrollView to Bottom with defaultScrollAnchor(.bottom) (SwiftUI)
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-view-defaultscrollanchor(_:).md
+
+This SwiftUI example illustrates applying `defaultScrollAnchor(.bottom)` to a `ScrollView` containing dynamic content, represented by a `LazyVStack`. This configuration ensures the scroll view starts at the bottom of its content, which is useful for displaying the latest items in lists or chat interfaces.
+
+```Swift
+@Binding var items: [Item]
+@Binding var scrolledID: Item.ID?
+
+ScrollView {
+    LazyVStack {
+        ForEach(items) { item in
+            ItemView(item)
+        }
+    }
+}
+.defaultScrollAnchor(.bottom)
+```
+
+--------------------------------
+
+### Initialize SwiftUI DocumentLaunchView for Document Experiences
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-documentlaunchview-init(_:for:_:ondocumentopen:backgroundaccessoryview:overlayaccessoryview:).md
+
+This initializer constructs a `DocumentLaunchView` to manage document-related user interactions, allowing customization of the view's title, supported content types, user actions, and the visual components for background and overlay accessory views. It requires iOS 18.0+ or iPadOS 18.0+ and utilizes `ViewBuilder` for flexible UI composition.
+
+```Swift
+init(
+    _ title: LocalizedStringKey,
+    for contentTypes: [UTType],
+    @ViewBuilder _ actions: () -> Actions,
+    @ViewBuilder onDocumentOpen: @escaping (URL) -> DocumentView,
+    @ViewBuilder backgroundAccessoryView: @escaping (DocumentLaunchGeometryProxy) -> some View,
+    @ViewBuilder overlayAccessoryView: @escaping (DocumentLaunchGeometryProxy) -> some View
+)
+```
+
+--------------------------------
+
+### SwiftUI App with Custom Window Launch Behavior
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-scene-defaultlaunchbehavior(_:).md
+
+This Swift example demonstrates configuring an `App`'s body to use `defaultLaunchBehavior(.presented)` for a specific `Window`. This ensures a 'Welcome' window is displayed on app launch, overriding the default behavior and providing a controlled initial user experience, especially on macOS when no previous state is restored.
+
+```swift
+@main
+struct MyApp: App {
+    var body: some Scene {
+        DocumentGroup(newDocument: MyDocument()) { configuration in
+            DocumentEditor(configuration.$document)
+        }
+
+        Window("Welcome to My App", id: "welcome") {
+            WelcomeView()
+        }
+        .defaultLaunchBehavior(.presented)
+    }
+}
+```
+
+--------------------------------
+
+### Get SwiftUI trailingFirstTextBaseline Alignment Property
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-alignment-trailingfirsttextbaseline.md
+
+This Swift code defines the `trailingFirstTextBaseline` type property within SwiftUI's `Alignment` struct. It provides a read-only computed property that returns an `Alignment` value representing the combination of the trailing edge and the top-most text baseline guides.
+
+```Swift
+static var trailingFirstTextBaseline: Alignment { get }
+```
+
+--------------------------------
+
+### SwiftUI Link Creation Example with URL and Text Label
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-link-init(_:destination:).md
+
+This SwiftUI example demonstrates how to create a `Link` control that navigates to a specific URL when tapped. It uses a string literal, which is implicitly converted to `LocalizedStringKey`, for the link's display text and a `URL` object for the navigation destination. The `!` forcefully unwraps the URL, assuming it's a valid URL string.
+
+```Swift
+Link("Visit Example Co",
+      destination: URL(string: "https://www.example.com/")!)
+```
+
+--------------------------------
+
+### Get Start Input Device 3D Pose in SwiftUI (visionOS)
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-draggesture-draggesture.value-startinputdevicepose3d.md
+
+Retrieves the initial 3D pose of the input device that initiated the drag gesture. This property is available on visionOS 1.0+ and returns an optional `Pose3D` value, indicating if 3D pose data is available.
+
+```Swift
+var startInputDevicePose3D: Pose3D? { get }
+```
+
+--------------------------------
+
+### Creating a Basic SwiftUI Link with String Title
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-link.md
+
+This example demonstrates how to create a simple SwiftUI `Link` using a string as its label and a `URL` as its destination. When a user interacts with this link, it will open the specified URL in the default system browser or associated application.
+
+```Swift
+Link("View Our Terms of Service",
+      destination: URL(string: "https://www.example.com/TOS.html")!)
+```
+
+--------------------------------
+
+### Close SwiftUI Auxiliary Window with dismissWindow
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-dismisswindowaction.md
+
+This example demonstrates how to create a button that dismisses an auxiliary SwiftUI window. It accesses the `dismissWindow` environment value and calls its `callAsFunction(id:)` method, passing the identifier of the window to be closed. The setup includes a multi-scene application with a main `WindowGroup` and a platform-specific auxiliary `Window`.
+
+```Swift
+@main
+struct MyApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+        #if os(macOS)
+        Window("Auxiliary", id: "auxiliary") {
+            AuxiliaryContentView()
+        }
+        #endif
+    }
+}
+
+struct DismissWindowButton: View {
+    @Environment(\.dismissWindow) private var dismissWindow
+
+    var body: some View {
+        Button("Close Auxiliary Window") {
+            dismissWindow(id: "auxiliary")
+        }
+    }
+}
+```
+
+--------------------------------
+
+### Initialize SwiftUI HelpLink with Custom Action
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-helplink-init(action:).md
+
+This initializer constructs a new `HelpLink` component in SwiftUI that performs a custom action when the user clicks it. It's suitable when you need a standard help button appearance but want to execute application-specific logic instead of opening an Apple Help book article. The `action` parameter expects an `@escaping` closure that defines the behavior.
+
+```Swift
+init(action: @escaping () -> Void)
+```
+
+--------------------------------
+
+### SwiftUI Example for Responding to `isSearching` State
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-environmentvalues-issearching.md
+
+Provides a comprehensive SwiftUI example showing how to structure views with `searchable` and `isSearching`. It demonstrates a `SearchedView` dynamically displaying text based on whether the user is actively searching.
+
+```Swift
+struct SearchingExample: View {
+    @State private var searchText = ""
+
+    var body: some View {
+        NavigationStack {
+            SearchedView()
+                .searchable(text: $searchText)
+        }
+    }
+}
+
+struct SearchedView: View {
+    @Environment(\.isSearching) private var isSearching
+
+    var body: some View {
+        Text(isSearching ? "Searching!" : "Not searching.")
+    }
+}
+```
+
+--------------------------------
+
+### Implement SwiftUI Palette View with luminanceToAlpha() Example
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-view-luminancetoalpha().md
+
+This SwiftUI example defines a `Palette` view that displays a series of rectangles with increasing luminance. It demonstrates how to apply the `luminanceToAlpha()` modifier to control the opacity of the rectangles based on their luminance, showcasing its effect over a background.
+
+```Swift
+struct Palette: View {
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(0..
+```
+
+--------------------------------
+
+### Create Basic SwiftUI View Preview with PreviewProvider
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-previewprovider.md
+
+This example demonstrates how to create a basic Xcode preview for a SwiftUI view by conforming a struct to the `PreviewProvider` protocol. It implements the `previews` computed property to return the `CircleImage()` view, making it discoverable by Xcode for display.
+
+```Swift
+struct CircleImage_Previews: PreviewProvider {
+    static var previews: some View {
+        CircleImage()
+    }
+}
+```
+
+--------------------------------
+
+### Get Coordinate Space Bounds in SwiftUI using GeometryProxy
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-geometryproxy-bounds(of:).md
+
+This instance method of `GeometryProxy` returns the bounds rectangle of a specified `NamedCoordinateSpace`, converted into the local coordinate space. It is available across various Apple platforms starting from iOS 17.0, including iOS, iPadOS, macOS, tvOS, watchOS, and visionOS.
+
+```Swift
+func bounds(of coordinateSpace: NamedCoordinateSpace) -> CGRect?
+```
+
+--------------------------------
+
+### Get Active Modifier Keys for SwiftUI Spatial Event
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-spatialeventcollection-spatialeventcollection.event-modifierkeys.md
+
+Accesses the set of active modifier keys (e.g., Command, Shift, Option) at the moment a `SpatialEventCollection.Event` occurred. This property is part of the `SpatialEventCollection.Event` type in SwiftUI and is supported across various Apple platforms starting from specific OS versions.
+
+```Swift
+var modifierKeys: EventModifiers
+```
+
+--------------------------------
+
+### List Simulator Device Types using xcrun simctl
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-previewdevice.md
+
+Provides a shell command to list all supported simulator device types on your system. This command is useful for identifying valid string values to use when initializing a `PreviewDevice`.
+
+```Shell
+% xcrun simctl list devicetypes
+```
+
+--------------------------------
+
+### SwiftUI: Example Usage of `lineLimit(_:reservesSpace:)`
+
+Source: https://github.com/zhangyu1818/swiftui.md/blob/main/swiftui-view-linelimit(_:reservesspace:).md
+
+Illustrates applying the `lineLimit(_:reservesSpace:)` modifier to `Text` views within a `GroupBox`. This example demonstrates how to control the line count and space reservation for both a headline and a subheadline.
+
+```Swift
+GroupBox {
+    Text("Title")
+        .font(.headline)
+        .lineLimit(2, reservesSpace: true)
+    Text("Subtitle")
+        .font(.subheadline)
+        .lineLimit(4, reservesSpace: true)
+}
+```

@@ -58,6 +58,12 @@ struct FileListView: View {
 
     /// 排序方式
     @State private var sortOrder: FileSortOrder = .name
+    
+    /// 要预览的文件对象
+    @State private var fileToPreview: FileObject?
+    
+    /// 拖拽目标状态
+    @State private var isTargeted: Bool = false
 
     /// 文件来源枚举
     private enum FileSource {
@@ -67,24 +73,29 @@ struct FileListView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // 顶部状态栏
-            statusBarView
-
-            Divider()
-
-            // 搜索筛选栏
-            SearchFilterBar(
-                searchText: $searchText,
-                filterType: $filterType,
-                sortOrder: $sortOrder
-            )
-
-            Divider()
+            // 面包屑导航
+            if r2Service.isConnected, let bucket = r2Service.selectedBucket {
+                BreadcrumbView(
+                    currentPrefix: currentPrefix,
+                    selectedBucket: bucket,
+                    onNavigate: navigateToPath
+                )
+                .padding(.horizontal, AppSpacing.large)
+                .padding(.vertical, AppSpacing.small)
+                .background(AppColors.contentBackground)
+                
+                Divider()
+            }
 
             // 主内容区域
             mainContentView
+                .overlay {
+                    if isTargeted {
+                        dropZoneOverlay
+                    }
+                }
             
-            // 上传队列面板（当有任务时显示）
+            // 上传队列面板
             if uploadQueueManager.isQueuePanelVisible {
                 Divider()
                 UploadQueueView(queueManager: uploadQueueManager)
@@ -92,12 +103,15 @@ struct FileListView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: uploadQueueManager.isQueuePanelVisible)
-        .navigationTitle("文件管理")
+        .navigationTitle(r2Service.selectedBucket?.name ?? "Files")
+        .searchable(text: $searchText, placement: .toolbar, prompt: "Search files...")
+        .toolbar {
+            toolbarContent
+        }
         .onAppear {
             loadFileList()
         }
         .onChange(of: r2Service.selectedBucket) { _ in
-            // 当选择的存储桶改变时，重置并重新加载
             currentPrefix = ""
             loadFileList()
         }
@@ -109,37 +123,18 @@ struct FileListView: View {
         }
         .fileImporter(
             isPresented: $showingFileImporter,
-            allowedContentTypes: [.data, .item], // 允许所有文件类型
-            allowsMultipleSelection: true  // 支持多文件选择
-        ) { result in
-            // 处理多文件上传
-            switch result {
-            case .success(let urls):
-                if urls.count == 1 {
-                    // 单文件上传走原有逻辑
-                    guard let fileURL = urls.first else { return }
-                    let originalFileName = fileURL.lastPathComponent
-                    uploadFileImmediately(fileURL: fileURL, originalFileName: originalFileName, source: .fileImporter)
-                } else {
-                    // 多文件上传使用队列
-                    if let bucket = r2Service.selectedBucket {
-                        uploadQueueManager.configure(r2Service: r2Service, bucketName: bucket.name)
-                        uploadQueueManager.addFiles(urls, to: currentPrefix)
-                    }
-                }
-                
-            case .failure(let error):
-                messageManager.showError("文件选择失败", description: error.localizedDescription)
-            }
-        }
+            allowedContentTypes: [.data, .item],
+            allowsMultipleSelection: true,
+            onCompletion: handleFileImport
+        )
         .sheet(isPresented: $showingDiagnostics) {
             DiagnosticsView(r2Service: r2Service)
         }
-        .alert("确认删除文件", isPresented: $showingDeleteConfirmation) {
-            Button("取消", role: .cancel) {
+        .alert("Complete Deletion", isPresented: $showingDeleteConfirmation) {
+            Button("Cancel", role: .cancel) {
                 fileToDelete = nil
             }
-            Button("删除", role: .destructive) {
+            Button("Delete", role: .destructive) {
                 if let fileToDelete = fileToDelete {
                     deleteFile(fileToDelete)
                     self.fileToDelete = nil
@@ -147,177 +142,92 @@ struct FileListView: View {
             }
         } message: {
             if let fileToDelete = fileToDelete {
-                Text("确定要删除文件 '\(fileToDelete.name)' 吗？此操作无法撤销。")
+                Text("Are you sure you want to delete '\(fileToDelete.name)'?")
             }
         }
     }
     
-    /// 顶部状态栏视图
-    @ViewBuilder
-    private var statusBarView: some View {
-        VStack(spacing: 0) {
-            // 第一行：连接状态和控制按钮
-            HStack {
-                // 连接和存储桶状态
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(r2Service.isConnected ? .green : .red)
-                        .frame(width: 8, height: 8)
-                    
-                    if isUploading {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                        Text(uploadMessage)
-                            .font(.caption)
-                            .foregroundColor(.blue)
-                    } else if r2Service.isConnected {
-                        if let bucket = r2Service.selectedBucket {
-                            Text("已连接")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        } else {
-                            Text("未选择存储桶")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    } else {
-                        Text("未连接")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                Spacer()
-                
-                // 控制按钮
-                HStack(spacing: 12) {
-                    // 主要操作按钮组
-                    HStack(spacing: 8) {
-                        // 上传文件按钮
-                        Button(action: {
-                            showingFileImporter = true
-                        }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "plus.circle.fill")
-                                Text("上传文件")
-                            }
-                            .font(.system(size: 12, weight: .medium))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .background(
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(isUploading || r2Service.isLoading ? Color.gray.opacity(0.3) : Color.blue.opacity(0.1))
-                        )
-                        .foregroundColor(isUploading || r2Service.isLoading ? .secondary : .blue)
-                        .disabled(!canLoadFiles || r2Service.isLoading || isUploading)
-                        
-                        // 创建文件夹按钮
-                        Button(action: {
-                            showingCreateFolderSheet = true
-                        }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "folder.badge.plus")
-                                Text("新建文件夹")
-                            }
-                            .font(.system(size: 12, weight: .medium))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .background(
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(isUploading || r2Service.isLoading ? Color.gray.opacity(0.3) : Color.green.opacity(0.1))
-                        )
-                        .foregroundColor(isUploading || r2Service.isLoading ? .secondary : .green)
-                        .disabled(!canLoadFiles || r2Service.isLoading || isUploading)
-                    }
-                    
-                    // 分隔线
-                    Divider()
-                        .frame(height: 20)
-                    
-                    // 导航按钮组
-                    HStack(spacing: 8) {
-                        // 返回上级按钮（当不在根目录时显示）
-                        if !currentPrefix.isEmpty {
-                            Button(action: goUpOneLevel) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "arrow.up.circle")
-                                    Text("上级")
-                                }
-                                .font(.system(size: 12, weight: .medium))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(Color.orange.opacity(0.1))
-                            )
-                            .foregroundColor(.orange)
-                            .disabled(r2Service.isLoading || isUploading)
-                        }
-                        
-                        // 刷新按钮
-                        Button(action: loadFileList) {
-                            HStack(spacing: 4) {
-                                Image(systemName: r2Service.isLoading ? "arrow.clockwise" : "arrow.clockwise.circle")
-                                Text("刷新")
-                            }
-                            .font(.system(size: 12, weight: .medium))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .background(
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(Color.secondary.opacity(0.1))
-                        )
-                        .foregroundColor(.secondary)
-                        .disabled(!canLoadFiles || r2Service.isLoading || isUploading)
-                        
-                        // 诊断按钮
-                        Button(action: {
-                            showingDiagnostics = true
-                        }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "checkmark.shield")
-                                Text("诊断")
-                            }
-                            .font(.system(size: 12, weight: .medium))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .background(
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(Color.purple.opacity(0.1))
-                        )
-                        .foregroundColor(.purple)
-                        .disabled(r2Service.isLoading || isUploading)
-                    }
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+    // MARK: - Subviews & Builders
+
+    /// 拖拽区域覆盖层
+    private var dropZoneOverlay: some View {
+        ZStack {
+            Color.blue.opacity(0.1)
             
-            // 第二行：面包屑导航（当连接且选择存储桶时显示）
-            if r2Service.isConnected, let bucket = r2Service.selectedBucket {
-                Divider()
-                
-                BreadcrumbView(
-                    currentPrefix: currentPrefix,
-                    selectedBucket: bucket,
-                    onNavigate: navigateToPath
-                )
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color.blue, lineWidth: 3)
+            
+            VStack {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.system(size: 50))
+                    .foregroundColor(.blue)
+                Text("Drop Files to Upload")
+                    .font(.title2)
+                    .foregroundColor(.blue)
             }
         }
-        .background(Color(NSColor.controlBackgroundColor))
+        .padding(8)
+        .allowsHitTesting(false)
+    }
+
+    /// 工具栏内容
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        // MARK: - Primary Actions
+        ToolbarItemGroup(placement: .primaryAction) {
+            Button(action: { showingCreateFolderSheet = true }) {
+                Label("New Folder", systemImage: "folder.badge.plus")
+            }
+            .disabled(!canLoadFiles)
+            
+            Button(action: { showingFileImporter = true }) {
+                Label("Upload", systemImage: "plus")
+            }
+            .disabled(!canLoadFiles)
+        }
+        
+        // MARK: - View Options (Filter & Sort)
+        ToolbarItemGroup(placement: .automatic) {
+            // Filter Menu
+            Menu {
+                Picker("Filter", selection: $filterType) {
+                    ForEach(FileFilterType.allCases, id: \.self) { type in
+                        Label(type.rawValue, systemImage: type.iconName).tag(type)
+                    }
+                }
+            } label: {
+                Label("Filter", systemImage: filterType == .all ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+            }
+            
+            // Sort Menu
+            Menu {
+                Picker("Sort By", selection: $sortOrder) {
+                    ForEach(FileSortOrder.allCases, id: \.self) { order in
+                        Label(order.rawValue, systemImage: order.iconName).tag(order)
+                    }
+                }
+            } label: {
+                Label("Sort", systemImage: "arrow.up.arrow.down")
+            }
+        }
+        
+        // MARK: - Navigation & Tools
+        ToolbarItemGroup(placement: .automatic) {
+            // Up Button
+            Button(action: goUpOneLevel) {
+                Label("Up", systemImage: "arrow.up")
+            }
+            .disabled(currentPrefix.isEmpty || r2Service.isLoading)
+            
+            Button(action: loadFileList) {
+                Label("Refresh", systemImage: "arrow.clockwise")
+            }
+            .disabled(!canLoadFiles || r2Service.isLoading)
+            
+            Button(action: { showingDiagnostics = true }) {
+                Label("Diagnostics", systemImage: "checkmark.shield")
+            }
+        }
     }
     
     /// 主内容视图
@@ -438,6 +348,7 @@ struct FileListView: View {
             // 拖拽区域背景
             FileDropView(
                 isEnabled: canLoadFiles && !isUploading && !r2Service.isLoading,
+                isTargeted: $isTargeted,
                 onFileDrop: { [self] fileURL, originalFileName in
                     print("🎯 空列表区域拖拽上传: \(originalFileName)")
                     uploadFileImmediately(fileURL: fileURL, originalFileName: originalFileName, source: .dragDrop)
@@ -519,6 +430,7 @@ struct FileListView: View {
             // 拖拽区域背景
             FileDropView(
                 isEnabled: canLoadFiles && !isUploading && !r2Service.isLoading,
+                isTargeted: $isTargeted,
                 onFileDrop: { [self] fileURL, originalFileName in
                     print("🎯 文件列表区域拖拽上传: \(originalFileName)")
                     uploadFileImmediately(fileURL: fileURL, originalFileName: originalFileName, source: .dragDrop)
@@ -530,8 +442,8 @@ struct FileListView: View {
             
             // 文件列表前景
             List {
-                // 应用搜索、筛选和排序后的文件列表
-                ForEach(fileObjects.filtered(by: searchText, filterType: filterType).sorted(by: sortOrder), id: \.key) { fileObject in
+                // 文件和文件夹列表（应用筛选和排序）
+                ForEach(SearchFilterBar.filterAndSort(files: fileObjects, searchText: searchText, filterType: filterType, sortOrder: sortOrder), id: \.key) { fileObject in
                     FileListItemView(
                         fileObject: fileObject,
                         r2Service: r2Service,
@@ -542,7 +454,12 @@ struct FileListView: View {
                         }
                     )
                     .onTapGesture {
-                        handleItemTap(fileObject)
+                        if fileObject.isDirectory {
+                            handleItemTap(fileObject)
+                        } else {
+                            // 文件点击预览
+                            fileToPreview = fileObject
+                        }
                     }
                 }
             }
@@ -574,6 +491,14 @@ struct FileListView: View {
                     }
                 }
             )
+            .sheet(item: $fileToPreview) { file in
+                FilePreviewView(
+                    r2Service: r2Service,
+                    fileObject: file,
+                    bucketName: r2Service.selectedBucket?.name ?? "",
+                    onDismiss: { fileToPreview = nil }
+                )
+            }
         }
     }
     
@@ -697,6 +622,25 @@ struct FileListView: View {
         }
     }
     
+    /// 处理文件导入结果
+    private func handleFileImport(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            if urls.count == 1 {
+                guard let fileURL = urls.first else { return }
+                let originalFileName = fileURL.lastPathComponent
+                uploadFileImmediately(fileURL: fileURL, originalFileName: originalFileName, source: .fileImporter)
+            } else {
+                if let bucket = r2Service.selectedBucket {
+                    uploadQueueManager.configure(r2Service: r2Service, bucketName: bucket.name)
+                    uploadQueueManager.addFiles(urls, to: currentPrefix)
+                }
+            }
+        case .failure(let error):
+            messageManager.showError("Import Failed", description: error.localizedDescription)
+        }
+    }
+
     /// 立即上传文件（支持文件选择器和拖拽上传）
     /// - Parameters:
     ///   - fileURL: 本地文件 URL
@@ -739,12 +683,10 @@ struct FileListView: View {
             print("   原始文件名: \(originalFileName)")
         }
         
-        // 根据文件来源决定是否需要处理沙盒权限
-        var needsSecurityScope = false
-        if source == .fileImporter {
-            needsSecurityScope = fileURL.startAccessingSecurityScopedResource()
-            print("🔐 文件选择器来源，安全作用域权限: \(needsSecurityScope ? "已获取" : "获取失败")")
-        }
+        // 获取沙盒安全作用域权限（文件选择器和拖拽都需要）
+        let needsSecurityScope = fileURL.startAccessingSecurityScopedResource()
+        let sourceDesc = source == .fileImporter ? "文件选择器" : "拖拽上传"
+        print("🔐 安全作用域权限 [\(sourceDesc)]: \(needsSecurityScope ? "已获取" : "未获取/不需要")")
         
         // 立即验证文件访问和读取数据
         let fileData: Data

@@ -11,45 +11,82 @@ import AppKit
 /// 文件拖拽视图
 /// 基于 NSView 的简单可靠实现，参考 AttachmentDroppableView
 struct FileDropView: NSViewRepresentable {
-    /// 文件拖拽处理回调
-    let onFileDrop: (URL, String) -> Void
-    
-    /// 错误处理回调
-    let onError: (String, String) -> Void
-    
     /// 是否启用拖拽
     let isEnabled: Bool
-    
+
+    /// 文件拖拽处理回调
+    let onFileDrop: (URL, String) -> Void
+
+    /// 错误处理回调
+    let onError: (String, String) -> Void
+
+    /// 是否有文件正在拖拽到上方
+    @Binding var isTargeted: Bool
+
     init(
         isEnabled: Bool = true,
+        isTargeted: Binding<Bool>,
         onFileDrop: @escaping (URL, String) -> Void,
         onError: @escaping (String, String) -> Void
     ) {
         self.isEnabled = isEnabled
+        self._isTargeted = isTargeted
         self.onFileDrop = onFileDrop
         self.onError = onError
     }
     
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
+    
     func makeNSView(context: Context) -> FileDropNSView {
         let view = FileDropNSView()
-        view.onFileDrop = onFileDrop
-        view.onError = onError
+        view.delegate = context.coordinator
         view.isDropEnabled = isEnabled
         return view
     }
     
     func updateNSView(_ nsView: FileDropNSView, context: Context) {
         nsView.isDropEnabled = isEnabled
+        // Update coordinator's parent reference to keep bindings fresh
+        context.coordinator.parent = self
     }
+    
+    /// Coordinator to handle delegation
+    class Coordinator: NSObject, FileDropDelegate {
+        var parent: FileDropView
+        
+        init(parent: FileDropView) {
+            self.parent = parent
+        }
+        
+        func onFileDrop(url: URL, originalName: String) {
+            parent.onFileDrop(url, originalName)
+        }
+        
+        func onError(title: String, description: String) {
+            parent.onError(title, description)
+        }
+        
+        func onTargetedChanged(_ targeted: Bool) {
+            DispatchQueue.main.async {
+                self.parent.isTargeted = targeted
+            }
+        }
+    }
+}
+
+/// Protocol for FileDropNSView delegation
+protocol FileDropDelegate: AnyObject {
+    func onFileDrop(url: URL, originalName: String)
+    func onError(title: String, description: String)
+    func onTargetedChanged(_ targeted: Bool)
 }
 
 /// NSView 实现类
 class FileDropNSView: NSView {
-    /// 文件拖拽处理回调
-    var onFileDrop: ((URL, String) -> Void)?
-    
-    /// 错误处理回调
-    var onError: ((String, String) -> Void)?
+    /// Delegate for callbacks
+    weak var delegate: FileDropDelegate?
     
     /// 是否启用拖拽
     var isDropEnabled: Bool = true {
@@ -101,6 +138,7 @@ class FileDropNSView: NSView {
             }
             
             print("🎯 FileDropView: 检测到有效拖拽文件: \(firstFile.lastPathComponent)")
+            delegate?.onTargetedChanged(true)
             return .copy
             
         } catch {
@@ -109,14 +147,19 @@ class FileDropNSView: NSView {
         }
     }
     
+    override func draggingExited(_ sender: NSDraggingInfo?) {
+        delegate?.onTargetedChanged(false)
+    }
+    
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        delegate?.onTargetedChanged(false)
         guard isDropEnabled else { return false }
         
         do {
             let files = try getFiles(from: sender)
             
             guard let firstFile = files.first else {
-                onError?("拖拽失败", "未检测到有效文件")
+                delegate?.onError(title: "拖拽失败", description: "未检测到有效文件")
                 return false
             }
             
@@ -124,13 +167,13 @@ class FileDropNSView: NSView {
             
             // 验证文件存在性
             guard FileManager.default.fileExists(atPath: firstFile.path) else {
-                onError?("文件不存在", "拖拽的文件无法找到，可能已被移动或删除")
+                delegate?.onError(title: "文件不存在", description: "拖拽的文件无法找到，可能已被移动或删除")
                 return false
             }
             
             // 验证文件可读性
             guard FileManager.default.isReadableFile(atPath: firstFile.path) else {
-                onError?("文件权限被拒绝", "无法读取拖拽的文件，请检查文件权限")
+                delegate?.onError(title: "文件权限被拒绝", description: "无法读取拖拽的文件，请检查文件权限")
                 return false
             }
             
@@ -144,19 +187,19 @@ class FileDropNSView: NSView {
                 
                 // 检查是否为常规文件
                 if resourceValues.isDirectory == true {
-                    onError?("不支持的内容", "不支持拖拽文件夹，请选择单个文件")
+                    delegate?.onError(title: "不支持的内容", description: "不支持拖拽文件夹，请选择单个文件")
                     return false
                 }
                 
                 guard resourceValues.isRegularFile == true else {
-                    onError?("不支持的内容", "只支持拖拽常规文件")
+                    delegate?.onError(title: "不支持的内容", description: "只支持拖拽常规文件")
                     return false
                 }
                 
                 // 检查文件大小
                 let fileSize = resourceValues.fileSize ?? 0
                 if fileSize == 0 {
-                    onError?("文件为空", "拖拽的文件大小为0，可能是空文件")
+                    delegate?.onError(title: "文件为空", description: "拖拽的文件大小为0，可能是空文件")
                     return false
                 }
                 
@@ -167,7 +210,7 @@ class FileDropNSView: NSView {
                     formatter.allowedUnits = [.useGB, .useMB]
                     formatter.countStyle = .file
                     let sizeString = formatter.string(fromByteCount: Int64(fileSize))
-                    onError?("文件过大", "文件大小为 \(sizeString)，超过 5GB 限制")
+                    delegate?.onError(title: "文件过大", description: "文件大小为 \(sizeString)，超过 5GB 限制")
                     return false
                 }
                 
@@ -183,20 +226,20 @@ class FileDropNSView: NSView {
             
             // 验证文件名有效性
             guard isValidFileName(originalFileName) else {
-                onError?("无效文件", "文件名包含无效字符或格式不正确")
+                delegate?.onError(title: "无效文件", description: "文件名包含无效字符或格式不正确")
                 return false
             }
             
             print("🎯 FileDropView: 准备上传文件 '\(originalFileName)'")
             
             // 调用上传回调
-            onFileDrop?(firstFile, originalFileName)
+            delegate?.onFileDrop(url: firstFile, originalName: originalFileName)
             
             return true
             
         } catch {
             print("❌ FileDropView: 拖拽操作失败: \(error)")
-            onError?("拖拽失败", "处理拖拽文件时发生错误: \(error.localizedDescription)")
+            delegate?.onError(title: "拖拽失败", description: "处理拖拽文件时发生错误: \(error.localizedDescription)")
             return false
         }
     }

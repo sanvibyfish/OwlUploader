@@ -9,27 +9,19 @@ enum MessageType {
     
     var color: Color {
         switch self {
-        case .success:
-            return .green
-        case .error:
-            return .red
-        case .warning:
-            return .orange
-        case .info:
-            return .blue
+        case .success: return AppColors.success
+        case .error: return AppColors.error
+        case .warning: return AppColors.warning
+        case .info: return AppColors.info
         }
     }
     
     var iconName: String {
         switch self {
-        case .success:
-            return "checkmark.circle.fill"
-        case .error:
-            return "xmark.circle.fill"
-        case .warning:
-            return "exclamationmark.triangle.fill"
-        case .info:
-            return "info.circle.fill"
+        case .success: return "checkmark.circle.fill"
+        case .error: return "xmark.circle.fill"
+        case .warning: return "exclamationmark.triangle.fill"
+        case .info: return "info.circle.fill"
         }
     }
 }
@@ -64,88 +56,48 @@ struct Message: Identifiable, Equatable {
 class MessageManager: ObservableObject {
     @Published var messages: [Message] = []
     
-    /// 显示消息
-    /// - Parameter message: 要显示的消息
     func show(_ message: Message) {
-        withAnimation(.easeInOut(duration: 0.3)) {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
             messages.append(message)
         }
         
-        // 自动隐藏消息
         Task {
             try await Task.sleep(nanoseconds: UInt64(message.duration * 1_000_000_000))
             await hide(message)
         }
     }
     
-    /// 隐藏消息
-    /// - Parameter message: 要隐藏的消息
     func hide(_ message: Message) {
-        withAnimation(.easeInOut(duration: 0.3)) {
+        withAnimation(.easeInOut(duration: 0.2)) {
             messages.removeAll { $0.id == message.id }
         }
     }
     
-    /// 显示成功消息
-    /// - Parameters:
-    ///   - title: 标题
-    ///   - description: 描述（可选）
     func showSuccess(_ title: String, description: String? = nil) {
-        let message = Message(type: .success, title: title, description: description)
-        show(message)
+        show(Message(type: .success, title: title, description: description))
     }
     
-    /// 显示错误消息
-    /// - Parameters:
-    ///   - title: 标题
-    ///   - description: 描述（可选）
-    ///   - actionTitle: 操作按钮标题（可选）
-    ///   - action: 操作回调（可选）
     func showError(_ title: String, description: String? = nil, 
                    actionTitle: String? = nil, action: (() -> Void)? = nil) {
-        let message = Message(
-            type: .error,
-            title: title,
-            description: description,
-            duration: 6.0, // 错误消息显示更长时间
-            actionTitle: actionTitle,
-            action: action
-        )
-        show(message)
+        show(Message(type: .error, title: title, description: description, 
+                     duration: 6.0, actionTitle: actionTitle, action: action))
     }
     
-    /// 显示 R2Service 错误
-    /// - Parameter error: R2ServiceError
     func showError(_ error: R2ServiceError) {
-        let actionTitle = error.isRetryable ? "重试" : nil
-        showError(
-            error.localizedDescription,
-            description: error.suggestedAction,
-            actionTitle: actionTitle
-        )
+        let actionTitle = error.isRetryable ? "Retry" : nil
+        showError(error.localizedDescription, description: error.suggestedAction, actionTitle: actionTitle)
     }
     
-    /// 显示警告消息
-    /// - Parameters:
-    ///   - title: 标题
-    ///   - description: 描述（可选）
     func showWarning(_ title: String, description: String? = nil) {
-        let message = Message(type: .warning, title: title, description: description)
-        show(message)
+        show(Message(type: .warning, title: title, description: description))
     }
     
-    /// 显示信息消息
-    /// - Parameters:
-    ///   - title: 标题
-    ///   - description: 描述（可选）
     func showInfo(_ title: String, description: String? = nil) {
-        let message = Message(type: .info, title: title, description: description)
-        show(message)
+        show(Message(type: .info, title: title, description: description))
     }
     
-    /// 清除所有消息
     func clearAll() {
-        withAnimation(.easeInOut(duration: 0.3)) {
+        withAnimation {
             messages.removeAll()
         }
     }
@@ -157,142 +109,71 @@ struct MessageBannerView: View {
     let onDismiss: () -> Void
     
     var body: some View {
-        HStack(spacing: 12) {
-            // 图标
+        HStack(alignment: .top, spacing: AppSpacing.medium) {
             Image(systemName: message.type.iconName)
                 .font(.title3)
                 .foregroundColor(.white)
             
-            // 文本内容
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(message.title)
-                    .font(.headline)
+                    .font(AppTypography.headline)
                     .foregroundColor(.white)
-                    .multilineTextAlignment(.leading)
                 
                 if let description = message.description {
                     Text(description)
-                        .font(.body)
+                        .font(AppTypography.caption)
                         .foregroundColor(.white.opacity(0.9))
-                        .multilineTextAlignment(.leading)
+                        .lineLimit(2)
                 }
             }
             
             Spacer()
             
-            // 操作按钮
-            HStack(spacing: 8) {
-                if let actionTitle = message.actionTitle,
-                   let action = message.action {
-                    Button(actionTitle) {
-                        action()
-                    }
-                    .font(.body.weight(.medium))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(.white.opacity(0.2))
-                    .cornerRadius(6)
+            if let actionTitle = message.actionTitle, let action = message.action {
+                Button(action: action) {
+                    Text(actionTitle)
+                        .fontWeight(.medium)
                 }
-                
-                // 关闭按钮
-                Button {
-                    onDismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.body.weight(.medium))
-                        .foregroundColor(.white.opacity(0.8))
-                }
+                .buttonStyle(.borderedProminent)
+                .tint(.white.opacity(0.2))
+                .foregroundColor(.white)
             }
+            
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .foregroundColor(.white.opacity(0.8))
+            }
+            .buttonStyle(.plain)
         }
-        .padding()
-        .background(message.type.color)
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+        .padding(AppSpacing.medium)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(message.type.color)
+                .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
+        )
+        // Add a clean border
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+        )
+        .padding(.horizontal)
     }
 }
 
-/// 消息横幅容器视图
+/// 消息横幅容器
 struct MessageBannerContainer: View {
     @ObservedObject var messageManager: MessageManager
     
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: AppSpacing.small) {
             ForEach(messageManager.messages) { message in
                 MessageBannerView(message: message) {
                     messageManager.hide(message)
                 }
-                .transition(.asymmetric(
-                    insertion: .move(edge: .top).combined(with: .opacity),
-                    removal: .opacity
-                ))
+                .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: messageManager.messages.count)
+        .padding(.top, AppSpacing.medium)
+        .animation(.spring(), value: messageManager.messages.count)
     }
 }
-
-// MARK: - 预览
-
-#Preview("成功消息") {
-    VStack {
-        MessageBannerView(
-            message: Message(
-                type: .success,
-                title: "上传成功",
-                description: "文件 'document.pdf' 已成功上传到存储桶"
-            )
-        ) { }
-        .padding()
-        
-        Spacer()
-    }
-}
-
-#Preview("错误消息") {
-    VStack {
-        MessageBannerView(
-            message: Message(
-                type: .error,
-                title: "上传失败",
-                description: "网络连接错误，请检查网络连接并重试",
-                actionTitle: "重试"
-            ) { }
-        ) { }
-        .padding()
-        
-        Spacer()
-    }
-}
-
-#Preview("消息管理器") {
-    @StateObject var messageManager = MessageManager()
-    
-    return VStack {
-        MessageBannerContainer(messageManager: messageManager)
-            .padding()
-        
-        Spacer()
-        
-        VStack(spacing: 16) {
-            Button("显示成功消息") {
-                messageManager.showSuccess("操作成功", description: "文件已成功上传")
-            }
-            
-            Button("显示错误消息") {
-                messageManager.showError("操作失败", description: "网络连接错误", actionTitle: "重试") {
-                    print("重试操作")
-                }
-            }
-            
-            Button("显示警告消息") {
-                messageManager.showWarning("注意", description: "存储空间即将用完")
-            }
-            
-            Button("清除所有消息") {
-                messageManager.clearAll()
-            }
-        }
-        .padding()
-    }
-} 

@@ -32,15 +32,14 @@ struct ContentView: View {
     }
     
     var body: some View {
-        NavigationView {
-            // 使用新的侧边栏组件
+        NavigationSplitView {
             SidebarView(
                 selectedView: $selectedView,
                 r2Service: r2Service,
                 accountManager: accountManager
             )
-            
-            // 主内容区域
+            .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 300)
+        } detail: {
             Group {
                 switch selectedView {
                 case .welcome:
@@ -55,15 +54,12 @@ struct ContentView: View {
                     WelcomeView(selectedView: $selectedView, r2Service: r2Service)
                 }
             }
-            .frame(minWidth: 600, idealWidth: 900, maxWidth: .infinity, minHeight: 500)
-            .clipped()
+            .frame(minWidth: 600, minHeight: 400)
         }
-        .navigationViewStyle(.columns)
         .environmentObject(r2Service)
         .environmentObject(accountManager)
         .environmentObject(messageManager)
         .overlay(alignment: .topTrailing) {
-            // 消息横幅容器
             MessageBannerContainer(messageManager: messageManager)
                 .padding()
                 .frame(maxWidth: 400)

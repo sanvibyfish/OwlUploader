@@ -1,276 +1,107 @@
-//
-//  SidebarView.swift
-//  OwlUploader
-//
-//  新侧边栏组件 - 支持多账户和多存储桶显示
-//
-
 import SwiftUI
 
-/// 侧边栏视图
-/// 支持多账户展示和快速切换存储桶
+/// Sidebar View - Refactored for Native Design
 struct SidebarView: View {
-    /// 当前显示的主视图绑定
     @Binding var selectedView: ContentView.MainViewSelection?
-    
-    /// R2 服务实例
     @ObservedObject var r2Service: R2Service
-    
-    /// R2 账户管理器实例
     @ObservedObject var accountManager: R2AccountManager
-    
-    /// 消息管理器
     @EnvironmentObject var messageManager: MessageManager
     
-    /// 展开的账户列表（通过账户 ID 追踪）
+    // UI State
     @State private var expandedAccounts: Set<UUID> = []
-    
-    /// 正在加载存储桶的账户
     @State private var loadingBuckets: Set<UUID> = []
-    
-    /// 账户对应的存储桶列表缓存
     @State private var accountBuckets: [UUID: [BucketItem]] = [:]
     
-    /// 断开连接确认对话框
+    // Disconnect Action
     @State private var showDisconnectConfirmation: Bool = false
-    
-    /// 要断开的账户
     @State private var accountToDisconnect: R2Account?
     
     var body: some View {
         List(selection: $selectedView) {
-            // 欢迎页面链接
-            NavigationLink(value: ContentView.MainViewSelection.welcome) {
-                Label("欢迎", systemImage: "house")
+            // MARK: - General
+            Section("General") {
+                NavigationLink(value: ContentView.MainViewSelection.welcome) {
+                    Label("Home", systemImage: "house")
+                }
+                
+                NavigationLink(value: ContentView.MainViewSelection.settings) {
+                    Label("Settings", systemImage: "gear")
+                }
             }
+            .collapsible(false)
             
-            // 账户设置链接
-            NavigationLink(value: ContentView.MainViewSelection.settings) {
-                Label("账户设置", systemImage: "gear")
+            // MARK: - Accounts
+            Section("Accounts") {
+                if accountManager.accounts.isEmpty {
+                    emptyAccountsView
+                } else {
+                    ForEach(accountManager.accounts) { account in
+                        AccountRow(
+                            account: account,
+                            isExpanded: expandedAccounts.contains(account.id),
+                            loading: loadingBuckets.contains(account.id),
+                            buckets: accountBuckets[account.id] ?? [],
+                            isConnected: isAccountConnected(account),
+                            selectedBucketName: r2Service.selectedBucket?.name,
+                            onToggle: { toggleExpansion(for: account) },
+                            onSelectBucket: { bucket in selectBucket(bucket, for: account) },
+                            onRefresh: { loadBucketsForAccount(account, forceRefresh: true) },
+                            onDisconnect: { confirmDisconnect(account) }
+                        )
+                    }
+                }
             }
-            
-            Divider()
-            
-            // 账户和存储桶列表
-            if accountManager.accounts.isEmpty {
-                emptyAccountsView
-            } else {
-                accountsListView
-            }
-            
-            Spacer()
-            
-            // 底部连接状态
-            connectionStatusView
         }
-        .listStyle(SidebarListStyle())
-        .navigationTitle("OwlUploader")
-        .frame(minWidth: 220, idealWidth: 260, maxWidth: 320)
+        .listStyle(.sidebar)
         .confirmationDialog(
-            "断开账户连接",
+            "Disconnect Account",
             isPresented: $showDisconnectConfirmation,
             titleVisibility: .visible
         ) {
-            Button("断开", role: .destructive) {
+            Button("Disconnect", role: .destructive) {
                 if let account = accountToDisconnect {
                     disconnectAccount(account)
                 }
             }
-            Button("取消", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         } message: {
             if let account = accountToDisconnect {
-                Text("确定要断开账户 '\(account.accessKeyID)' 的连接吗？")
+                Text("Are you sure you want to disconnect '\(account.accessKeyID)'?")
             }
         }
     }
     
-    // MARK: - 子视图
+    // MARK: - Views
     
-    /// 空账户提示视图
     private var emptyAccountsView: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "person.crop.circle.badge.plus")
-                .font(.title2)
-                .foregroundColor(.secondary)
-            Text("未配置账户")
-                .font(.caption)
-                .foregroundColor(.secondary)
-            Button("添加账户") {
-                selectedView = .settings
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-        }
-        .frame(maxWidth: .infinity)
-        .padding()
-    }
-    
-    /// 账户列表视图
-    private var accountsListView: some View {
-        ForEach(accountManager.accounts) { account in
-            accountSection(for: account)
-        }
-    }
-    
-    /// 单个账户分区
-    @ViewBuilder
-    private func accountSection(for account: R2Account) -> some View {
-        DisclosureGroup(
-            isExpanded: Binding(
-                get: { expandedAccounts.contains(account.id) },
-                set: { isExpanded in
-                    if isExpanded {
-                        expandedAccounts.insert(account.id)
-                        loadBucketsForAccount(account)
-                    } else {
-                        expandedAccounts.remove(account.id)
-                    }
-                }
-            )
-        ) {
-            // 存储桶列表
-            if loadingBuckets.contains(account.id) {
-                HStack {
-                    ProgressView()
-                        .scaleEffect(0.7)
-                    Text("加载中...")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.leading, 8)
-            } else if let buckets = accountBuckets[account.id], !buckets.isEmpty {
-                ForEach(buckets) { bucket in
-                    bucketRow(bucket: bucket, account: account)
-                }
-            } else {
-                // 无存储桶或需要手动输入
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("输入存储桶名称连接")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    if let defaultBucket = account.defaultBucketName, !defaultBucket.isEmpty {
-                        bucketRow(
-                            bucket: BucketItem(name: defaultBucket, creationDate: nil, owner: nil, region: "auto"),
-                            account: account
-                        )
-                    }
-                }
-                .padding(.leading, 8)
-            }
+        Button {
+            selectedView = .settings
         } label: {
-            accountHeader(for: account)
-        }
-        .contextMenu {
-            Button("刷新存储桶列表") {
-                loadBucketsForAccount(account, forceRefresh: true)
-            }
-            Divider()
-            Button("断开连接", role: .destructive) {
-                accountToDisconnect = account
-                showDisconnectConfirmation = true
-            }
-        }
-    }
-    
-    /// 账户头部视图
-    private func accountHeader(for account: R2Account) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "cloud")
-                .foregroundColor(isAccountConnected(account) ? .green : .secondary)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(account.accessKeyID.prefix(8) + "...")
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .lineLimit(1)
-                
-                if let defaultBucket = account.defaultBucketName, !defaultBucket.isEmpty {
-                    Text(defaultBucket)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                }
-            }
-        }
-    }
-    
-    /// 存储桶行
-    private func bucketRow(bucket: BucketItem, account: R2Account) -> some View {
-        Button(action: {
-            selectBucket(bucket, for: account)
-        }) {
-            HStack(spacing: 6) {
-                Image(systemName: isSelectedBucket(bucket) ? "externaldrive.fill" : "externaldrive")
-                    .foregroundColor(isSelectedBucket(bucket) ? .accentColor : .secondary)
-                    .font(.caption)
-                
-                Text(bucket.name)
-                    .font(.caption)
-                    .foregroundColor(isSelectedBucket(bucket) ? .accentColor : .primary)
-                    .lineLimit(1)
-                
-                Spacer()
-                
-                if isSelectedBucket(bucket) {
-                    Image(systemName: "checkmark")
-                        .font(.caption2)
-                        .foregroundColor(.accentColor)
-                }
-            }
+            Label("Add Account", systemImage: "plus.circle")
+                .foregroundColor(AppColors.textSecondary)
         }
         .buttonStyle(.plain)
-        .padding(.vertical, 2)
-        .padding(.leading, 8)
     }
     
-    /// 连接状态视图
-    private var connectionStatusView: some View {
-        VStack(spacing: 8) {
-            Divider()
-            
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(r2Service.isConnected ? .green : .red)
-                    .frame(width: 8, height: 8)
-                
-                Text(r2Service.isConnected ? "已连接" : "未连接")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
-                Spacer()
-                
-                if let bucket = r2Service.selectedBucket {
-                    Text(bucket.name)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                }
-            }
+    // MARK: - Logic
+    
+    private func toggleExpansion(for account: R2Account) {
+        if expandedAccounts.contains(account.id) {
+            expandedAccounts.remove(account.id)
+        } else {
+            expandedAccounts.insert(account.id)
+            loadBucketsForAccount(account)
         }
-        .padding(.horizontal, 8)
-        .padding(.bottom, 8)
     }
     
-    // MARK: - 辅助方法
-    
-    /// 检查账户是否已连接
     private func isAccountConnected(_ account: R2Account) -> Bool {
         return accountManager.currentAccount?.id == account.id && r2Service.isConnected
     }
     
-    /// 检查是否为当前选中的存储桶
-    private func isSelectedBucket(_ bucket: BucketItem) -> Bool {
-        return r2Service.selectedBucket?.name == bucket.name
-    }
-    
-    /// 加载账户的存储桶列表
     private func loadBucketsForAccount(_ account: R2Account, forceRefresh: Bool = false) {
-        // 如果已有缓存且不是强制刷新，直接返回
-        if !forceRefresh, accountBuckets[account.id] != nil {
-            return
-        }
+        if !forceRefresh, accountBuckets[account.id] != nil { return }
         
-        // R2 不支持 listBuckets，使用默认存储桶
+        // Mock loading/logic as per original file (R2 listBuckets limitation workaround)
         if let defaultBucket = account.defaultBucketName, !defaultBucket.isEmpty {
             let bucket = BucketItem(name: defaultBucket, creationDate: nil, owner: nil, region: "auto")
             accountBuckets[account.id] = [bucket]
@@ -279,55 +110,114 @@ struct SidebarView: View {
         }
     }
     
-    /// 选择存储桶
     private func selectBucket(_ bucket: BucketItem, for account: R2Account) {
         Task {
             do {
-                // 如果不是当前账户，先切换账户
                 if accountManager.currentAccount?.id != account.id {
                     let credentials = try accountManager.getCompleteCredentials(for: account)
                     try await r2Service.initialize(with: credentials.account, secretAccessKey: credentials.secretAccessKey)
                     accountManager.setCurrentAccount(account)
                 }
                 
-                // 选择存储桶
                 let _ = try await r2Service.selectBucketDirectly(bucket.name)
                 
-                // 导航到文件管理页面
                 await MainActor.run {
                     selectedView = .files
-                    messageManager.showSuccess("已连接", description: "成功连接到存储桶 '\(bucket.name)'")
+                    messageManager.showSuccess("Connected", description: "Connected to '\(bucket.name)'")
                 }
             } catch {
                 await MainActor.run {
-                    messageManager.showError("连接失败", description: error.localizedDescription)
+                    messageManager.showError("Connection Failed", description: error.localizedDescription)
                 }
             }
         }
     }
     
-    /// 断开账户连接
+    private func confirmDisconnect(_ account: R2Account) {
+        accountToDisconnect = account
+        showDisconnectConfirmation = true
+    }
+    
     private func disconnectAccount(_ account: R2Account) {
         if accountManager.currentAccount?.id == account.id {
             r2Service.disconnect()
         }
         expandedAccounts.remove(account.id)
         accountBuckets.removeValue(forKey: account.id)
-        messageManager.showSuccess("已断开", description: "账户连接已断开")
+        messageManager.showSuccess("Disconnected", description: "Account disconnected")
     }
 }
 
-// MARK: - 预览
+// MARK: - Subcomponents
 
-#Preview {
-    NavigationView {
-        SidebarView(
-            selectedView: .constant(.welcome),
-            r2Service: R2Service.preview,
-            accountManager: R2AccountManager.shared
-        )
-        .environmentObject(MessageManager())
-        
-        Text("内容区域")
+struct AccountRow: View {
+    let account: R2Account
+    let isExpanded: Bool
+    let loading: Bool
+    let buckets: [BucketItem]
+    let isConnected: Bool
+    let selectedBucketName: String?
+    let onToggle: () -> Void
+    let onSelectBucket: (BucketItem) -> Void
+    let onRefresh: () -> Void
+    let onDisconnect: () -> Void
+    
+    var body: some View {
+        DisclosureGroup(
+            isExpanded: Binding(
+                get: { isExpanded },
+                set: { _ in onToggle() }
+            )
+        ) {
+            if loading {
+                ProgressView().scaleEffect(0.5)
+            } else if buckets.isEmpty {
+                Text("No buckets found")
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.textSecondary)
+                    .padding(.leading)
+            } else {
+                ForEach(buckets) { bucket in
+                    BucketRowItem(
+                        bucket: bucket,
+                        isSelected: bucket.name == selectedBucketName,
+                        action: { onSelectBucket(bucket) }
+                    )
+                }
+            }
+        } label: {
+            HStack {
+                Image(systemName: "cloud.fill")
+                    .foregroundColor(isConnected ? AppColors.success : AppColors.textSecondary)
+                Text(account.accessKeyID)
+                    .font(AppTypography.body)
+                    .lineLimit(1)
+            }
+        }
+        .contextMenu {
+            Button("Refresh", action: onRefresh)
+            Divider()
+            Button("Disconnect", role: .destructive, action: onDisconnect)
+        }
+    }
+}
+
+struct BucketRowItem: View {
+    let bucket: BucketItem
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                Image(systemName: isSelected ? "cylinder.split.1x2.fill" : "cylinder.split.1x2")
+                    .foregroundColor(isSelected ? AppColors.primary : AppColors.textSecondary)
+                Text(bucket.name)
+                    .foregroundColor(isSelected ? AppColors.primary : AppColors.textPrimary)
+                Spacer()
+            }
+        }
+        .buttonStyle(.plain) // Important for List
+        .listRowBackground(isSelected ? AppColors.primary.opacity(0.1) : nil)
     }
 }

@@ -2,120 +2,67 @@
 //  SearchFilterBar.swift
 //  OwlUploader
 //
-//  搜索和筛选栏组件
-//  支持按文件名搜索和按类型筛选
+//  搜索和筛选工具栏
 //
 
 import SwiftUI
 
-/// 筛选类型
+/// 文件筛选类型
 enum FileFilterType: String, CaseIterable {
     case all = "全部"
-    case folder = "文件夹"
-    case image = "图片"
-    case video = "视频"
-    case audio = "音频"
-    case document = "文档"
-    case archive = "压缩包"
+    case folders = "文件夹"
+    case images = "图片"
+    case videos = "视频"
+    case documents = "文档"
+    case archives = "压缩包"
     case other = "其他"
-    
+
+    /// 筛选类型对应的图标名称
     var iconName: String {
         switch self {
         case .all: return "square.grid.2x2"
-        case .folder: return "folder"
-        case .image: return "photo"
-        case .video: return "video"
-        case .audio: return "music.note"
-        case .document: return "doc.text"
-        case .archive: return "archivebox"
-        case .other: return "doc"
+        case .folders: return "folder"
+        case .images: return "photo"
+        case .videos: return "video"
+        case .documents: return "doc.text"
+        case .archives: return "archivebox"
+        case .other: return "questionmark.circle"
         }
-    }
-    
-    /// 检查文件是否匹配此类型
-    func matches(_ fileObject: FileObject) -> Bool {
-        switch self {
-        case .all:
-            return true
-        case .folder:
-            return fileObject.isDirectory
-        case .image:
-            let imageExts = ["jpg", "jpeg", "png", "gif", "webp", "bmp", "ico", "svg", "heic"]
-            return matchesExtensions(fileObject, extensions: imageExts)
-        case .video:
-            let videoExts = ["mp4", "mov", "avi", "mkv", "webm", "m4v", "wmv"]
-            return matchesExtensions(fileObject, extensions: videoExts)
-        case .audio:
-            let audioExts = ["mp3", "wav", "flac", "aac", "ogg", "m4a", "wma"]
-            return matchesExtensions(fileObject, extensions: audioExts)
-        case .document:
-            let docExts = ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "md", "rtf"]
-            return matchesExtensions(fileObject, extensions: docExts)
-        case .archive:
-            let archiveExts = ["zip", "rar", "7z", "tar", "gz", "bz2"]
-            return matchesExtensions(fileObject, extensions: archiveExts)
-        case .other:
-            return !fileObject.isDirectory && 
-                   !FileFilterType.image.matches(fileObject) &&
-                   !FileFilterType.video.matches(fileObject) &&
-                   !FileFilterType.audio.matches(fileObject) &&
-                   !FileFilterType.document.matches(fileObject) &&
-                   !FileFilterType.archive.matches(fileObject)
-        }
-    }
-    
-    private func matchesExtensions(_ fileObject: FileObject, extensions: [String]) -> Bool {
-        let ext = fileObject.name.components(separatedBy: ".").last?.lowercased() ?? ""
-        return extensions.contains(ext)
     }
 }
 
-/// 排序方式
+/// 文件排序方式
 enum FileSortOrder: String, CaseIterable {
     case name = "名称"
-    case nameDesc = "名称 (降序)"
     case size = "大小"
-    case sizeDesc = "大小 (降序)"
     case date = "日期"
-    case dateDesc = "日期 (降序)"
-    
+    case type = "类型"
+
+    /// 排序方式对应的图标名称
     var iconName: String {
         switch self {
-        case .name: return "textformat.abc"
-        case .nameDesc: return "textformat.abc"
-        case .size: return "arrow.up.arrow.down"
-        case .sizeDesc: return "arrow.up.arrow.down"
+        case .name: return "textformat"
+        case .size: return "internaldrive"
         case .date: return "calendar"
-        case .dateDesc: return "calendar"
+        case .type: return "doc"
         }
     }
 }
 
-/// 搜索筛选栏视图
+/// 搜索和筛选工具栏视图
 struct SearchFilterBar: View {
-    
-    /// 搜索文本
     @Binding var searchText: String
-    
-    /// 当前筛选类型
     @Binding var filterType: FileFilterType
-    
-    /// 当前排序方式
     @Binding var sortOrder: FileSortOrder
-    
-    /// 是否显示筛选选项
-    @State private var showFilterOptions: Bool = false
-    
+
     var body: some View {
         HStack(spacing: 12) {
             // 搜索框
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.secondary)
-                
-                TextField("搜索文件名...", text: $searchText)
+                TextField("搜索文件...", text: $searchText)
                     .textFieldStyle(.plain)
-                
                 if !searchText.isEmpty {
                     Button(action: { searchText = "" }) {
                         Image(systemName: "xmark.circle.fill")
@@ -124,163 +71,103 @@ struct SearchFilterBar: View {
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .background(Color(NSColor.controlBackgroundColor))
-            .cornerRadius(8)
-            .frame(maxWidth: 300)
-            
-            // 类型筛选下拉
-            Menu {
+            .padding(6)
+            .background(Color(nsColor: .controlBackgroundColor))
+            .cornerRadius(6)
+            .frame(maxWidth: 200)
+
+            // 筛选类型
+            Picker("筛选", selection: $filterType) {
                 ForEach(FileFilterType.allCases, id: \.self) { type in
-                    Button(action: { filterType = type }) {
-                        Label(type.rawValue, systemImage: type.iconName)
-                    }
+                    Text(type.rawValue).tag(type)
                 }
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: filterType.iconName)
-                    Text(filterType.rawValue)
-                    Image(systemName: "chevron.down")
-                        .font(.caption)
-                }
-                .font(.caption)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .background(filterType == .all ? Color.clear : Color.blue.opacity(0.1))
-                .cornerRadius(6)
             }
-            .menuStyle(.borderlessButton)
-            
-            // 排序方式下拉
-            Menu {
+            .pickerStyle(.menu)
+            .frame(width: 100)
+
+            // 排序方式
+            Picker("排序", selection: $sortOrder) {
                 ForEach(FileSortOrder.allCases, id: \.self) { order in
-                    Button(action: { sortOrder = order }) {
-                        Label(order.rawValue, systemImage: order.iconName)
-                    }
+                    Text(order.rawValue).tag(order)
                 }
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.up.arrow.down")
-                    Text(sortOrder.rawValue)
-                    Image(systemName: "chevron.down")
-                        .font(.caption)
-                }
-                .font(.caption)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .cornerRadius(6)
             }
-            .menuStyle(.borderlessButton)
-            
+            .pickerStyle(.menu)
+            .frame(width: 80)
+
             Spacer()
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal)
         .padding(.vertical, 8)
     }
 }
 
-/// 文件筛选和排序辅助方法
-extension Array where Element == FileObject {
-    
-    /// 应用搜索和筛选
-    func filtered(by searchText: String, filterType: FileFilterType) -> [FileObject] {
-        var result = self
-        
-        // 应用类型筛选
-        if filterType != .all {
-            result = result.filter { filterType.matches($0) }
-        }
-        
-        // 应用搜索
+// MARK: - 辅助方法
+
+extension SearchFilterBar {
+    /// 根据当前筛选条件过滤和排序文件
+    static func filterAndSort(
+        files: [FileObject],
+        searchText: String,
+        filterType: FileFilterType,
+        sortOrder: FileSortOrder
+    ) -> [FileObject] {
+        var result = files
+
+        // 搜索过滤
         if !searchText.isEmpty {
-            let lowercasedSearch = searchText.lowercased()
-            result = result.filter { $0.name.lowercased().contains(lowercasedSearch) }
-        }
-        
-        return result
-    }
-    
-    /// 应用排序
-    func sorted(by order: FileSortOrder) -> [FileObject] {
-        // 文件夹始终排在前面
-        let folders = self.filter { $0.isDirectory }
-        let files = self.filter { !$0.isDirectory }
-
-        // 按名称升序排序
-        func sortByNameAsc(_ items: [FileObject]) -> [FileObject] {
-            items.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            result = result.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
         }
 
-        // 按名称降序排序
-        func sortByNameDesc(_ items: [FileObject]) -> [FileObject] {
-            items.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedDescending }
+        // 类型过滤
+        switch filterType {
+        case .all:
+            break
+        case .folders:
+            result = result.filter { $0.isDirectory }
+        case .images:
+            result = result.filter { $0.isImage }
+        case .videos:
+            result = result.filter { $0.isVideo }
+        case .documents:
+            result = result.filter { $0.isDocument }
+        case .archives:
+            result = result.filter { $0.isArchive }
+        case .other:
+            result = result.filter { !$0.isDirectory && !$0.isImage && !$0.isVideo && !$0.isDocument && !$0.isArchive }
         }
 
-        // 按大小升序排序
-        func sortBySizeAsc(_ items: [FileObject]) -> [FileObject] {
-            items.sorted { ($0.size ?? 0) < ($1.size ?? 0) }
-        }
-
-        // 按大小降序排序
-        func sortBySizeDesc(_ items: [FileObject]) -> [FileObject] {
-            items.sorted { ($0.size ?? 0) > ($1.size ?? 0) }
-        }
-
-        // 按日期升序排序
-        func sortByDateAsc(_ items: [FileObject]) -> [FileObject] {
-            items.sorted { (a: FileObject, b: FileObject) -> Bool in
-                let dateA = a.lastModifiedDate ?? Date.distantPast
-                let dateB = b.lastModifiedDate ?? Date.distantPast
-                return dateA < dateB
-            }
-        }
-
-        // 按日期降序排序
-        func sortByDateDesc(_ items: [FileObject]) -> [FileObject] {
-            items.sorted { (a: FileObject, b: FileObject) -> Bool in
-                let dateA = a.lastModifiedDate ?? Date.distantPast
-                let dateB = b.lastModifiedDate ?? Date.distantPast
-                return dateA > dateB
-            }
-        }
-
-        let sortedFolders: [FileObject]
-        let sortedFiles: [FileObject]
-
-        switch order {
+        // 排序
+        switch sortOrder {
         case .name:
-            sortedFolders = sortByNameAsc(folders)
-            sortedFiles = sortByNameAsc(files)
-        case .nameDesc:
-            sortedFolders = sortByNameDesc(folders)
-            sortedFiles = sortByNameDesc(files)
+            result.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         case .size:
-            sortedFolders = sortByNameAsc(folders)
-            sortedFiles = sortBySizeAsc(files)
-        case .sizeDesc:
-            sortedFolders = sortByNameAsc(folders)
-            sortedFiles = sortBySizeDesc(files)
+            result.sort { ($0.size ?? 0) < ($1.size ?? 0) }
         case .date:
-            sortedFolders = sortByDateAsc(folders)
-            sortedFiles = sortByDateAsc(files)
-        case .dateDesc:
-            sortedFolders = sortByDateDesc(folders)
-            sortedFiles = sortByDateDesc(files)
+            result.sort { ($0.lastModifiedDate ?? Date.distantPast) < ($1.lastModifiedDate ?? Date.distantPast) }
+        case .type:
+            result.sort { $0.fileExtension.lowercased() < $1.fileExtension.lowercased() }
         }
 
-        return sortedFolders + sortedFiles
+        // 文件夹始终在前面
+        let folders = result.filter { $0.isDirectory }
+        let files = result.filter { !$0.isDirectory }
+
+        return folders + files
     }
 }
 
-// MARK: - 预览
+// MARK: - FileObject 辅助扩展
 
-#Preview("搜索筛选栏") {
-    SearchFilterBar(
-        searchText: .constant("test"),
-        filterType: .constant(.all),
-        sortOrder: .constant(.name)
-    )
-    .frame(width: 600)
-    .padding()
+extension FileObject {
+    /// 是否为文档类型
+    var isDocument: Bool {
+        let docExtensions = ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "rtf", "pages", "numbers", "keynote"]
+        return docExtensions.contains(fileExtension.lowercased())
+    }
+
+    /// 是否为压缩包
+    var isArchive: Bool {
+        let archiveExtensions = ["zip", "rar", "7z", "tar", "gz", "bz2", "xz"]
+        return archiveExtensions.contains(fileExtension.lowercased())
+    }
 }
