@@ -13,10 +13,16 @@ import UniformTypeIdentifiers
 struct FileListView: View {
     /// R2 服务实例
     @ObservedObject var r2Service: R2Service
-    
+
+    /// 选择状态管理器
+    @ObservedObject var selectionManager: SelectionManager
+
+    /// 视图模式管理器
+    @ObservedObject var viewModeManager: ViewModeManager
+
     /// 消息管理器（通过环境对象传递）
     @EnvironmentObject var messageManager: MessageManager
-    
+
     /// 当前路径前缀
     @State private var currentPrefix: String = ""
     
@@ -443,9 +449,11 @@ struct FileListView: View {
             // 文件列表前景
             List {
                 // 文件和文件夹列表（应用筛选和排序）
-                ForEach(SearchFilterBar.filterAndSort(files: fileObjects, searchText: searchText, filterType: filterType, sortOrder: sortOrder), id: \.key) { fileObject in
+                let filteredFiles = SearchFilterBar.filterAndSort(files: fileObjects, searchText: searchText, filterType: filterType, sortOrder: sortOrder)
+                ForEach(filteredFiles, id: \.key) { fileObject in
                     FileListItemView(
                         fileObject: fileObject,
+                        isSelected: selectionManager.isSelected(fileObject),
                         r2Service: r2Service,
                         bucketName: r2Service.selectedBucket?.name,
                         messageManager: messageManager,
@@ -453,14 +461,15 @@ struct FileListView: View {
                             requestDeleteFile(fileToDelete)
                         }
                     )
+                    .contentShape(Rectangle())
                     .onTapGesture {
-                        if fileObject.isDirectory {
-                            handleItemTap(fileObject)
-                        } else {
-                            // 文件点击预览
-                            fileToPreview = fileObject
-                        }
+                        handleFileItemTap(fileObject, allFiles: filteredFiles)
                     }
+                    .simultaneousGesture(
+                        TapGesture(count: 2).onEnded {
+                            handleFileItemDoubleTap(fileObject)
+                        }
+                    )
                 }
             }
             .listStyle(PlainListStyle())
@@ -537,10 +546,40 @@ struct FileListView: View {
     private func handleItemTap(_ fileObject: FileObject) {
         // 只有文件夹可以点击进入
         guard fileObject.isDirectory else { return }
-        
+
         // 更新当前路径并重新加载列表
         currentPrefix = fileObject.key
+        selectionManager.clearSelection()
         loadFileList()
+    }
+
+    /// 处理文件列表项单击
+    /// - Parameters:
+    ///   - fileObject: 被点击的文件对象
+    ///   - allFiles: 所有文件列表（用于范围选择）
+    private func handleFileItemTap(_ fileObject: FileObject, allFiles: [FileObject]) {
+        // 获取当前修饰键
+        let modifiers = NSEvent.modifierFlags
+
+        // 根据修饰键确定选择模式
+        let mode = SelectionManager.modeFromModifiers(modifiers)
+
+        // 执行选择
+        selectionManager.select(fileObject, mode: mode, allFiles: allFiles)
+    }
+
+    /// 处理文件列表项双击
+    /// - Parameter fileObject: 被双击的文件对象
+    private func handleFileItemDoubleTap(_ fileObject: FileObject) {
+        if fileObject.isDirectory {
+            // 文件夹：进入目录
+            currentPrefix = fileObject.key
+            selectionManager.clearSelection()
+            loadFileList()
+        } else {
+            // 文件：打开预览
+            fileToPreview = fileObject
+        }
     }
     
     /// 返回上一级目录
@@ -994,15 +1033,27 @@ struct FileListView: View {
 // MARK: - 预览
 
 #Preview("未连接状态") {
-    FileListView(r2Service: R2Service())
+    FileListView(
+        r2Service: R2Service(),
+        selectionManager: SelectionManager(),
+        viewModeManager: ViewModeManager()
+    )
 }
 
 #Preview("正常状态") {
-    FileListView(r2Service: R2Service.preview)
+    FileListView(
+        r2Service: R2Service.preview,
+        selectionManager: SelectionManager(),
+        viewModeManager: ViewModeManager()
+    )
 }
 
 #Preview("加载中状态") {
     let service = R2Service.preview
     service.isLoading = true
-    return FileListView(r2Service: service)
+    return FileListView(
+        r2Service: service,
+        selectionManager: SelectionManager(),
+        viewModeManager: ViewModeManager()
+    )
 } 

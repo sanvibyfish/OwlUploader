@@ -10,16 +10,22 @@ import SwiftUI
 struct ContentView: View {
     /// 当前显示的主视图
     @State private var selectedView: MainViewSelection? = .welcome
-    
+
     /// R2 服务实例
     @StateObject private var r2Service = R2Service.shared
-    
+
     /// R2 账户管理器实例
     @StateObject private var accountManager = R2AccountManager.shared
-    
+
     /// 消息管理器实例
     @StateObject private var messageManager = MessageManager()
-    
+
+    /// 选择状态管理器
+    @StateObject private var selectionManager = SelectionManager()
+
+    /// 视图模式管理器
+    @StateObject private var viewModeManager = ViewModeManager()
+
     /// 断开连接确认对话框
     @State private var showDisconnectConfirmation: Bool = false
     
@@ -49,7 +55,11 @@ struct ContentView: View {
                 case .buckets:
                     BucketListView(r2Service: r2Service)
                 case .files:
-                    FileListView(r2Service: r2Service)
+                    FileListView(
+                        r2Service: r2Service,
+                        selectionManager: selectionManager,
+                        viewModeManager: viewModeManager
+                    )
                 case .none:
                     WelcomeView(selectedView: $selectedView, r2Service: r2Service)
                 }

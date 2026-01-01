@@ -28,9 +28,22 @@ struct R2Account: Codable, Identifiable {
     /// 账户名称（用户自定义，便于识别）
     var displayName: String
     
-    /// 默认存储桶名称（可选，用于没有 listBuckets 权限的情况）
-    var defaultBucketName: String?
-    
+    /// 默认存储桶名称（已废弃，使用 bucketNames 代替）
+    @available(*, deprecated, message: "使用 bucketNames 代替")
+    var defaultBucketName: String? {
+        get { bucketNames.first }
+        set {
+            if let name = newValue, !name.isEmpty {
+                if !bucketNames.contains(name) {
+                    bucketNames.insert(name, at: 0)
+                }
+            }
+        }
+    }
+
+    /// 存储桶名称列表（支持多个存储桶）
+    var bucketNames: [String]
+
     /// 公共域名（可选，用于生成文件的公共访问链接）
     var publicDomain: String?
     
@@ -48,18 +61,61 @@ struct R2Account: Codable, Identifiable {
     ///   - accessKeyID: Access Key ID
     ///   - endpointURL: 服务端点 URL，如果为空则使用默认的 Cloudflare R2 端点
     ///   - displayName: 显示名称，如果为空则使用 Account ID 的前8位字符
-    ///   - defaultBucketName: 默认存储桶名称，可选
+    ///   - bucketNames: 存储桶名称列表
     ///   - publicDomain: 公共域名，可选
-    init(accountID: String, accessKeyID: String, endpointURL: String? = nil, displayName: String? = nil, defaultBucketName: String? = nil, publicDomain: String? = nil) {
+    init(accountID: String, accessKeyID: String, endpointURL: String? = nil, displayName: String? = nil, bucketNames: [String] = [], publicDomain: String? = nil) {
         self.id = UUID()
         self.accountID = accountID
         self.accessKeyID = accessKeyID
         self.endpointURL = endpointURL ?? Self.defaultCloudflareR2EndpointURL(for: accountID)
         self.displayName = displayName ?? String(accountID.prefix(8))
-        self.defaultBucketName = defaultBucketName
+        self.bucketNames = bucketNames
         self.publicDomain = publicDomain
         self.createdAt = Date()
         self.updatedAt = Date()
+    }
+
+    // MARK: - Codable (支持旧数据迁移)
+
+    private enum CodingKeys: String, CodingKey {
+        case id, accountID, accessKeyID, endpointURL, displayName
+        case bucketNames, defaultBucketName // 支持两种格式
+        case publicDomain, createdAt, updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        accountID = try container.decode(String.self, forKey: .accountID)
+        accessKeyID = try container.decode(String.self, forKey: .accessKeyID)
+        endpointURL = try container.decode(String.self, forKey: .endpointURL)
+        displayName = try container.decode(String.self, forKey: .displayName)
+        publicDomain = try container.decodeIfPresent(String.self, forKey: .publicDomain)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+
+        // 迁移逻辑：优先读取 bucketNames，否则从 defaultBucketName 迁移
+        if let names = try container.decodeIfPresent([String].self, forKey: .bucketNames) {
+            bucketNames = names
+        } else if let defaultName = try container.decodeIfPresent(String.self, forKey: .defaultBucketName),
+                  !defaultName.isEmpty {
+            bucketNames = [defaultName]
+        } else {
+            bucketNames = []
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(accountID, forKey: .accountID)
+        try container.encode(accessKeyID, forKey: .accessKeyID)
+        try container.encode(endpointURL, forKey: .endpointURL)
+        try container.encode(displayName, forKey: .displayName)
+        try container.encode(bucketNames, forKey: .bucketNames)
+        try container.encodeIfPresent(publicDomain, forKey: .publicDomain)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(updatedAt, forKey: .updatedAt)
     }
     
     // MARK: - 静态方法
@@ -96,14 +152,14 @@ struct R2Account: Codable, Identifiable {
     ///   - accessKeyID: 新的 Access Key ID
     ///   - endpointURL: 新的端点 URL
     ///   - displayName: 新的显示名称
-    ///   - defaultBucketName: 新的默认存储桶名称
+    ///   - bucketNames: 新的存储桶名称列表
     ///   - publicDomain: 新的公共域名
     /// - Returns: 更新后的账户对象
-    func updated(accountID: String? = nil, 
-                 accessKeyID: String? = nil, 
-                 endpointURL: String? = nil, 
+    func updated(accountID: String? = nil,
+                 accessKeyID: String? = nil,
+                 endpointURL: String? = nil,
                  displayName: String? = nil,
-                 defaultBucketName: String? = nil,
+                 bucketNames: [String]? = nil,
                  publicDomain: String? = nil) -> R2Account {
         var updated = self
         if let accountID = accountID {
@@ -118,14 +174,44 @@ struct R2Account: Codable, Identifiable {
         if let displayName = displayName {
             updated.displayName = displayName
         }
-        if let defaultBucketName = defaultBucketName {
-            updated.defaultBucketName = defaultBucketName
+        if let bucketNames = bucketNames {
+            updated.bucketNames = bucketNames
         }
         if let publicDomain = publicDomain {
             updated.publicDomain = publicDomain
         }
         updated.updatedAt = Date()
         return updated
+    }
+
+    // MARK: - 存储桶管理
+
+    /// 添加存储桶
+    /// - Parameter bucketName: 存储桶名称
+    /// - Returns: 更新后的账户对象
+    func addingBucket(_ bucketName: String) -> R2Account {
+        guard !bucketName.isEmpty, !bucketNames.contains(bucketName) else { return self }
+        var updated = self
+        updated.bucketNames.append(bucketName)
+        updated.updatedAt = Date()
+        return updated
+    }
+
+    /// 移除存储桶
+    /// - Parameter bucketName: 存储桶名称
+    /// - Returns: 更新后的账户对象
+    func removingBucket(_ bucketName: String) -> R2Account {
+        var updated = self
+        updated.bucketNames.removeAll { $0 == bucketName }
+        updated.updatedAt = Date()
+        return updated
+    }
+
+    /// 检查是否包含指定存储桶
+    /// - Parameter bucketName: 存储桶名称
+    /// - Returns: 是否包含
+    func hasBucket(_ bucketName: String) -> Bool {
+        return bucketNames.contains(bucketName)
     }
 }
 

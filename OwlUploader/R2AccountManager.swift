@@ -170,7 +170,78 @@ class R2AccountManager: ObservableObject {
     func validateAccount(_ account: R2Account) -> Bool {
         return account.isValid() && keychainService.hasSecretAccessKey(for: account)
     }
-    
+
+    // MARK: - 存储桶管理
+
+    /// 为账户添加存储桶
+    /// - Parameters:
+    ///   - account: 目标账户
+    ///   - bucketName: 存储桶名称
+    /// - Throws: 保存过程中的错误
+    func addBucket(to account: R2Account, bucketName: String) throws {
+        guard let index = accounts.firstIndex(where: { $0.id == account.id }) else {
+            throw AccountManagerError.accountNotFound
+        }
+
+        let trimmedName = bucketName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return }
+
+        // 检查是否已存在
+        guard !accounts[index].bucketNames.contains(trimmedName) else { return }
+
+        // 添加存储桶
+        accounts[index] = accounts[index].addingBucket(trimmedName)
+
+        // 同步更新 currentAccount
+        if currentAccount?.id == account.id {
+            currentAccount = accounts[index]
+        }
+
+        // 保存到 UserDefaults
+        try saveAccountsToUserDefaults()
+    }
+
+    /// 从账户移除存储桶
+    /// - Parameters:
+    ///   - account: 目标账户
+    ///   - bucketName: 存储桶名称
+    /// - Throws: 保存过程中的错误
+    func removeBucket(from account: R2Account, bucketName: String) throws {
+        guard let index = accounts.firstIndex(where: { $0.id == account.id }) else {
+            throw AccountManagerError.accountNotFound
+        }
+
+        // 移除存储桶
+        accounts[index] = accounts[index].removingBucket(bucketName)
+
+        // 同步更新 currentAccount
+        if currentAccount?.id == account.id {
+            currentAccount = accounts[index]
+        }
+
+        // 保存到 UserDefaults
+        try saveAccountsToUserDefaults()
+    }
+
+    /// 更新账户信息
+    /// - Parameter account: 更新后的账户
+    /// - Throws: 保存过程中的错误
+    func updateAccount(_ account: R2Account) throws {
+        guard let index = accounts.firstIndex(where: { $0.id == account.id }) else {
+            throw AccountManagerError.accountNotFound
+        }
+
+        accounts[index] = account
+
+        // 同步更新 currentAccount
+        if currentAccount?.id == account.id {
+            currentAccount = account
+        }
+
+        // 保存到 UserDefaults
+        try saveAccountsToUserDefaults()
+    }
+
     // MARK: - 私有方法
     
     /// 加载当前选中的账户
