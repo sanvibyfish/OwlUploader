@@ -41,11 +41,7 @@ struct FileListView: View {
     /// 是否显示文件选择器
     @State private var showingFileImporter: Bool = false
     
-    /// 上传状态
-    @State private var isUploading: Bool = false
-    
-    /// 上传进度信息
-    @State private var uploadMessage: String = ""
+
     
     /// 上传队列管理器
     @StateObject private var uploadQueueManager = UploadQueueManager()
@@ -363,7 +359,7 @@ struct FileListView: View {
         ZStack {
             // 拖拽区域背景
             FileDropView(
-                isEnabled: canLoadFiles && !isUploading && !r2Service.isLoading,
+                isEnabled: canLoadFiles && !r2Service.isLoading,
                 isTargeted: $isTargeted,
                 onFileDrop: { [self] fileURL, originalFileName in
                     print("🎯 空列表区域拖拽上传: \(originalFileName)")
@@ -467,7 +463,7 @@ struct FileListView: View {
         return ZStack {
             // 拖拽区域背景
             FileDropView(
-                isEnabled: canLoadFiles && !isUploading && !r2Service.isLoading,
+                isEnabled: canLoadFiles && !r2Service.isLoading,
                 isTargeted: $isTargeted,
                 onFileDrop: { [self] fileURL, originalFileName in
                     print("🎯 文件列表区域拖拽上传: \(originalFileName)")
@@ -616,6 +612,12 @@ struct FileListView: View {
     /// 加载文件列表
     private func loadFileList() {
         guard canLoadFiles else { return }
+        
+        // 立即重置状态以防止显示 stale data
+        fileObjects = []
+        isInitialLoading = true
+        selectionManager.clearSelection()
+        
         guard let bucket = r2Service.selectedBucket else { return }
         
         Task {
@@ -942,288 +944,21 @@ struct FileListView: View {
         print("📤 上传文件: \(originalFileName)")
         print("📍 文件来源: \(source)")
         
-        // 根据来源调用不同的上传方法
-        actuallyUpload(fileURL: fileURL, originalFileName: originalFileName, source: source)
-    }
-    
-    /// 实际执行文件上传的方法
-    /// - Parameters:
-    ///   - fileURL: 本地文件 URL
-    ///   - originalFileName: 原始文件名
-    ///   - source: 文件来源
-    private func actuallyUpload(fileURL: URL, originalFileName: String, source: FileSource) {
-        guard canLoadFiles else { 
-            print("❌ canLoadFiles = false，无法上传")
+        guard canLoadFiles else {
             messageManager.showError(L.Message.Error.cannotUpload, description: L.Message.Error.serviceNotReady)
-            return 
+            return
         }
-        guard let bucket = r2Service.selectedBucket else { 
-            print("❌ 未选择存储桶，无法上传")
+        guard let bucket = r2Service.selectedBucket else {
             messageManager.showError(L.Message.Error.cannotUpload, description: L.Message.Error.noBucketSelected)
-            return 
-        }
-        
-        // 使用传入的原始文件名
-        let fileName = sanitizeFileName(originalFileName)
-        print("📄 准备上传文件: \(originalFileName) -> \(fileName)")
-        
-        // 检查是否是临时文件名被替换的情况
-        if originalFileName != fileURL.lastPathComponent {
-            print("🔄 使用原始文件名替换文件URL名:")
-            print("   文件URL名: \(fileURL.lastPathComponent)")
-            print("   原始文件名: \(originalFileName)")
-        }
-        
-        // 获取沙盒安全作用域权限（文件选择器和拖拽都需要）
-        let needsSecurityScope = fileURL.startAccessingSecurityScopedResource()
-        let sourceDesc = source == .fileImporter ? "文件选择器" : "拖拽上传"
-        print("🔐 安全作用域权限 [\(sourceDesc)]: \(needsSecurityScope ? "已获取" : "未获取/不需要")")
-        
-        // 立即验证文件访问和读取数据
-        let fileData: Data
-        do {
-            // 先检查文件存在性
-            guard FileManager.default.fileExists(atPath: fileURL.path) else {
-                print("❌ 文件不存在: \(fileURL.path)")
-                if needsSecurityScope {
-                    fileURL.stopAccessingSecurityScopedResource()
-                }
-                messageManager.showError(L.Message.Error.uploadFailed, description: L.Message.Error.fileNotExists(originalFileName))
-                return
-            }
-            
-            // 立即读取文件数据（这会验证权限是否有效）
-            fileData = try Data(contentsOf: fileURL)
-            print("✅ 成功读取文件数据: \(fileName), 大小: \(fileData.count) bytes")
-            
-            // 检查文件大小限制
-            let maxSize: Int64 = 5 * 1024 * 1024 * 1024 // 5GB
-            if fileData.count > maxSize {
-                if needsSecurityScope {
-                    fileURL.stopAccessingSecurityScopedResource()
-                }
-                let formatter = ByteCountFormatter()
-                formatter.allowedUnits = [.useGB, .useMB]
-                formatter.countStyle = .file
-                let fileSizeString = formatter.string(fromByteCount: Int64(fileData.count))
-                print("❌ 文件过大: \(fileSizeString)")
-                messageManager.showError(L.Message.Error.uploadFailed, description: L.Message.Error.fileTooLarge(originalFileName, fileSizeString))
-                return
-            }
-            
-            // 显示文件大小信息
-            let formatter = ByteCountFormatter()
-            formatter.allowedUnits = [.useGB, .useMB, .useKB]
-            formatter.countStyle = .file
-            let fileSizeString = formatter.string(fromByteCount: Int64(fileData.count))
-            print("📊 文件大小检查通过: \(fileName) (\(fileSizeString))")
-            
-        } catch {
-            // 出错时立即释放权限
-            if needsSecurityScope {
-                fileURL.stopAccessingSecurityScopedResource()
-            }
-            
-            print("❌ 无法读取文件数据: \(error)")
-            // 特殊处理权限错误
-            if let nsError = error as? NSError, nsError.domain == "NSCocoaErrorDomain", nsError.code == 257 {
-                messageManager.showError(L.Message.Error.filePermissionDenied, description: L.Message.Error.filePermissionDeniedDetail(originalFileName))
-            } else {
-                messageManager.showError(L.Message.Error.uploadFailed, description: L.Message.Error.fileReadFailed(originalFileName, error.localizedDescription))
-            }
             return
         }
         
-        // 构造目标对象键
-        let objectKey: String
-        if currentPrefix.isEmpty {
-            objectKey = fileName
-        } else {
-            // 确保当前前缀以 `/` 结尾
-            let normalizedPrefix = currentPrefix.hasSuffix("/") ? currentPrefix : currentPrefix + "/"
-            objectKey = normalizedPrefix + fileName
-        }
-        
-        print("🚀 准备上传到: \(bucket.name)/\(objectKey)")
-        
-        // 立即更新 UI 状态
-        isUploading = true
-        uploadMessage = L.Upload.uploadingFile(originalFileName)
-        
-        // 👇 立即执行上传，使用已读取的数据，避免异步权限问题
-        Task {
-            do {
-                print("🔄 开始上传，使用预读取的数据...")
-                
-                // 使用 Data 版本的上传方法，避免再次访问文件
-                try await r2Service.uploadData(
-                    bucket: bucket.name,
-                    key: objectKey,
-                    data: fileData,
-                    contentType: self.getContentType(for: fileName)
-                )
-                
-                await MainActor.run {
-                    // 上传成功后立即释放权限
-                    if needsSecurityScope {
-                        fileURL.stopAccessingSecurityScopedResource()
-                        print("🔓 已释放安全作用域权限")
-                    }
-                    
-                    // 上传成功
-                    isUploading = false
-                    uploadMessage = ""
-                    print("✅ 文件上传成功: \(objectKey)")
-                    messageManager.showSuccess(L.Message.Success.uploadComplete, description: L.Message.Success.uploadToBucket(originalFileName, bucket.name))
-                    
-                    // 清理临时复制的文件
-                    self.cleanupTempFile(fileURL)
-                    
-                    // 刷新文件列表以显示新上传的文件
-                    loadFileList()
-                }
-            } catch {
-                await MainActor.run {
-                    // 上传失败后立即释放权限
-                    if needsSecurityScope {
-                        fileURL.stopAccessingSecurityScopedResource()
-                        print("🔓 已释放安全作用域权限（上传失败）")
-                    }
-                    
-                    // 上传失败
-                    isUploading = false
-                    uploadMessage = ""
-                    print("❌ 文件上传失败: \(error)")
-                    
-                    // 清理临时复制的文件
-                    self.cleanupTempFile(fileURL)
-                    
-                    if let r2Error = error as? R2ServiceError {
-                        // 提供更详细的错误诊断
-                        print("🔍 R2ServiceError 详情: \(r2Error.errorDescription ?? "未知错误")")
-                        if let suggestion = r2Error.suggestedAction {
-                            print("💡 建议操作: \(suggestion)")
-                        }
-                        messageManager.showError(r2Error)
-                    } else {
-                        // 处理其他未知错误
-                        print("🔍 其他错误类型: \(type(of: error))")
-                        messageManager.showError(L.Message.Error.uploadFailed, description: L.Error.File.uploadFailed(originalFileName, error.localizedDescription))
-                    }
-                }
-            }
-        }
+        // 配置并添加到队列
+        uploadQueueManager.configure(r2Service: r2Service, bucketName: bucket.name)
+        // 使用数组包装单个文件
+        uploadQueueManager.addFiles([fileURL], to: currentPrefix)
     }
     
-    /// 清理文件名，确保符合 S3/R2 对象键要求
-    /// - Parameter fileName: 原始文件名
-    /// - Returns: 清理后的文件名
-    private func sanitizeFileName(_ fileName: String) -> String {
-        // 如果文件名已经是有效的，直接返回
-        if isValidObjectKey(fileName) {
-            return fileName
-        }
-        
-        print("⚠️ 文件名包含特殊字符，正在清理: \(fileName)")
-        
-        // 分离文件名和扩展名
-        let fileNameWithoutExt = (fileName as NSString).deletingPathExtension
-        let fileExtension = (fileName as NSString).pathExtension
-        
-        // 清理文件名主体
-        var sanitized = fileNameWithoutExt
-        
-        // 替换不安全的字符为下划线
-        let unsafeCharacters = CharacterSet(charactersIn: "\\/:*?\"<>|{}[]")
-        sanitized = sanitized.components(separatedBy: unsafeCharacters).joined(separator: "_")
-        
-        // 移除连续的下划线
-        while sanitized.contains("__") {
-            sanitized = sanitized.replacingOccurrences(of: "__", with: "_")
-        }
-        
-        // 移除开头和结尾的下划线和空格
-        sanitized = sanitized.trimmingCharacters(in: CharacterSet(charactersIn: "_ "))
-        
-        // 如果清理后为空，使用默认名称
-        if sanitized.isEmpty {
-            sanitized = L.Files.defaultFileName
-        }
-        
-        // 重新组合文件名
-        let result = fileExtension.isEmpty ? sanitized : "\(sanitized).\(fileExtension)"
-        
-        print("✅ 文件名清理完成: \(fileName) -> \(result)")
-        return result
-    }
-    
-    /// 检查是否为有效的 S3/R2 对象键
-    /// - Parameter key: 对象键
-    /// - Returns: 是否有效
-    private func isValidObjectKey(_ key: String) -> Bool {
-        // 基本检查
-        guard !key.isEmpty else { return false }
-        guard key.count <= 1024 else { return false } // S3 对象键最大长度限制
-        
-        // 检查是否包含不安全字符
-        let unsafeCharacters = CharacterSet(charactersIn: "\\:*?\"<>|{}[]")
-        if key.rangeOfCharacter(from: unsafeCharacters) != nil {
-            return false
-        }
-        
-        // 不能以 / 开头
-        if key.hasPrefix("/") {
-            return false
-        }
-        
-        return true
-    }
-    
-    /// 根据文件扩展名获取MIME类型
-    /// - Parameter fileName: 文件名
-    /// - Returns: MIME类型字符串
-    private func getContentType(for fileName: String) -> String {
-        let ext = (fileName as NSString).pathExtension.lowercased()
-        
-        switch ext {
-        case "jpg", "jpeg": return "image/jpeg"
-        case "png": return "image/png"
-        case "gif": return "image/gif"
-        case "pdf": return "application/pdf"
-        case "txt": return "text/plain"
-        case "html": return "text/html"
-        case "css": return "text/css"
-        case "js": return "application/javascript"
-        case "json": return "application/json"
-        case "xml": return "application/xml"
-        case "zip": return "application/zip"
-        case "mp4": return "video/mp4"
-        case "mp3": return "audio/mpeg"
-        default: return "application/octet-stream"
-        }
-    }
-    
-    /// 清理临时文件
-    /// 删除应用documents/uploads目录中的临时复制文件
-    /// - Parameter fileURL: 要清理的文件URL
-    private func cleanupTempFile(_ fileURL: URL) {
-        // 检查是否是应用的uploads目录中的文件
-        guard let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            return
-        }
-        
-        let uploadsURL = documentsURL.appendingPathComponent("uploads")
-        
-        // 确保文件在uploads目录中才删除
-        if fileURL.path.starts(with: uploadsURL.path) {
-            do {
-                try FileManager.default.removeItem(at: fileURL)
-                print("🧹 已清理临时文件: \(fileURL.lastPathComponent)")
-            } catch {
-                print("⚠️ 清理临时文件失败: \(error)")
-            }
-        }
-    }
     
     /// 请求删除文件或文件夹（显示确认对话框）
     /// - Parameter fileObject: 要删除的文件或文件夹对象

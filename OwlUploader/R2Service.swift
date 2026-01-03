@@ -727,8 +727,9 @@ class R2Service: ObservableObject {
                         }
 
                         // Cloudflare R2 特殊处理：检查是否为文件夹对象
-                        // R2 可能会在 listObjects 时去掉文件夹对象的末尾斜杠，但保持 size=0
-                        let isLikelyFolderObject = (size == 0) && !key.contains(".")
+                        // 1. 如果 key 以 / 结尾，绝对是文件夹
+                        // 2. 如果大小为 0 且不包含点（兼容旧逻辑）
+                        let isLikelyFolderObject = key.hasSuffix("/") || ((size == 0) && !key.contains("."))
                         
                         if !isLikelyFolderObject {
                             // 这是一个真正的文件对象
@@ -1255,12 +1256,19 @@ class R2Service: ObservableObject {
 
             print("📋 找到 \(allKeys.count) 个对象需要删除")
 
-            // 重要：始终添加文件夹标记对象本身（以 / 结尾的空对象）
-            // R2/S3 中文件夹是虚拟的，由一个以 / 结尾的空对象表示
-            // 列出文件夹内容时不会返回这个标记对象，必须显式删除
-            if !allKeys.contains(prefix) {
-                allKeys.append(prefix)
-                print("📁 添加文件夹标记对象: \(prefix)")
+            // 重要：始终添加文件夹标记对象本身（包括带斜杠和不带斜杠的版本）
+            // R2/S3 中文件夹通常由以 / 结尾的对象表示，但为了兼容性，我们也尝试删除不带斜杠的键
+            let slashedKey = prefix.hasSuffix("/") ? prefix : prefix + "/"
+            let noSlashKey = prefix.hasSuffix("/") ? String(prefix.dropLast()) : prefix
+            
+            if !allKeys.contains(slashedKey) {
+                allKeys.append(slashedKey)
+                print("📁 添加文件夹标记对象(标准): \(slashedKey)")
+            }
+            
+            if !allKeys.contains(noSlashKey) {
+                allKeys.append(noSlashKey)
+                print("📁 添加文件夹标记对象(兼容): \(noSlashKey)")
             }
 
             // 2. 批量删除所有对象（包括文件夹标记）

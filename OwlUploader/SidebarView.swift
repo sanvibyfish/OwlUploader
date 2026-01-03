@@ -207,10 +207,16 @@ struct SidebarView: View {
                     accountManager.setCurrentAccount(account)
                 }
                 
+                // 1. Optimistically update UI
+                await MainActor.run {
+                    selectedView = .files
+                    r2Service.selectBucket(bucket)
+                }
+                
+                // 2. Then perform the actual verification/connection
                 let _ = try await r2Service.selectBucketDirectly(bucket.name)
                 
                 await MainActor.run {
-                    selectedView = .files
                     messageManager.showSuccess(L.Message.Success.connected, description: L.Message.Success.connectedDescription(bucket.name))
                 }
             } catch {

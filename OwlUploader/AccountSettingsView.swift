@@ -192,40 +192,29 @@ struct AccountSettingsView: View {
     private var uploadSettingsSection: some View {
         SettingsCard(title: L.Settings.Upload.title, icon: "arrow.up.circle") {
             VStack(alignment: .leading, spacing: 16) {
-                // 并发上传数滑块
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text(L.Settings.Upload.concurrentUploads)
-                            .font(.body)
+                // 并发上传数设置
+                HStack {
+                    Text(L.Settings.Upload.concurrentUploads)
+                        .font(.body)
 
-                        Spacer()
+                    Spacer()
 
-                        Text("\(Int(concurrentUploads))")
-                            .font(.body)
-                            .monospacedDigit()
-                            .foregroundColor(AppColors.primary)
-                            .frame(width: 30, alignment: .trailing)
-                    }
-
-                    Slider(value: $concurrentUploads, in: 1...10, step: 1) {
-                        Text(L.Settings.Upload.concurrentUploads)
-                    } minimumValueLabel: {
-                        Text("1")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    } maximumValueLabel: {
-                        Text("10")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    .onChange(of: concurrentUploads) { _, newValue in
-                        UploadQueueManager.setMaxConcurrentUploads(Int(newValue))
-                    }
-
-                    Text(L.Settings.Upload.concurrentHint)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    TextField("1-10", value: $concurrentUploads, format: .number)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 60)
+                        .multilineTextAlignment(.trailing)
+                        .onChange(of: concurrentUploads) { _, newValue in
+                            let clamped = min(max(1.0, newValue), 50.0)
+                            if clamped != newValue {
+                                concurrentUploads = clamped
+                            }
+                            UploadQueueManager.setMaxConcurrentUploads(Int(clamped))
+                        }
                 }
+
+                Text(L.Settings.Upload.concurrentHint)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
             .padding(.vertical, 8)
         }
@@ -482,19 +471,24 @@ struct EditAccountSheet: View {
                 Section(L.Account.Add.accountInfo) {
                     TextField(L.Account.Field.accountID, text: $accountID)
                         .textContentType(.username)
+                        .textFieldStyle(.roundedBorder)
 
                     TextField(L.Account.Field.accessKeyID, text: $accessKeyID)
                         .textContentType(.username)
+                        .textFieldStyle(.roundedBorder)
 
                     SecureField(L.Account.Field.secretAccessKeyHint, text: $secretAccessKey)
                         .textContentType(.password)
+                        .textFieldStyle(.roundedBorder)
 
                     TextField(L.Account.Field.displayName, text: $displayName)
+                        .textFieldStyle(.roundedBorder)
                 }
 
                 Section(L.Account.Add.endpoint) {
                     TextField(L.Account.Field.endpointURL, text: $endpointURL)
                         .textContentType(.URL)
+                        .textFieldStyle(.roundedBorder)
                     Text(L.Account.Field.endpointHint)
                         .font(.caption)
                         .foregroundColor(.secondary)

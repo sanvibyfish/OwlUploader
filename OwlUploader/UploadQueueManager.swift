@@ -281,9 +281,20 @@ class UploadQueueManager: ObservableObject {
                     // 计算相对路径：从baseFolder开始保留目录结构
                     let basePath = base.deletingLastPathComponent().path
                     let relativePath = url.path.replacingOccurrences(of: basePath + "/", with: "")
-                    remotePath = prefix.isEmpty ? relativePath : "\(prefix)\(relativePath)"
+                    
+                    var safePrefix = prefix
+                    if !safePrefix.isEmpty && !safePrefix.hasSuffix("/") {
+                        safePrefix += "/"
+                    }
+                    
+                    remotePath = safePrefix.isEmpty ? relativePath : "\(safePrefix)\(relativePath)"
                 } else {
-                    remotePath = prefix.isEmpty ? url.lastPathComponent : "\(prefix)\(url.lastPathComponent)"
+                    var safePrefix = prefix
+                    if !safePrefix.isEmpty && !safePrefix.hasSuffix("/") {
+                        safePrefix += "/"
+                    }
+                    
+                    remotePath = safePrefix.isEmpty ? url.lastPathComponent : "\(safePrefix)\(url.lastPathComponent)"
                 }
 
                 // 创建上传任务（不立即读取文件数据）
@@ -475,7 +486,17 @@ class UploadQueueManager: ObservableObject {
 
         do {
             // 在后台线程读取文件数据
+            // 注意：需要在读取时处理安全作用域权限
             let data = try await Task.detached(priority: .userInitiated) {
+                // 获取安全作用域权限
+                let needsSecurityScope = task.localURL.startAccessingSecurityScopedResource()
+                
+                defer {
+                    if needsSecurityScope {
+                        task.localURL.stopAccessingSecurityScopedResource()
+                    }
+                }
+                
                 let fileData = try Data(contentsOf: task.localURL)
                 return fileData
             }.value
