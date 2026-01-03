@@ -58,8 +58,10 @@ struct ContentView: View {
                     FileListView(
                         r2Service: r2Service,
                         selectionManager: selectionManager,
-                        viewModeManager: viewModeManager
+                        viewModeManager: viewModeManager,
+                        isActive: selectedView == .files
                     )
+                    .id("files-\(r2Service.selectedBucket?.name ?? "")")
                 case .none:
                     WelcomeView(selectedView: $selectedView, r2Service: r2Service)
                 }
@@ -83,13 +85,13 @@ struct ContentView: View {
         .onChange(of: r2Service.selectedBucket) { bucket in
             handleBucketSelectionChange(bucket)
         }
-        .alert("断开连接", isPresented: $showDisconnectConfirmation) {
-            Button("取消", role: .cancel) { }
-            Button("断开连接", role: .destructive) {
+        .alert(L.Alert.Disconnect.title, isPresented: $showDisconnectConfirmation) {
+            Button(L.Common.Button.cancel, role: .cancel) { }
+            Button(L.Sidebar.Action.disconnect, role: .destructive) {
                 disconnectFromR2Service()
             }
         } message: {
-            Text("确定要断开与 R2 服务的连接吗？\n\n断开后将清除当前会话状态，包括选中的存储桶和文件列表。")
+            Text(L.Alert.Disconnect.description)
         }
     }
     
@@ -142,7 +144,7 @@ struct ContentView: View {
         r2Service.disconnect()
         
         // 显示成功消息
-        messageManager.showSuccess("断开连接成功", description: "已成功断开与 R2 服务的连接，可以重新配置账户")
+        messageManager.showSuccess(L.Message.Success.disconnected, description: L.Message.Success.disconnectedDescription)
         
         // 导航回欢迎页面
         selectedView = .welcome
@@ -164,27 +166,27 @@ struct WelcomeView: View {
                     .font(.system(size: 80))
                     .foregroundColor(.blue)
                 
-                Text("OwlUploader")
+                Text(L.Welcome.title)
                     .font(.largeTitle)
                     .fontWeight(.bold)
-                
-                Text("专业的 R2 文件管理工具")
+
+                Text(L.Welcome.subtitle)
                     .font(.title2)
                     .foregroundColor(.secondary)
             }
             
             // 功能介绍
             VStack(alignment: .leading, spacing: 12) {
-                FeatureRow(icon: "folder", title: "文件管理", description: "浏览和管理 R2 存储桶中的文件")
-                FeatureRow(icon: "square.and.arrow.up", title: "文件上传", description: "快速上传本地文件到 R2 存储")
-                FeatureRow(icon: "folder.badge.plus", title: "创建文件夹", description: "在 R2 中创建和组织文件夹")
-                FeatureRow(icon: "lock.shield", title: "安全连接", description: "使用 Keychain 安全存储账户凭证")
+                FeatureRow(icon: "folder", title: L.Welcome.Feature.fileManagementTitle, description: L.Welcome.Feature.fileManagementDesc)
+                FeatureRow(icon: "square.and.arrow.up", title: L.Welcome.Feature.uploadTitle, description: L.Welcome.Feature.uploadDesc)
+                FeatureRow(icon: "folder.badge.plus", title: L.Welcome.Feature.folderTitle, description: L.Welcome.Feature.folderDesc)
+                FeatureRow(icon: "lock.shield", title: L.Welcome.Feature.securityTitle, description: L.Welcome.Feature.securityDesc)
             }
             .padding(.horizontal, 40)
             
             // 快速开始提示
             VStack(spacing: 12) {
-                Text("开始使用")
+                Text(L.Welcome.getStarted)
                     .font(.headline)
                 
                 // 当前状态指示
@@ -195,7 +197,7 @@ struct WelcomeView: View {
             Spacer()
         }
         .padding()
-        .navigationTitle("欢迎")
+        .navigationTitle(L.Welcome.navigationTitle)
     }
     
     /// 当前状态指示视图
@@ -207,7 +209,7 @@ struct WelcomeView: View {
                     .fill(r2Service.isConnected ? .green : .red)
                     .frame(width: 8, height: 8)
                 
-                Text(r2Service.isConnected ? "已连接到 R2" : "未连接")
+                Text(r2Service.isConnected ? L.Common.Status.connectedToR2 : L.Common.Status.notConnected)
                     .font(.caption)
                     .foregroundColor(.secondary)
                 
@@ -223,40 +225,40 @@ struct WelcomeView: View {
             
             if !r2Service.isConnected {
                 VStack(spacing: 12) {
-                    Text("请配置您的 R2 账户以开始使用")
+                    Text(L.Welcome.Status.configurePrompt)
                         .font(.body)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
-                    
-                    Button("配置账户") {
+
+                    Button(L.Welcome.Status.configureAccount) {
                         selectedView = .settings
                     }
                     .buttonStyle(.borderedProminent)
                 }
             } else if r2Service.selectedBucket == nil {
                 VStack(spacing: 12) {
-                    Text("账户已连接，请选择要操作的存储桶")
+                    Text(L.Welcome.Status.selectBucketPrompt)
                         .font(.body)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
-                    
-                    Button("选择存储桶") {
+
+                    Button(L.Welcome.Status.selectBucket) {
                         selectedView = .buckets
                     }
                     .buttonStyle(.borderedProminent)
                 }
             } else {
                 VStack(spacing: 12) {
-                    Text("当前选择的存储桶：\(r2Service.selectedBucket!.name)")
+                    Text(L.Welcome.Status.currentBucket(r2Service.selectedBucket!.name))
                         .font(.body)
                         .foregroundColor(.primary)
-                    
-                    Text("您已准备好开始管理文件了！")
+
+                    Text(L.Welcome.Status.readyToManage)
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
-                    
-                    Button("开始管理文件") {
+
+                    Button(L.Welcome.Status.startManaging) {
                         selectedView = .files
                     }
                     .buttonStyle(.borderedProminent)
@@ -268,7 +270,7 @@ struct WelcomeView: View {
                 Divider()
                     .padding(.horizontal, 20)
                 
-                Button("重新配置账户") {
+                Button(L.Welcome.Status.reconfigureAccount) {
                     selectedView = .settings
                 }
                 .buttonStyle(.bordered)

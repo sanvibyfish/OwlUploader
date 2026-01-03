@@ -10,7 +10,8 @@ import SwiftUI
 
 /// 文件视图模式
 enum FileViewMode: String, CaseIterable, Identifiable {
-    case list       // 列表视图（带列头，详细信息）
+    case list       // 简洁列表视图
+    case table      // 表格视图（带列头，详细信息）
     case icons      // 图标网格视图
 
     var id: String { rawValue }
@@ -20,6 +21,8 @@ enum FileViewMode: String, CaseIterable, Identifiable {
         switch self {
         case .list:
             return "list.bullet"
+        case .table:
+            return "tablecells"
         case .icons:
             return "square.grid.2x2"
         }
@@ -29,9 +32,11 @@ enum FileViewMode: String, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .list:
-            return "列表"
+            return L.Files.ViewMode.list
+        case .table:
+            return L.Files.ViewMode.table
         case .icons:
-            return "图标"
+            return L.Files.ViewMode.icons
         }
     }
 
@@ -39,6 +44,8 @@ enum FileViewMode: String, CaseIterable, Identifiable {
     var keyboardShortcutHint: String {
         switch self {
         case .list:
+            return "Cmd+1"
+        case .table:
             return "Cmd+2"
         case .icons:
             return "Cmd+3"
@@ -71,13 +78,13 @@ enum IconSize: String, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .small:
-            return "小"
+            return L.Files.IconSize.small
         case .medium:
-            return "中"
+            return L.Files.IconSize.medium
         case .large:
-            return "大"
+            return L.Files.IconSize.large
         case .extraLarge:
-            return "特大"
+            return L.Files.IconSize.extraLarge
         }
     }
 }
@@ -206,6 +213,11 @@ class ViewModeManager: ObservableObject {
 
     /// 获取当前图标尺寸值
     var currentIconSize: CGFloat {
+        iconSize.size
+    }
+
+    /// 获取图标尺寸值（别名）
+    var iconSizeValue: CGFloat {
         iconSize.size
     }
 

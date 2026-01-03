@@ -66,17 +66,17 @@ struct CreateFolderSheet: View {
     var body: some View {
         VStack(spacing: 20) {
             // 标题
-            Text("创建新文件夹")
+            Text(L.Folder.Create.title)
                 .font(.title2)
                 .fontWeight(.semibold)
             
             // 输入区域
             VStack(alignment: .leading, spacing: 8) {
-                Text("文件夹名称")
+                Text(L.Folder.Create.nameLabel)
                     .font(.headline)
                     .foregroundColor(.primary)
-                
-                TextField("请输入文件夹名称", text: $folderName)
+
+                TextField(L.Folder.Create.namePlaceholder, text: $folderName)
                     .textFieldStyle(.roundedBorder)
                     .focused($isTextFieldFocused)
                     .onSubmit {
@@ -87,16 +87,16 @@ struct CreateFolderSheet: View {
                 
                 // 输入提示和验证信息
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("文件夹名称不能包含以下字符：\\ / : * ? \" < > |")
+                    Text(L.Folder.Create.invalidCharsHint)
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    
+
                     if !folderName.isEmpty && !isValidFolderName {
-                        Text("❌ 文件夹名称包含无效字符")
+                        Text(L.Folder.Create.invalidName)
                             .font(.caption)
                             .foregroundColor(.red)
                     } else if !folderName.isEmpty && isValidFolderName {
-                        Text("✅ 文件夹名称有效")
+                        Text(L.Folder.Create.validName)
                             .font(.caption)
                             .foregroundColor(.green)
                     }
@@ -106,16 +106,16 @@ struct CreateFolderSheet: View {
             // 按钮区域
             HStack(spacing: 12) {
                 // 取消按钮
-                Button("取消") {
+                Button(L.Common.Button.cancel) {
                     dismissSheet()
                 }
                 .keyboardShortcut(.escape, modifiers: [])
                 .buttonStyle(.bordered)
-                
+
                 Spacer()
-                
+
                 // 创建按钮
-                Button("创建文件夹") {
+                Button(L.Folder.Create.createButton) {
                     createFolder()
                 }
                 .keyboardShortcut(.return, modifiers: [])

@@ -17,14 +17,14 @@ enum UploadStatus: Equatable {
     case completed    // 已完成
     case failed(String)  // 失败（附带错误信息）
     case cancelled    // 已取消
-    
+
     var displayText: String {
         switch self {
-        case .pending: return "等待中"
-        case .uploading: return "上传中"
-        case .completed: return "已完成"
-        case .failed(let error): return "失败: \(error)"
-        case .cancelled: return "已取消"
+        case .pending: return L.Upload.Status.pending
+        case .uploading: return L.Upload.Status.uploading
+        case .completed: return L.Upload.Status.completed
+        case .failed(let error): return L.Upload.Status.failed(error)
+        case .cancelled: return L.Upload.Status.cancelled
         }
     }
     
@@ -60,7 +60,9 @@ struct UploadTask: Identifiable, Equatable {
     var progress: Double = 0
     var status: UploadStatus = .pending
     var data: Data?  // 缓存的文件数据
-    
+    var bytesUploaded: Int64 = 0  // 已上传字节数
+    var startTime: Date?  // 开始上传时间
+
     /// 格式化的文件大小
     var formattedSize: String {
         let formatter = ByteCountFormatter()
@@ -68,7 +70,7 @@ struct UploadTask: Identifiable, Equatable {
         formatter.countStyle = .file
         return formatter.string(fromByteCount: fileSize)
     }
-    
+
     static func == (lhs: UploadTask, rhs: UploadTask) -> Bool {
         lhs.id == rhs.id && lhs.status == rhs.status && lhs.progress == rhs.progress
     }
@@ -79,31 +81,75 @@ struct UploadTask: Identifiable, Equatable {
 class UploadQueueManager: ObservableObject {
     
     // MARK: - Published Properties
-    
+
     /// 所有上传任务
     @Published var tasks: [UploadTask] = []
-    
+
     /// 是否正在处理队列
     @Published var isProcessing: Bool = false
-    
+
     /// 队列面板是否显示
     @Published var isQueuePanelVisible: Bool = false
-    
+
+    /// 当前上传速度（字节/秒）
+    @Published var currentSpeed: Double = 0
+
+    /// 预计剩余时间（秒）
+    @Published var estimatedTimeRemaining: TimeInterval = 0
+
     // MARK: - Configuration
-    
-    /// 最大并发上传数
-    let maxConcurrentUploads: Int = 3
-    
+
+    /// 并发上传数 UserDefaults 键
+    private static let concurrentUploadsKey = "maxConcurrentUploads"
+
+    /// 最大并发上传数（从设置读取，默认 5，范围 1-10）
+    var maxConcurrentUploads: Int {
+        let stored = UserDefaults.standard.integer(forKey: Self.concurrentUploadsKey)
+        if stored == 0 {
+            return 5 // 默认值
+        }
+        return min(max(stored, 1), 10) // 限制在 1-10 范围
+    }
+
+    /// 设置最大并发上传数
+    static func setMaxConcurrentUploads(_ value: Int) {
+        let clamped = min(max(value, 1), 10)
+        UserDefaults.standard.set(clamped, forKey: concurrentUploadsKey)
+    }
+
+    /// 获取当前设置的最大并发上传数（用于 UI 显示）
+    static func getMaxConcurrentUploads() -> Int {
+        let stored = UserDefaults.standard.integer(forKey: concurrentUploadsKey)
+        if stored == 0 {
+            return 5 // 默认值
+        }
+        return min(max(stored, 1), 10)
+    }
+
+    // MARK: - Callbacks
+
+    /// 队列完成回调（所有任务完成或失败后触发）
+    var onQueueComplete: (() -> Void)?
+
     // MARK: - Private Properties
-    
+
     /// 当前正在上传的任务数量
     private var activeUploadCount: Int = 0
-    
+
     /// R2 服务引用
     private weak var r2Service: R2Service?
-    
+
     /// 当前存储桶名称
     private var bucketName: String = ""
+
+    /// 速度计算的滑动窗口
+    private var speedSamples: [(bytes: Int64, time: Date)] = []
+
+    /// 队列开始时间
+    private var queueStartTime: Date?
+
+    /// 已上传的总字节数
+    private var totalBytesUploaded: Int64 = 0
     
     // MARK: - Computed Properties
     
@@ -141,6 +187,59 @@ class UploadQueueManager: ObservableObject {
     var hasActiveTasks: Bool {
         !pendingTasks.isEmpty || !uploadingTasks.isEmpty
     }
+
+    /// 总待上传字节数
+    var totalBytes: Int64 {
+        tasks.reduce(0) { $0 + $1.fileSize }
+    }
+
+    /// 已上传字节数
+    var uploadedBytes: Int64 {
+        tasks.reduce(0) { result, task in
+            switch task.status {
+            case .completed:
+                return result + task.fileSize
+            case .uploading:
+                return result + Int64(Double(task.fileSize) * task.progress)
+            default:
+                return result
+            }
+        }
+    }
+
+    /// 格式化的上传速度
+    var formattedSpeed: String {
+        if currentSpeed <= 0 { return "--" }
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useGB, .useMB, .useKB]
+        formatter.countStyle = .file
+        return "\(formatter.string(fromByteCount: Int64(currentSpeed)))/s"
+    }
+
+    /// 格式化的剩余时间
+    var formattedETA: String {
+        if estimatedTimeRemaining <= 0 || estimatedTimeRemaining.isInfinite {
+            return "--"
+        }
+
+        let hours = Int(estimatedTimeRemaining) / 3600
+        let minutes = (Int(estimatedTimeRemaining) % 3600) / 60
+        let seconds = Int(estimatedTimeRemaining) % 60
+
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, seconds)
+        } else if minutes > 0 {
+            return String(format: "%d:%02d", minutes, seconds)
+        } else {
+            return String(format: "0:%02d", seconds)
+        }
+    }
+
+    /// 总体进度百分比
+    var overallProgressPercent: Int {
+        guard totalBytes > 0 else { return 0 }
+        return Int((Double(uploadedBytes) / Double(totalBytes)) * 100)
+    }
     
     // MARK: - Public Methods
     
@@ -154,30 +253,41 @@ class UploadQueueManager: ObservableObject {
     /// - Parameters:
     ///   - urls: 本地文件 URL 列表
     ///   - prefix: 目标路径前缀
-    func addFiles(_ urls: [URL], to prefix: String) {
-        for url in urls {
+    ///   - baseFolder: 基础文件夹URL（用于计算相对路径保留目录结构）
+    func addFiles(_ urls: [URL], to prefix: String, baseFolder: URL? = nil) {
+        print("📥 [UploadQueue] addFiles 开始，收到 \(urls.count) 个文件")
+        print("📥 [UploadQueue] 当前线程: \(Thread.isMainThread ? "主线程" : "后台线程")")
+
+        for (index, url) in urls.enumerated() {
+            print("📥 [UploadQueue] 处理文件 \(index + 1)/\(urls.count): \(url.lastPathComponent)")
+
             // 验证文件
             guard FileManager.default.fileExists(atPath: url.path) else {
                 print("⚠️ 文件不存在: \(url.path)")
                 continue
             }
-            
+
             do {
-                // 获取文件属性
+                // 获取文件属性（只获取大小，不读取内容）
                 let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
                 let fileSize = attributes[.size] as? Int64 ?? 0
-                
-                // 读取文件数据
-                let data = try Data(contentsOf: url)
-                
+
                 // 推断 MIME 类型
                 let contentType = inferContentType(from: url)
-                
-                // 构建远程路径
-                let remotePath = prefix.isEmpty ? url.lastPathComponent : "\(prefix)\(url.lastPathComponent)"
-                
-                // 创建上传任务
-                var task = UploadTask(
+
+                // 构建远程路径（保留目录结构）
+                let remotePath: String
+                if let base = baseFolder {
+                    // 计算相对路径：从baseFolder开始保留目录结构
+                    let basePath = base.deletingLastPathComponent().path
+                    let relativePath = url.path.replacingOccurrences(of: basePath + "/", with: "")
+                    remotePath = prefix.isEmpty ? relativePath : "\(prefix)\(relativePath)"
+                } else {
+                    remotePath = prefix.isEmpty ? url.lastPathComponent : "\(prefix)\(url.lastPathComponent)"
+                }
+
+                // 创建上传任务（不立即读取文件数据）
+                let task = UploadTask(
                     id: UUID(),
                     fileName: url.lastPathComponent,
                     fileSize: fileSize,
@@ -185,20 +295,23 @@ class UploadQueueManager: ObservableObject {
                     remotePath: remotePath,
                     contentType: contentType
                 )
-                task.data = data
-                
+
                 tasks.append(task)
-                print("✅ 添加上传任务: \(task.fileName) (\(task.formattedSize))")
-                
+                print("✅ [UploadQueue] 添加任务成功: \(task.fileName) (\(task.formattedSize))")
+
             } catch {
-                print("❌ 无法读取文件: \(url.path) - \(error.localizedDescription)")
+                print("❌ 无法获取文件信息: \(url.path) - \(error.localizedDescription)")
             }
         }
-        
+
+        print("📥 [UploadQueue] addFiles 完成，队列中共 \(tasks.count) 个任务")
+
         // 显示队列面板
         if !tasks.isEmpty {
+            print("📥 [UploadQueue] 显示队列面板，准备调用 processQueue")
             isQueuePanelVisible = true
             processQueue()
+            print("📥 [UploadQueue] processQueue 调用完成")
         }
     }
     
@@ -250,69 +363,174 @@ class UploadQueueManager: ObservableObject {
     
     /// 处理上传队列
     private func processQueue() {
-        guard !isProcessing else { return }
+        print("🔄 [UploadQueue] processQueue 进入")
+        guard !isProcessing else {
+            print("🔄 [UploadQueue] 已在处理中，跳过")
+            return
+        }
         isProcessing = true
-        
-        Task {
+        queueStartTime = Date()
+        speedSamples.removeAll()
+        totalBytesUploaded = 0
+        print("🔄 [UploadQueue] 开始处理队列，待处理任务: \(pendingTasks.count)，并发数: \(maxConcurrentUploads)")
+
+        Task { @MainActor in
+            print("🔄 [UploadQueue] Task 开始执行")
+            var loopCount = 0
             while hasActiveTasks {
-                // 检查是否可以启动新任务
+                loopCount += 1
+                if loopCount % 20 == 1 {
+                    print("🔄 [UploadQueue] 循环 #\(loopCount), pending: \(pendingTasks.count), uploading: \(uploadingTasks.count), active: \(activeUploadCount)")
+                }
+
+                // 检查是否可以启动新任务（真正的并发：不等待上传完成）
                 while activeUploadCount < maxConcurrentUploads,
                       let nextTask = pendingTasks.first {
-                    await startUpload(nextTask)
+                    // 立即标记为 uploading，防止重复选择
+                    if let index = tasks.firstIndex(where: { $0.id == nextTask.id }) {
+                        tasks[index].status = .uploading
+                        tasks[index].startTime = Date()
+                    }
+                    activeUploadCount += 1
+                    print("🔄 [UploadQueue] 启动任务: \(nextTask.fileName)，当前并发: \(activeUploadCount)")
+
+                    // 启动上传任务但不等待完成（真正的并发）
+                    let taskId = nextTask.id
+                    Task {
+                        await self.performUpload(taskId: taskId, task: nextTask)
+                    }
                 }
-                
-                // 等待一小段时间再检查
-                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1秒
+
+                // 更新速度和ETA
+                updateSpeedAndETA()
+
+                // 等待一小段时间再检查（减少到 0.05s 提高响应速度）
+                try? await Task.sleep(nanoseconds: 50_000_000) // 0.05秒
             }
-            
+
+            print("🔄 [UploadQueue] 队列处理完成")
+            // 完成后重置
+            currentSpeed = 0
+            estimatedTimeRemaining = 0
             isProcessing = false
+
+            // 触发完成回调（刷新文件列表等）
+            if completedTasks.count > 0 {
+                print("🔄 [UploadQueue] 触发完成回调，\(completedTasks.count) 个任务已完成")
+                onQueueComplete?()
+            }
+        }
+        print("🔄 [UploadQueue] processQueue 退出（Task已启动）")
+    }
+
+    /// 更新速度和剩余时间计算
+    private func updateSpeedAndETA() {
+        let now = Date()
+        let currentUploaded = uploadedBytes
+
+        // 添加新样本
+        speedSamples.append((bytes: currentUploaded, time: now))
+
+        // 只保留最近5秒的样本
+        speedSamples = speedSamples.filter { now.timeIntervalSince($0.time) <= 5 }
+
+        // 计算速度（使用滑动窗口平均）
+        if speedSamples.count >= 2 {
+            let oldest = speedSamples.first!
+            let newest = speedSamples.last!
+            let bytesTransferred = newest.bytes - oldest.bytes
+            let timeElapsed = newest.time.timeIntervalSince(oldest.time)
+
+            if timeElapsed > 0 {
+                currentSpeed = Double(bytesTransferred) / timeElapsed
+            }
+        }
+
+        // 计算剩余时间
+        if currentSpeed > 0 {
+            let remainingBytes = totalBytes - currentUploaded
+            estimatedTimeRemaining = Double(remainingBytes) / currentSpeed
+        } else {
+            estimatedTimeRemaining = 0
         }
     }
     
-    /// 开始上传任务
-    private func startUpload(_ task: UploadTask) async {
-        guard let r2Service = r2Service,
-              let taskIndex = tasks.firstIndex(where: { $0.id == task.id }),
-              let data = task.data else {
+    /// 执行单个上传任务（由 processQueue 并发调用）
+    /// - Parameters:
+    ///   - taskId: 任务 ID
+    ///   - task: 上传任务
+    private func performUpload(taskId: UUID, task: UploadTask) async {
+        print("⬆️ [Upload] performUpload 开始: \(task.fileName)")
+
+        guard let r2Service = r2Service else {
+            print("⬆️ [Upload] r2Service 为空，跳过")
+            await MainActor.run {
+                activeUploadCount -= 1
+                if let idx = tasks.firstIndex(where: { $0.id == taskId }) {
+                    tasks[idx].status = .failed("R2 服务未初始化")
+                }
+            }
             return
         }
-        
-        activeUploadCount += 1
-        tasks[taskIndex].status = .uploading
-        
+
         do {
-            // 模拟进度更新（实际 AWS SDK 可能不支持进度回调）
-            for progress in stride(from: 0.0, through: 0.9, by: 0.1) {
-                if tasks[taskIndex].status == .cancelled { break }
-                tasks[taskIndex].progress = progress
-                try? await Task.sleep(nanoseconds: 50_000_000)
+            // 在后台线程读取文件数据
+            let data = try await Task.detached(priority: .userInitiated) {
+                let fileData = try Data(contentsOf: task.localURL)
+                return fileData
+            }.value
+            print("⬆️ [Upload] 文件数据读取完成: \(task.fileName), \(data.count) bytes")
+
+            // 检查是否已取消
+            let isCancelled = await MainActor.run {
+                guard let currentIndex = tasks.firstIndex(where: { $0.id == taskId }) else {
+                    return true
+                }
+                if tasks[currentIndex].status != .uploading {
+                    return true
+                }
+                // 更新进度为10%（文件读取完成）
+                tasks[currentIndex].progress = 0.1
+                return false
             }
-            
+
+            if isCancelled {
+                print("⬆️ [Upload] 任务已取消，跳过上传: \(task.fileName)")
+                await MainActor.run { activeUploadCount -= 1 }
+                return
+            }
+
             // 执行上传
+            print("⬆️ [Upload] 开始上传到 R2: \(task.remotePath)")
             try await r2Service.uploadData(
                 bucket: bucketName,
                 key: task.remotePath,
                 data: data,
                 contentType: task.contentType
             )
-            
-            // 更新状态
-            if let idx = tasks.firstIndex(where: { $0.id == task.id }) {
-                tasks[idx].progress = 1.0
-                tasks[idx].status = .completed
+            print("✅ [Upload] 上传完成: \(task.fileName)")
+
+            // 更新状态为完成
+            await MainActor.run {
+                if let idx = tasks.firstIndex(where: { $0.id == taskId }) {
+                    tasks[idx].progress = 1.0
+                    tasks[idx].status = .completed
+                }
+                activeUploadCount -= 1
             }
-            
-            print("✅ 上传完成: \(task.fileName)")
-            
+
         } catch {
+            print("❌ [Upload] 上传失败: \(task.fileName) - \(error.localizedDescription)")
             // 更新失败状态
-            if let idx = tasks.firstIndex(where: { $0.id == task.id }) {
-                tasks[idx].status = .failed(error.localizedDescription)
+            await MainActor.run {
+                if let idx = tasks.firstIndex(where: { $0.id == taskId }) {
+                    tasks[idx].status = .failed(error.localizedDescription)
+                }
+                activeUploadCount -= 1
             }
-            print("❌ 上传失败: \(task.fileName) - \(error.localizedDescription)")
         }
-        
-        activeUploadCount -= 1
+
+        print("⬆️ [Upload] performUpload 结束: \(task.fileName)")
     }
     
     /// 推断文件的 MIME 类型

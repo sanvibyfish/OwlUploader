@@ -44,12 +44,25 @@ struct R2Account: Codable, Identifiable {
     /// 存储桶名称列表（支持多个存储桶）
     var bucketNames: [String]
 
-    /// 公共域名（可选，用于生成文件的公共访问链接）
-    var publicDomain: String?
-    
+    /// 公共域名列表（用于生成文件的公共访问链接）
+    var publicDomains: [String]
+
+    /// 默认公共域名索引
+    var defaultPublicDomainIndex: Int
+
+    /// 获取默认公共域名
+    var defaultPublicDomain: String? {
+        guard !publicDomains.isEmpty,
+              defaultPublicDomainIndex >= 0,
+              defaultPublicDomainIndex < publicDomains.count else {
+            return nil
+        }
+        return publicDomains[defaultPublicDomainIndex]
+    }
+
     /// 账户创建时间
     let createdAt: Date
-    
+
     /// 最后更新时间
     var updatedAt: Date
     
@@ -62,15 +75,17 @@ struct R2Account: Codable, Identifiable {
     ///   - endpointURL: 服务端点 URL，如果为空则使用默认的 Cloudflare R2 端点
     ///   - displayName: 显示名称，如果为空则使用 Account ID 的前8位字符
     ///   - bucketNames: 存储桶名称列表
-    ///   - publicDomain: 公共域名，可选
-    init(accountID: String, accessKeyID: String, endpointURL: String? = nil, displayName: String? = nil, bucketNames: [String] = [], publicDomain: String? = nil) {
+    ///   - publicDomains: 公共域名列表
+    ///   - defaultPublicDomainIndex: 默认域名索引
+    init(accountID: String, accessKeyID: String, endpointURL: String? = nil, displayName: String? = nil, bucketNames: [String] = [], publicDomains: [String] = [], defaultPublicDomainIndex: Int = 0) {
         self.id = UUID()
         self.accountID = accountID
         self.accessKeyID = accessKeyID
         self.endpointURL = endpointURL ?? Self.defaultCloudflareR2EndpointURL(for: accountID)
         self.displayName = displayName ?? String(accountID.prefix(8))
         self.bucketNames = bucketNames
-        self.publicDomain = publicDomain
+        self.publicDomains = publicDomains
+        self.defaultPublicDomainIndex = defaultPublicDomainIndex
         self.createdAt = Date()
         self.updatedAt = Date()
     }
@@ -80,7 +95,8 @@ struct R2Account: Codable, Identifiable {
     private enum CodingKeys: String, CodingKey {
         case id, accountID, accessKeyID, endpointURL, displayName
         case bucketNames, defaultBucketName // 支持两种格式
-        case publicDomain, createdAt, updatedAt
+        case publicDomain, publicDomains, defaultPublicDomainIndex // 支持两种格式
+        case createdAt, updatedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -90,7 +106,6 @@ struct R2Account: Codable, Identifiable {
         accessKeyID = try container.decode(String.self, forKey: .accessKeyID)
         endpointURL = try container.decode(String.self, forKey: .endpointURL)
         displayName = try container.decode(String.self, forKey: .displayName)
-        publicDomain = try container.decodeIfPresent(String.self, forKey: .publicDomain)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         updatedAt = try container.decode(Date.self, forKey: .updatedAt)
 
@@ -103,6 +118,19 @@ struct R2Account: Codable, Identifiable {
         } else {
             bucketNames = []
         }
+
+        // 迁移逻辑：优先读取 publicDomains，否则从 publicDomain 迁移
+        if let domains = try container.decodeIfPresent([String].self, forKey: .publicDomains) {
+            publicDomains = domains
+            defaultPublicDomainIndex = try container.decodeIfPresent(Int.self, forKey: .defaultPublicDomainIndex) ?? 0
+        } else if let singleDomain = try container.decodeIfPresent(String.self, forKey: .publicDomain),
+                  !singleDomain.isEmpty {
+            publicDomains = [singleDomain]
+            defaultPublicDomainIndex = 0
+        } else {
+            publicDomains = []
+            defaultPublicDomainIndex = 0
+        }
     }
 
     func encode(to encoder: Encoder) throws {
@@ -113,7 +141,8 @@ struct R2Account: Codable, Identifiable {
         try container.encode(endpointURL, forKey: .endpointURL)
         try container.encode(displayName, forKey: .displayName)
         try container.encode(bucketNames, forKey: .bucketNames)
-        try container.encodeIfPresent(publicDomain, forKey: .publicDomain)
+        try container.encode(publicDomains, forKey: .publicDomains)
+        try container.encode(defaultPublicDomainIndex, forKey: .defaultPublicDomainIndex)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(updatedAt, forKey: .updatedAt)
     }
@@ -145,7 +174,7 @@ struct R2Account: Codable, Identifiable {
     }
     
     // MARK: - 更新方法
-    
+
     /// 更新账户信息
     /// - Parameters:
     ///   - accountID: 新的账户 ID
@@ -153,14 +182,16 @@ struct R2Account: Codable, Identifiable {
     ///   - endpointURL: 新的端点 URL
     ///   - displayName: 新的显示名称
     ///   - bucketNames: 新的存储桶名称列表
-    ///   - publicDomain: 新的公共域名
+    ///   - publicDomains: 新的公共域名列表
+    ///   - defaultPublicDomainIndex: 新的默认域名索引
     /// - Returns: 更新后的账户对象
     func updated(accountID: String? = nil,
                  accessKeyID: String? = nil,
                  endpointURL: String? = nil,
                  displayName: String? = nil,
                  bucketNames: [String]? = nil,
-                 publicDomain: String? = nil) -> R2Account {
+                 publicDomains: [String]? = nil,
+                 defaultPublicDomainIndex: Int? = nil) -> R2Account {
         var updated = self
         if let accountID = accountID {
             updated.accountID = accountID
@@ -177,8 +208,11 @@ struct R2Account: Codable, Identifiable {
         if let bucketNames = bucketNames {
             updated.bucketNames = bucketNames
         }
-        if let publicDomain = publicDomain {
-            updated.publicDomain = publicDomain
+        if let publicDomains = publicDomains {
+            updated.publicDomains = publicDomains
+        }
+        if let defaultPublicDomainIndex = defaultPublicDomainIndex {
+            updated.defaultPublicDomainIndex = defaultPublicDomainIndex
         }
         updated.updatedAt = Date()
         return updated

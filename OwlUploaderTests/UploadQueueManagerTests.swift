@@ -464,10 +464,101 @@ final class UploadQueueManagerTests: XCTestCase {
     @MainActor
     func testMaxConcurrentUploads_hasDefaultValue() {
         // Given
+        // 清除任何之前保存的设置以确保测试独立性
+        UserDefaults.standard.removeObject(forKey: "maxConcurrentUploads")
         let manager = UploadQueueManager()
 
+        // Then - 默认值现在是 5
+        XCTAssertEqual(manager.maxConcurrentUploads, 5)
+    }
+
+    @MainActor
+    func testSetMaxConcurrentUploads_storesValueInUserDefaults() {
+        // Given
+        let testValue = 7
+
+        // When
+        UploadQueueManager.setMaxConcurrentUploads(testValue)
+
         // Then
-        XCTAssertEqual(manager.maxConcurrentUploads, 3)
+        let storedValue = UserDefaults.standard.integer(forKey: "maxConcurrentUploads")
+        XCTAssertEqual(storedValue, testValue)
+
+        // Cleanup
+        UserDefaults.standard.removeObject(forKey: "maxConcurrentUploads")
+    }
+
+    @MainActor
+    func testGetMaxConcurrentUploads_returnsStoredValue() {
+        // Given
+        let testValue = 8
+        UserDefaults.standard.set(testValue, forKey: "maxConcurrentUploads")
+
+        // When
+        let result = UploadQueueManager.getMaxConcurrentUploads()
+
+        // Then
+        XCTAssertEqual(result, testValue)
+
+        // Cleanup
+        UserDefaults.standard.removeObject(forKey: "maxConcurrentUploads")
+    }
+
+    @MainActor
+    func testGetMaxConcurrentUploads_withNoStoredValue_returnsDefault() {
+        // Given
+        UserDefaults.standard.removeObject(forKey: "maxConcurrentUploads")
+
+        // When
+        let result = UploadQueueManager.getMaxConcurrentUploads()
+
+        // Then - 默认值是 5
+        XCTAssertEqual(result, 5)
+    }
+
+    @MainActor
+    func testSetMaxConcurrentUploads_clampsToMaximum() {
+        // Given - 尝试设置超过最大值 10 的值
+        let testValue = 15
+
+        // When
+        UploadQueueManager.setMaxConcurrentUploads(testValue)
+
+        // Then - 应该被限制在 10
+        let storedValue = UploadQueueManager.getMaxConcurrentUploads()
+        XCTAssertEqual(storedValue, 10)
+
+        // Cleanup
+        UserDefaults.standard.removeObject(forKey: "maxConcurrentUploads")
+    }
+
+    @MainActor
+    func testSetMaxConcurrentUploads_clampsToMinimum() {
+        // Given - 尝试设置小于最小值 1 的值
+        let testValue = 0
+
+        // When
+        UploadQueueManager.setMaxConcurrentUploads(testValue)
+
+        // Then - 应该被限制在 1
+        let storedValue = UploadQueueManager.getMaxConcurrentUploads()
+        XCTAssertEqual(storedValue, 1)
+
+        // Cleanup
+        UserDefaults.standard.removeObject(forKey: "maxConcurrentUploads")
+    }
+
+    @MainActor
+    func testMaxConcurrentUploads_readsFromUserDefaults() {
+        // Given
+        UserDefaults.standard.set(6, forKey: "maxConcurrentUploads")
+        let manager = UploadQueueManager()
+
+        // When/Then
+        XCTAssertEqual(manager.maxConcurrentUploads, 6)
+
+        // Cleanup
+        UserDefaults.standard.removeObject(forKey: "maxConcurrentUploads")
     }
 
     // MARK: - Helper Methods

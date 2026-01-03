@@ -13,6 +13,7 @@ struct FileListItemView: View {
 
     // Actions
     var onDeleteFile: ((FileObject) -> Void)?
+    var onDownloadFile: ((FileObject) -> Void)?
 
     @State private var isHovering = false
 
@@ -33,7 +34,7 @@ struct FileListItemView: View {
 
                 HStack(spacing: 8) {
                     if fileObject.isDirectory {
-                        Text("Folder")
+                        Text(L.Files.FileType.folder)
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.textSecondary)
                     } else {
@@ -56,19 +57,26 @@ struct FileListItemView: View {
             // Hover Actions (Only visible on hover)
             if isHovering && !fileObject.isDirectory {
                 HStack(spacing: 12) {
+                    Button(action: { onDownloadFile?(fileObject) }) {
+                        Image(systemName: "arrow.down.circle")
+                            .foregroundColor(AppColors.primary)
+                    }
+                    .buttonStyle(.plain)
+                    .help(L.Help.download)
+
                     Button(action: copyFileURL) {
                         Image(systemName: "link")
                             .foregroundColor(AppColors.primary)
                     }
                     .buttonStyle(.plain)
-                    .help("Copy Link")
+                    .help(L.Help.copyLink)
 
                     Button(action: { onDeleteFile?(fileObject) }) {
                         Image(systemName: "trash")
                             .foregroundColor(AppColors.destructive)
                     }
                     .buttonStyle(.plain)
-                    .help("Delete")
+                    .help(L.Help.delete)
                 }
                 .transition(AppTransitions.hoverActions)
             }
@@ -91,12 +99,17 @@ struct FileListItemView: View {
         }
         .animation(AppAnimations.selection, value: isSelected)
         .contextMenu {
-            Button(action: copyFileURL) {
-                Label("Copy Link", systemImage: "link")
+            if !fileObject.isDirectory {
+                Button(action: { onDownloadFile?(fileObject) }) {
+                    Label(L.Files.ContextMenu.download, systemImage: "arrow.down.circle")
+                }
+                Button(action: copyFileURL) {
+                    Label(L.Files.ContextMenu.copyLink, systemImage: "link")
+                }
+                Divider()
             }
-            Divider()
             Button(role: .destructive, action: { onDeleteFile?(fileObject) }) {
-                Label("Delete", systemImage: "trash")
+                Label(L.Files.ContextMenu.delete, systemImage: "trash")
             }
         }
     }
@@ -135,6 +148,6 @@ struct FileListItemView: View {
         
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(fileURL, forType: .string)
-        messageManager?.showSuccess("Link Copied", description: "File URL copied to clipboard")
+        messageManager?.showSuccess(L.Message.Success.linkCopied, description: L.Message.Success.linkCopiedDescription)
     }
 }

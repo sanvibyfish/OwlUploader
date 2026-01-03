@@ -51,51 +51,47 @@ enum R2ServiceError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .accountNotConfigured:
-            return "R2 账户未配置。请先配置您的 R2 账户信息。"
+            return L.Error.Account.notConfigured
         case .invalidCredentials:
-            return "R2 账户凭证无效。请检查您的 Access Key ID 和 Secret Access Key。"
+            return L.Error.Account.invalidCredentials
         case .networkError(let error):
-            return "网络连接错误：\(error.localizedDescription)"
+            return L.Error.Network.error(error.localizedDescription)
         case .authenticationError:
-            return "身份验证失败。请检查您的账户凭证。"
+            return L.Error.Account.authenticationFailed
         case .serverError(let message):
-            return "服务器错误：\(message)"
+            return L.Error.Server.error(message)
         case .unknownError(let error):
-            return "未知错误：\(error.localizedDescription)"
-            
-        // 新增错误类型的描述
+            return L.Error.Unknown.error(error.localizedDescription)
         case .bucketNotFound(let bucketName):
-            return "存储桶 '\(bucketName)' 不存在或无访问权限。"
+            return L.Error.Bucket.notFound(bucketName)
         case .fileNotFound(let fileName):
-            return "文件 '\(fileName)' 不存在。"
+            return L.Error.File.notFound(fileName)
         case .invalidFileName(let fileName):
-            return "文件名 '\(fileName)' 包含非法字符，请使用有效的文件名。"
+            return L.Error.File.invalidName(fileName)
         case .uploadFailed(let fileName, let error):
-            return "上传文件 '\(fileName)' 失败：\(error.localizedDescription)"
+            return L.Error.File.uploadFailed(fileName, error.localizedDescription)
         case .downloadFailed(let fileName, let error):
-            return "下载文件 '\(fileName)' 失败：\(error.localizedDescription)"
+            return L.Error.File.downloadFailed(fileName, error.localizedDescription)
         case .createFolderFailed(let folderName, let error):
-            return "创建文件夹 '\(folderName)' 失败：\(error.localizedDescription)"
+            return L.Error.Folder.createFailed(folderName, error.localizedDescription)
         case .deleteFileFailed(let fileName, let error):
-            return "删除文件 '\(fileName)' 失败：\(error.localizedDescription)"
+            return L.Error.File.deleteFailed(fileName, error.localizedDescription)
         case .permissionDenied(let operation):
-            return "权限不足，无法执行 '\(operation)' 操作。请检查您的账户权限。"
+            return L.Error.Permission.denied(operation)
         case .storageQuotaExceeded:
-            return "存储配额已满，无法上传更多文件。请清理空间或升级账户。"
+            return L.Error.Storage.quotaExceeded
         case .invalidFileSize(let fileName):
-            return "文件 '\(fileName)' 大小超出限制。单个文件最大支持 5GB。"
+            return L.Error.File.sizeExceeded(fileName)
         case .fileAccessDenied(let fileName):
-            return "无法访问文件 '\(fileName)'。应用没有读取此文件的权限。"
-            
-        // 新增错误类型的描述
+            return L.Error.File.accessDenied(fileName)
         case .connectionTimeout:
-            return "连接超时。请检查网络连接并重试。"
+            return L.Error.Network.timeout
         case .dnsResolutionFailed:
-            return "DNS 解析失败。请检查端点 URL 是否正确，或者网络连接是否正常。"
+            return L.Error.Network.dnsResolutionFailed
         case .sslCertificateError:
-            return "SSL 证书验证失败。请检查端点 URL 是否支持 HTTPS。"
+            return L.Error.Network.sslCertificateError
         case .endpointNotReachable(let endpoint):
-            return "无法连接到端点 '\(endpoint)'。请检查 URL 是否正确且服务可用。"
+            return L.Error.Network.endpointNotReachable(endpoint)
         }
     }
     
@@ -103,31 +99,31 @@ enum R2ServiceError: Error, LocalizedError {
     var suggestedAction: String? {
         switch self {
         case .accountNotConfigured:
-            return "请前往账户设置页面配置您的 R2 账户信息。"
+            return L.Error.Account.notConfiguredSuggestion
         case .invalidCredentials:
-            return "请检查并重新输入正确的 Access Key ID 和 Secret Access Key。"
+            return L.Error.Account.invalidCredentialsSuggestion
         case .networkError:
-            return "请检查网络连接并重试。"
+            return L.Error.Network.errorSuggestion
         case .authenticationError:
-            return "请重新配置您的账户凭证。"
+            return L.Error.Account.authenticationFailedSuggestion
         case .bucketNotFound:
-            return "请选择一个存在的存储桶或在 Cloudflare 控制台中创建新的存储桶。"
+            return L.Error.Bucket.notFoundSuggestion
         case .permissionDenied:
-            return "请联系管理员检查您的账户权限设置。"
+            return L.Error.Permission.deniedSuggestion
         case .storageQuotaExceeded:
-            return "请删除不需要的文件或联系管理员扩容。"
+            return L.Error.Storage.quotaExceededSuggestion
         case .invalidFileSize:
-            return "请选择小于 5GB 的文件进行上传。"
+            return L.Error.File.sizeExceededSuggestion
         case .fileAccessDenied:
-            return "请尝试以下解决方案：1) 将文件移动到文档文件夹或桌面；2) 检查文件权限设置；3) 重新选择文件进行上传。"
+            return L.Error.File.accessDeniedSuggestion
         case .connectionTimeout:
-            return "请检查网络连接稳定性，然后重试操作。"
+            return L.Error.Network.timeoutSuggestion
         case .dnsResolutionFailed:
-            return "请验证端点 URL 是否正确，检查网络 DNS 设置。"
+            return L.Error.Network.dnsResolutionFailedSuggestion
         case .sslCertificateError:
-            return "请确认端点 URL 使用 HTTPS 协议且证书有效。"
+            return L.Error.Network.sslCertificateErrorSuggestion
         case .endpointNotReachable:
-            return "请检查以下几点：1) 端点 URL 格式是否正确（应为 https://账户ID.r2.cloudflarestorage.com）；2) 网络连接是否正常；3) 防火墙是否允许 HTTPS 连接；4) Cloudflare R2 服务是否可用。"
+            return L.Error.Network.endpointNotReachableSuggestion
         default:
             return nil
         }
@@ -660,27 +656,36 @@ class R2Service: ObservableObject {
         guard let s3Client = s3Client else {
             throw R2ServiceError.accountNotConfigured
         }
-        
+
         isLoading = true
         lastError = nil
-        
+
         do {
-            // 构造 ListObjectsV2 请求
-            let input = ListObjectsV2Input(
-                bucket: bucket,
-                delimiter: "/",  // 使用 `/` 作为分隔符来模拟文件夹结构
-                maxKeys: 1000,   // 单次最多返回 1000 个对象
-                prefix: prefix   // 路径前缀，用于指定"文件夹"
-            )
-            
-            let response = try await s3Client.listObjectsV2(input: input)
             var fileObjects: [FileObject] = []
             var processedKeys = Set<String>() // 用于去重的 key 集合
-            
-            // 添加调试信息：开始处理返回结果
-            print("🐛 DEBUG listObjects: Processing response for prefix '\(prefix ?? "ROOT")'")
-            print("🐛 DEBUG listObjects: Raw CommonPrefixes count: \(response.commonPrefixes?.count ?? 0)")
-            print("🐛 DEBUG listObjects: Raw Contents count: \(response.contents?.count ?? 0)")
+            var continuationToken: String? = nil
+            var pageCount = 0
+
+            // 分页循环获取所有对象
+            repeat {
+                pageCount += 1
+
+                // 构造 ListObjectsV2 请求
+                let input = ListObjectsV2Input(
+                    bucket: bucket,
+                    continuationToken: continuationToken,  // 分页令牌
+                    delimiter: "/",  // 使用 `/` 作为分隔符来模拟文件夹结构
+                    maxKeys: 1000,   // 单次最多返回 1000 个对象
+                    prefix: prefix   // 路径前缀，用于指定"文件夹"
+                )
+
+                let response = try await s3Client.listObjectsV2(input: input)
+
+                // 添加调试信息：开始处理返回结果
+                print("🐛 DEBUG listObjects: Page \(pageCount) for prefix '\(prefix ?? "ROOT")'")
+                print("🐛 DEBUG listObjects: Raw CommonPrefixes count: \(response.commonPrefixes?.count ?? 0)")
+                print("🐛 DEBUG listObjects: Raw Contents count: \(response.contents?.count ?? 0)")
+                print("🐛 DEBUG listObjects: IsTruncated: \(response.isTruncated ?? false)")
 
             // 处理文件夹（CommonPrefixes）- 优先处理，避免重复
             if let commonPrefixes = response.commonPrefixes {
@@ -752,9 +757,15 @@ class R2Service: ObservableObject {
                     }
                 }
             }
-            
+
+                // 更新分页令牌
+                continuationToken = response.nextContinuationToken
+
+                // 如果没有更多数据，退出循环
+            } while continuationToken != nil
+
             // 添加调试信息：完成处理
-            print("🐛 DEBUG listObjects: Finished processing. Total FileObjects created: \(fileObjects.count)")
+            print("🐛 DEBUG listObjects: Finished processing \(pageCount) page(s). Total FileObjects created: \(fileObjects.count)")
             fileObjects.forEach { fo in
                 if fo.key == "stricker-ai-blog/" || fo.name == "stricker-ai-blog" {
                     print("    📄 Final FileObject: Name='\(fo.name)', Key='\(fo.key)', IsDirectory=\(fo.isDirectory), Icon='\(fo.iconName)'")
@@ -763,7 +774,7 @@ class R2Service: ObservableObject {
 
             isLoading = false
             return fileObjects
-            
+
         } catch {
             isLoading = false
             let serviceError = mapError(error)
@@ -1200,7 +1211,77 @@ class R2Service: ObservableObject {
         isLoading = false
         return failedKeys
     }
-    
+
+    /// 删除文件夹及其所有内容
+    /// - Parameters:
+    ///   - bucket: 存储桶名称
+    ///   - folderKey: 文件夹路径（以 / 结尾）
+    /// - Returns: 删除的文件数量和失败的文件列表
+    func deleteFolder(bucket: String, folderKey: String) async throws -> (deletedCount: Int, failedKeys: [String]) {
+        guard let s3Client = s3Client else {
+            throw R2ServiceError.accountNotConfigured
+        }
+
+        // 确保 folderKey 以 / 结尾
+        let prefix = folderKey.hasSuffix("/") ? folderKey : folderKey + "/"
+
+        print("📁 开始删除文件夹: \(prefix)")
+        print("   存储桶: \(bucket)")
+
+        isLoading = true
+        lastError = nil
+
+        var allKeys: [String] = []
+        var continuationToken: String? = nil
+
+        // 1. 列出文件夹内所有对象
+        do {
+            repeat {
+                let input = ListObjectsV2Input(
+                    bucket: bucket,
+                    continuationToken: continuationToken,
+                    prefix: prefix
+                )
+
+                let response = try await s3Client.listObjectsV2(input: input)
+
+                if let contents = response.contents {
+                    let keys = contents.compactMap { $0.key }
+                    allKeys.append(contentsOf: keys)
+                }
+
+                continuationToken = response.nextContinuationToken
+            } while continuationToken != nil
+
+            print("📋 找到 \(allKeys.count) 个对象需要删除")
+
+            // 重要：始终添加文件夹标记对象本身（以 / 结尾的空对象）
+            // R2/S3 中文件夹是虚拟的，由一个以 / 结尾的空对象表示
+            // 列出文件夹内容时不会返回这个标记对象，必须显式删除
+            if !allKeys.contains(prefix) {
+                allKeys.append(prefix)
+                print("📁 添加文件夹标记对象: \(prefix)")
+            }
+
+            // 2. 批量删除所有对象（包括文件夹标记）
+            let failedKeys = try await deleteObjects(bucket: bucket, keys: allKeys)
+
+            isLoading = false
+
+            let deletedCount = allKeys.count - failedKeys.count
+            print("✅ 文件夹删除完成，删除 \(deletedCount) 个对象，失败 \(failedKeys.count) 个")
+
+            return (deletedCount, failedKeys)
+
+        } catch {
+            isLoading = false
+            print("❌ 删除文件夹失败: \(error.localizedDescription)")
+            let serviceError = mapError(error)
+            lastError = serviceError
+            throw serviceError
+        }
+    }
+
     /// 重命名文件（通过复制后删除实现）
     /// - Parameters:
     ///   - bucket: 存储桶名称
@@ -1344,8 +1425,8 @@ class R2Service: ObservableObject {
         // 构建文件路径
         let filePath = fileObject.key
         
-        // 如果配置了公共域名，使用公共域名
-        if let publicDomain = account.publicDomain, !publicDomain.isEmpty {
+        // 如果配置了公共域名，使用默认公共域名
+        if let publicDomain = account.defaultPublicDomain, !publicDomain.isEmpty {
             // 确保域名格式正确
             let domain = publicDomain.hasPrefix("http") ? publicDomain : "https://\(publicDomain)"
             return "\(domain)/\(filePath)"

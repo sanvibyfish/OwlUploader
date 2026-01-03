@@ -91,6 +91,43 @@ S3/R2 中文件夹通过创建一个以 `/` 结尾的空对象来表示：
 let folderKey = "\(prefix)\(name)/"
 ```
 
+## 文件夹删除
+
+### 删除流程
+
+```mermaid
+flowchart TD
+    A[选择文件夹] --> B[右键或工具栏删除]
+    B --> C[显示确认对话框]
+    C --> D{用户确认?}
+    D -->|取消| E[关闭对话框]
+    D -->|确认| F[递归列出所有子对象]
+    F --> G[收集所有对象 key]
+    G --> H[包含文件夹标记对象]
+    H --> I[批量删除]
+    I --> J[刷新文件列表]
+```
+
+### 技术实现
+
+R2/S3 中文件夹是"虚拟"的，由两部分组成：
+1. **文件夹标记**: 以 `/` 结尾的空对象（如 `documents/`）
+2. **文件夹内容**: 共享相同前缀的对象（如 `documents/file.txt`）
+
+删除文件夹时必须同时删除：
+- 所有子对象（文件和嵌套文件夹）
+- 文件夹标记对象本身
+
+### 删除 API
+
+```swift
+func deleteFolder(bucket: String, prefix: String) async throws {
+    // 1. 列出所有以 prefix 开头的对象
+    // 2. 确保包含文件夹标记对象（prefix 本身）
+    // 3. 批量删除所有对象
+}
+```
+
 ## 错误类型
 
 | 错误 | 描述 |
@@ -98,6 +135,7 @@ let folderKey = "\(prefix)\(name)/"
 | `createFolderFailed` | 创建文件夹失败 |
 | `invalidFolderName` | 文件夹名称无效 |
 | `folderAlreadyExists` | 文件夹已存在 |
+| `deleteFolderFailed` | 删除文件夹失败 |
 | `networkError` | 网络连接错误 |
 
 ## 相关链接

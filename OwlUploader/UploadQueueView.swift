@@ -48,70 +48,95 @@ struct UploadQueueView: View {
                     .foregroundColor(.secondary)
             }
             .buttonStyle(.plain)
-            
+
             // 标题和进度信息
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text("上传队列")
+                    Text(L.Upload.Queue.title)
                         .font(.headline)
-                    
-                    Text("(\(queueManager.tasks.count) 个文件)")
+
+                    Text(L.Upload.Queue.fileCount(queueManager.tasks.count))
                         .font(.caption)
                         .foregroundColor(.secondary)
+
+                    // 速度和剩余时间
+                    if queueManager.hasActiveTasks {
+                        Text("•")
+                            .foregroundColor(.secondary)
+                        Text(queueManager.formattedSpeed)
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                            .monospacedDigit()
+
+                        if queueManager.estimatedTimeRemaining > 0 {
+                            Text(L.Upload.Queue.remaining(queueManager.formattedETA))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .monospacedDigit()
+                        }
+                    }
                 }
-                
+
                 // 进度信息
                 HStack(spacing: 8) {
                     if !queueManager.uploadingTasks.isEmpty {
-                        Text("\(queueManager.uploadingTasks.count) 个上传中")
+                        Text(L.Upload.Queue.uploading(queueManager.uploadingTasks.count))
                             .font(.caption)
                             .foregroundColor(.blue)
                     }
                     if !queueManager.pendingTasks.isEmpty {
-                        Text("\(queueManager.pendingTasks.count) 个等待")
+                        Text(L.Upload.Queue.pending(queueManager.pendingTasks.count))
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
                     if !queueManager.completedTasks.isEmpty {
-                        Text("\(queueManager.completedTasks.count) 个完成")
+                        Text(L.Upload.Queue.completed(queueManager.completedTasks.count))
                             .font(.caption)
                             .foregroundColor(.green)
                     }
                     if !queueManager.failedTasks.isEmpty {
-                        Text("\(queueManager.failedTasks.count) 个失败")
+                        Text(L.Upload.Queue.failed(queueManager.failedTasks.count))
                             .font(.caption)
                             .foregroundColor(.red)
                     }
                 }
             }
-            
+
             Spacer()
-            
-            // 总进度
+
+            // 总进度（百分比 + 进度条）
             if queueManager.hasActiveTasks {
-                ProgressView(value: queueManager.totalProgress)
-                    .progressViewStyle(.linear)
-                    .frame(width: 80)
+                HStack(spacing: 6) {
+                    Text("\(queueManager.overallProgressPercent)%")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .monospacedDigit()
+                        .frame(width: 32, alignment: .trailing)
+
+                    ProgressView(value: queueManager.totalProgress)
+                        .progressViewStyle(.linear)
+                        .frame(width: 80)
+                }
             }
-            
+
             // 操作按钮
             HStack(spacing: 8) {
                 if !queueManager.failedTasks.isEmpty {
-                    Button("重试失败") {
+                    Button(L.Upload.Action.retryFailed) {
                         queueManager.retryAllFailed()
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                 }
-                
+
                 if !queueManager.completedTasks.isEmpty {
-                    Button("清除完成") {
+                    Button(L.Upload.Action.clearCompleted) {
                         queueManager.clearCompleted()
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                 }
-                
+
                 Button(action: {
                     queueManager.clearAll()
                 }) {
@@ -189,7 +214,7 @@ struct UploadTaskRow: View {
                 .foregroundColor(.secondary)
                 
             } else if case .failed = task.status {
-                Button("重试") {
+                Button(L.Common.Button.retry) {
                     onRetry()
                 }
                 .buttonStyle(.bordered)

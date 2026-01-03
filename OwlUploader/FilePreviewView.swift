@@ -84,8 +84,8 @@ struct FilePreviewView: View {
             }
             
             Spacer()
-            
-            Button("关闭") {
+
+            Button(L.Common.Button.close) {
                 onDismiss()
             }
             .buttonStyle(.bordered)
@@ -110,8 +110,8 @@ struct FilePreviewView: View {
         VStack(spacing: 16) {
             ProgressView()
                 .scaleEffect(1.5)
-            
-            Text("正在加载预览...")
+
+            Text(L.Preview.loading)
                 .font(.body)
                 .foregroundColor(.secondary)
         }
@@ -124,10 +124,10 @@ struct FilePreviewView: View {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 48))
                 .foregroundColor(.orange)
-            
-            Text("无法预览")
+
+            Text(L.Preview.cannotPreview)
                 .font(.headline)
-            
+
             Text(message)
                 .font(.body)
                 .foregroundColor(.secondary)
@@ -165,11 +165,11 @@ struct FilePreviewView: View {
                     .aspectRatio(contentMode: .fit)
                     .padding()
             } else {
-                errorView("无法加载图片")
+                errorView(L.Preview.cannotLoadImage)
             }
         }
     }
-    
+
     /// 视频预览
     private var videoPreview: some View {
         Group {
@@ -177,7 +177,7 @@ struct FilePreviewView: View {
                 VideoPlayer(player: AVPlayer(url: url))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                errorView("无法加载视频")
+                errorView(L.Preview.cannotLoadVideo)
             }
         }
     }
@@ -206,11 +206,11 @@ struct FilePreviewView: View {
             if let data = previewData, let pdfDocument = PDFDocument(data: data) {
                 PDFKitView(document: pdfDocument)
             } else {
-                errorView("无法加载 PDF")
+                errorView(L.Preview.cannotLoadPDF)
             }
         }
     }
-    
+
     /// 文本预览
     private var textPreview: some View {
         Group {
@@ -223,7 +223,7 @@ struct FilePreviewView: View {
                         .textSelection(.enabled)
                 }
             } else {
-                errorView("无法加载文本内容")
+                errorView(L.Preview.cannotLoadText)
             }
         }
     }
@@ -234,11 +234,11 @@ struct FilePreviewView: View {
             Image(systemName: "doc.questionmark")
                 .font(.system(size: 48))
                 .foregroundColor(.secondary)
-            
-            Text("此文件类型暂不支持预览")
+
+            Text(L.Preview.unsupportedType)
                 .font(.headline)
-            
-            Text("文件类型: \(fileObject.name.components(separatedBy: ".").last ?? "未知")")
+
+            Text(L.Preview.fileType(fileObject.name.components(separatedBy: ".").last ?? L.Files.FileType.unknown))
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -312,15 +312,15 @@ enum PreviewFileType {
     case pdf
     case text
     case unknown
-    
+
     var displayName: String {
         switch self {
-        case .image: return "图片"
-        case .video: return "视频"
-        case .audio: return "音频"
-        case .pdf: return "PDF 文档"
-        case .text: return "文本文件"
-        case .unknown: return "未知类型"
+        case .image: return L.Files.FileType.image
+        case .video: return L.Files.FileType.video
+        case .audio: return L.Files.FileType.audio
+        case .pdf: return L.Files.FileType.pdf
+        case .text: return L.Files.FileType.text
+        case .unknown: return L.Files.FileType.unknown
         }
     }
 }

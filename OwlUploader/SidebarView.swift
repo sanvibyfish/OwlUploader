@@ -27,19 +27,19 @@ struct SidebarView: View {
     var body: some View {
         List(selection: $selectedView) {
             // MARK: - General
-            Section("General") {
+            Section(L.Sidebar.Section.general) {
                 NavigationLink(value: ContentView.MainViewSelection.welcome) {
-                    Label("Home", systemImage: "house")
+                    Label(L.Sidebar.Item.home, systemImage: "house")
                 }
 
                 NavigationLink(value: ContentView.MainViewSelection.settings) {
-                    Label("Settings", systemImage: "gear")
+                    Label(L.Sidebar.Item.settings, systemImage: "gear")
                 }
             }
             .collapsible(false)
 
             // MARK: - Accounts
-            Section("Accounts") {
+            Section(L.Sidebar.Section.accounts) {
                 ForEach(accountManager.accounts) { account in
                     AccountRow(
                         account: account,
@@ -60,7 +60,7 @@ struct SidebarView: View {
                 Button {
                     showAddAccountDialog = true
                 } label: {
-                    Label("Add Account...", systemImage: "plus.circle")
+                    Label(L.Sidebar.Action.addAccount, systemImage: "plus.circle")
                         .foregroundColor(AppColors.primary)
                 }
                 .buttonStyle(.plain)
@@ -79,19 +79,19 @@ struct SidebarView: View {
         }
         .listStyle(.sidebar)
         .confirmationDialog(
-            "Disconnect Account",
+            L.Alert.Disconnect.title,
             isPresented: $showDisconnectConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Disconnect", role: .destructive) {
+            Button(L.Sidebar.Action.disconnect, role: .destructive) {
                 if let account = accountToDisconnect {
                     disconnectAccount(account)
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(L.Common.Button.cancel, role: .cancel) {}
         } message: {
             if let account = accountToDisconnect {
-                Text("Are you sure you want to disconnect '\(account.accessKeyID)'?")
+                Text(L.Alert.Disconnect.message(account.accessKeyID))
             }
         }
     }
@@ -100,20 +100,20 @@ struct SidebarView: View {
 
     private var addBucketSheet: some View {
         VStack(spacing: 16) {
-            Text("Add Bucket")
+            Text(L.Bucket.Add.title)
                 .font(.headline)
 
-            TextField("Bucket Name", text: $newBucketName)
+            TextField(L.Bucket.Add.namePlaceholder, text: $newBucketName)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 250)
 
             HStack(spacing: 12) {
-                Button("Cancel") {
+                Button(L.Common.Button.cancel) {
                     closeAddBucketSheet()
                 }
                 .keyboardShortcut(.cancelAction)
 
-                Button("Add") {
+                Button(L.Common.Button.add) {
                     addBucketToAccount()
                 }
                 .keyboardShortcut(.defaultAction)
@@ -187,12 +187,12 @@ struct SidebarView: View {
 
                 await MainActor.run {
                     closeAddBucketSheet()
-                    messageManager.showSuccess("Bucket Added", description: "'\(bucketName)' added successfully")
+                    messageManager.showSuccess(L.Message.Success.bucketAdded, description: L.Message.Success.bucketAddedDescription(bucketName))
                 }
             } catch {
                 await MainActor.run {
                     isValidatingBucket = false
-                    messageManager.showError("Failed to Add Bucket", description: error.localizedDescription)
+                    messageManager.showError(L.Message.Error.connectionFailed, description: error.localizedDescription)
                 }
             }
         }
@@ -211,11 +211,11 @@ struct SidebarView: View {
                 
                 await MainActor.run {
                     selectedView = .files
-                    messageManager.showSuccess("Connected", description: "Connected to '\(bucket.name)'")
+                    messageManager.showSuccess(L.Message.Success.connected, description: L.Message.Success.connectedDescription(bucket.name))
                 }
             } catch {
                 await MainActor.run {
-                    messageManager.showError("Connection Failed", description: error.localizedDescription)
+                    messageManager.showError(L.Message.Error.connectionFailed, description: error.localizedDescription)
                 }
             }
         }
@@ -231,7 +231,7 @@ struct SidebarView: View {
             r2Service.disconnect()
         }
         expandedAccounts.remove(account.id)
-        messageManager.showSuccess("Disconnected", description: "Account disconnected")
+        messageManager.showSuccess(L.Message.Success.disconnected, description: L.Message.Info.accountDisconnected)
     }
 }
 
@@ -273,7 +273,7 @@ struct AccountRow: View {
                 Button {
                     onAddBucket()
                 } label: {
-                    Label("Add Bucket...", systemImage: "plus")
+                    Label(L.Sidebar.Action.addBucket, systemImage: "plus")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.primary)
                 }
@@ -292,10 +292,10 @@ struct AccountRow: View {
             Button {
                 onAddBucket()
             } label: {
-                Label("Add Bucket...", systemImage: "plus")
+                Label(L.Sidebar.Action.addBucket, systemImage: "plus")
             }
             Divider()
-            Button("Disconnect", role: .destructive, action: onDisconnect)
+            Button(L.Sidebar.Action.disconnect, role: .destructive, action: onDisconnect)
         }
     }
 }
@@ -333,6 +333,9 @@ struct AddAccountSheet: View {
     @State private var accessKeyID: String = ""
     @State private var secretAccessKey: String = ""
     @State private var endpointURL: String = ""
+    @State private var publicDomains: [String] = []
+    @State private var newDomain: String = ""
+    @State private var defaultDomainIndex: Int = 0
     @State private var isTesting: Bool = false
     @State private var testError: String?
 
@@ -340,13 +343,13 @@ struct AddAccountSheet: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Button("Cancel") { onDismiss() }
+                Button(L.Common.Button.cancel) { onDismiss() }
                     .keyboardShortcut(.cancelAction)
                 Spacer()
-                Text("Add Account")
+                Text(L.Account.Add.title)
                     .font(.headline)
                 Spacer()
-                Button("Add") { addAccount() }
+                Button(L.Common.Button.add) { addAccount() }
                     .keyboardShortcut(.defaultAction)
                     .disabled(!isFormValid || isTesting)
             }
@@ -355,44 +358,101 @@ struct AddAccountSheet: View {
             Divider()
 
             // Form
-            Form {
-                Section("Account Info") {
-                    TextField("Display Name", text: $displayName)
-                    TextField("Account ID", text: $accountID)
-                        .textContentType(.username)
-                }
+            ScrollView {
+                Form {
+                    Section(L.Account.Add.accountInfo) {
+                        TextField(L.Account.Field.displayName, text: $displayName)
+                        TextField(L.Account.Field.accountID, text: $accountID)
+                            .textContentType(.username)
+                    }
 
-                Section("Credentials") {
-                    TextField("Access Key ID", text: $accessKeyID)
-                        .textContentType(.username)
-                    SecureField("Secret Access Key", text: $secretAccessKey)
-                        .textContentType(.password)
-                }
+                    Section(L.Account.Add.credentials) {
+                        TextField(L.Account.Field.accessKeyID, text: $accessKeyID)
+                            .textContentType(.username)
+                        SecureField(L.Account.Field.secretAccessKey, text: $secretAccessKey)
+                            .textContentType(.password)
+                    }
 
-                Section("Endpoint") {
-                    TextField("Endpoint URL", text: $endpointURL)
-                        .textContentType(.URL)
-                    Text("Leave empty to use default: https://{accountID}.r2.cloudflarestorage.com")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                if let error = testError {
-                    Section {
-                        Text(error)
-                            .foregroundColor(.red)
+                    Section(L.Account.Add.endpoint) {
+                        TextField(L.Account.Field.endpointURL, text: $endpointURL)
+                            .textContentType(.URL)
+                        Text(L.Account.Field.endpointHint)
                             .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Section(L.Account.Add.publicDomains) {
+                        // 已添加的域名列表
+                        if publicDomains.isEmpty {
+                            Text(L.Account.Domain.empty)
+                                .foregroundColor(.secondary)
+                                .font(.subheadline)
+                        } else {
+                            ForEach(Array(publicDomains.enumerated()), id: \.offset) { index, domain in
+                                HStack(spacing: 12) {
+                                    // 默认标记
+                                    Button {
+                                        withAnimation { defaultDomainIndex = index }
+                                    } label: {
+                                        Image(systemName: defaultDomainIndex == index ? "star.fill" : "star")
+                                            .foregroundColor(defaultDomainIndex == index ? .yellow : .gray)
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .help(defaultDomainIndex == index ? L.Account.Domain.isDefault : L.Account.Domain.setDefault)
+
+                                    Text(domain)
+                                        .font(.system(.body, design: .monospaced))
+
+                                    Spacer()
+
+                                    // 删除按钮
+                                    Button {
+                                        withAnimation { removeDomain(at: index) }
+                                    } label: {
+                                        Image(systemName: "trash")
+                                            .foregroundColor(.red)
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .help(L.Account.Domain.remove)
+                                }
+                            }
+                        }
+
+                        // 添加新域名
+                        HStack(spacing: 8) {
+                            TextField(L.Account.Domain.placeholder, text: $newDomain)
+                                .textFieldStyle(.roundedBorder)
+                                .onSubmit { addDomain() }
+
+                            Button(L.Common.Button.add) {
+                                addDomain()
+                            }
+                            .disabled(newDomain.trimmingCharacters(in: .whitespaces).isEmpty)
+                        }
+
+                        Text(L.Account.Domain.defaultHint)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    if let error = testError {
+                        Section {
+                            Text(error)
+                                .foregroundColor(.red)
+                                .font(.caption)
+                        }
                     }
                 }
+                .formStyle(.grouped)
+                .disabled(isTesting)
             }
-            .formStyle(.grouped)
 
             if isTesting {
-                ProgressView("Testing connection...")
+                ProgressView(L.Account.Add.testingConnection)
                     .padding()
             }
         }
-        .frame(width: 450, height: 480)
+        .frame(width: 500, height: 600)
     }
 
     private var isFormValid: Bool {
@@ -401,9 +461,31 @@ struct AddAccountSheet: View {
         !secretAccessKey.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
+    private func addDomain() {
+        let trimmed = newDomain.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, !publicDomains.contains(trimmed) else { return }
+        withAnimation {
+            publicDomains.append(trimmed)
+            if publicDomains.count == 1 {
+                defaultDomainIndex = 0
+            }
+        }
+        newDomain = ""
+    }
+
+    private func removeDomain(at index: Int) {
+        publicDomains.remove(at: index)
+        // 调整默认索引
+        if defaultDomainIndex >= publicDomains.count {
+            defaultDomainIndex = max(0, publicDomains.count - 1)
+        }
+    }
+
     private func addAccount() {
-        isTesting = true
-        testError = nil
+        withAnimation(AppAnimations.standard) {
+            isTesting = true
+            testError = nil
+        }
 
         let trimmedAccountID = accountID.trimmingCharacters(in: .whitespaces)
         let trimmedAccessKeyID = accessKeyID.trimmingCharacters(in: .whitespaces)
@@ -416,7 +498,9 @@ struct AddAccountSheet: View {
             accessKeyID: trimmedAccessKeyID,
             endpointURL: trimmedEndpoint.isEmpty ? nil : trimmedEndpoint,
             displayName: trimmedDisplayName.isEmpty ? nil : trimmedDisplayName,
-            bucketNames: []
+            bucketNames: [],
+            publicDomains: publicDomains,
+            defaultPublicDomainIndex: defaultDomainIndex
         )
 
         Task {
@@ -435,19 +519,26 @@ struct AddAccountSheet: View {
                     accountManager.setCurrentAccount(account)
 
                     await MainActor.run {
-                        messageManager.showSuccess("Account Added", description: "'\(account.displayName)' connected successfully")
+                        withAnimation(AppAnimations.standard) {
+                            isTesting = false
+                        }
+                        messageManager.showSuccess(L.Message.Success.accountAdded, description: L.Message.Success.accountAddedDescription(account.displayName))
                         onDismiss()
                     }
                 } else {
                     await MainActor.run {
-                        isTesting = false
-                        testError = "Connection test failed"
+                        withAnimation(AppAnimations.standard) {
+                            isTesting = false
+                            testError = L.Message.Error.connectionTestFailed
+                        }
                     }
                 }
             } catch {
                 await MainActor.run {
-                    isTesting = false
-                    testError = error.localizedDescription
+                    withAnimation(AppAnimations.standard) {
+                        isTesting = false
+                        testError = error.localizedDescription
+                    }
                 }
             }
         }

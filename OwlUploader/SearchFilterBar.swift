@@ -9,13 +9,26 @@ import SwiftUI
 
 /// 文件筛选类型
 enum FileFilterType: String, CaseIterable {
-    case all = "全部"
-    case folders = "文件夹"
-    case images = "图片"
-    case videos = "视频"
-    case documents = "文档"
-    case archives = "压缩包"
-    case other = "其他"
+    case all = "all"
+    case folders = "folders"
+    case images = "images"
+    case videos = "videos"
+    case documents = "documents"
+    case archives = "archives"
+    case other = "other"
+
+    /// 本地化显示名称
+    var displayName: String {
+        switch self {
+        case .all: return L.Files.Filter.all
+        case .folders: return L.Files.Filter.folders
+        case .images: return L.Files.Filter.images
+        case .videos: return L.Files.Filter.videos
+        case .documents: return L.Files.Filter.documents
+        case .archives: return L.Files.Filter.archives
+        case .other: return L.Files.Filter.other
+        }
+    }
 
     /// 筛选类型对应的图标名称
     var iconName: String {
@@ -33,19 +46,50 @@ enum FileFilterType: String, CaseIterable {
 
 /// 文件排序方式
 enum FileSortOrder: String, CaseIterable {
-    case name = "名称"
-    case size = "大小"
-    case date = "日期"
-    case type = "类型"
+    case name = "name"
+    case nameDescending = "nameDescending"
+    case size = "size"
+    case sizeDescending = "sizeDescending"
+    case date = "date"
+    case dateDescending = "dateDescending"
+    case type = "type"
+
+    /// 本地化显示名称
+    var displayName: String {
+        switch self {
+        case .name: return L.Files.Sort.name
+        case .nameDescending: return L.Files.Sort.nameDesc
+        case .size: return L.Files.Sort.size
+        case .sizeDescending: return L.Files.Sort.sizeDesc
+        case .date: return L.Files.Sort.date
+        case .dateDescending: return L.Files.Sort.dateDesc
+        case .type: return L.Files.Sort.type
+        }
+    }
 
     /// 排序方式对应的图标名称
     var iconName: String {
         switch self {
-        case .name: return "textformat"
-        case .size: return "internaldrive"
-        case .date: return "calendar"
+        case .name, .nameDescending: return "textformat"
+        case .size, .sizeDescending: return "internaldrive"
+        case .date, .dateDescending: return "calendar"
         case .type: return "doc"
         }
+    }
+
+    /// 是否为降序
+    var isDescending: Bool {
+        switch self {
+        case .nameDescending, .sizeDescending, .dateDescending:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// 基础排序类型（用于菜单显示）
+    static var menuCases: [FileSortOrder] {
+        [.name, .size, .date, .type]
     }
 }
 
@@ -61,7 +105,7 @@ struct SearchFilterBar: View {
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.secondary)
-                TextField("搜索文件...", text: $searchText)
+                TextField(L.Files.Toolbar.searchPlaceholder, text: $searchText)
                     .textFieldStyle(.plain)
                 if !searchText.isEmpty {
                     Button(action: { searchText = "" }) {
@@ -77,18 +121,18 @@ struct SearchFilterBar: View {
             .frame(maxWidth: 200)
 
             // 筛选类型
-            Picker("筛选", selection: $filterType) {
+            Picker(L.Help.filter, selection: $filterType) {
                 ForEach(FileFilterType.allCases, id: \.self) { type in
-                    Text(type.rawValue).tag(type)
+                    Text(type.displayName).tag(type)
                 }
             }
             .pickerStyle(.menu)
             .frame(width: 100)
 
             // 排序方式
-            Picker("排序", selection: $sortOrder) {
+            Picker(L.Help.sort, selection: $sortOrder) {
                 ForEach(FileSortOrder.allCases, id: \.self) { order in
-                    Text(order.rawValue).tag(order)
+                    Text(order.displayName).tag(order)
                 }
             }
             .pickerStyle(.menu)
@@ -140,10 +184,16 @@ extension SearchFilterBar {
         switch sortOrder {
         case .name:
             result.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        case .nameDescending:
+            result.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedDescending }
         case .size:
             result.sort { ($0.size ?? 0) < ($1.size ?? 0) }
+        case .sizeDescending:
+            result.sort { ($0.size ?? 0) > ($1.size ?? 0) }
         case .date:
             result.sort { ($0.lastModifiedDate ?? Date.distantPast) < ($1.lastModifiedDate ?? Date.distantPast) }
+        case .dateDescending:
+            result.sort { ($0.lastModifiedDate ?? Date.distantPast) > ($1.lastModifiedDate ?? Date.distantPast) }
         case .type:
             result.sort { $0.fileExtension.lowercased() < $1.fileExtension.lowercased() }
         }

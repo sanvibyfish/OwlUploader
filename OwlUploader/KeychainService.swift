@@ -20,17 +20,17 @@ class KeychainService {
         case itemNotFound
         case duplicateItem
         case unexpectedError(status: OSStatus)
-        
+
         var errorDescription: String? {
             switch self {
             case .invalidData:
-                return "无效的数据格式"
+                return L.Error.Keychain.invalidData
             case .itemNotFound:
-                return "未找到指定的项目"
+                return L.Error.Keychain.itemNotFound
             case .duplicateItem:
-                return "项目已存在"
+                return L.Error.Keychain.duplicateItem
             case .unexpectedError(let status):
-                return "Keychain 操作失败 (状态码: \(status))"
+                return L.Error.Keychain.unexpectedError(status)
             }
         }
     }

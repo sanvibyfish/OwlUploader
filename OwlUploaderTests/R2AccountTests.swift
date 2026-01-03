@@ -315,8 +315,8 @@ final class R2AccountTests: XCTestCase {
             accessKeyID: "AKIAIOSFODNN7EXAMPLE",
             endpointURL: "https://test.r2.cloudflarestorage.com",
             displayName: "Test Account",
-            defaultBucketName: "my-bucket",
-            publicDomain: "cdn.example.com"
+            bucketNames: ["my-bucket"],
+            publicDomains: ["cdn.example.com"]
         )
 
         // When
@@ -332,8 +332,8 @@ final class R2AccountTests: XCTestCase {
         XCTAssertEqual(decoded.accessKeyID, original.accessKeyID)
         XCTAssertEqual(decoded.endpointURL, original.endpointURL)
         XCTAssertEqual(decoded.displayName, original.displayName)
-        XCTAssertEqual(decoded.defaultBucketName, original.defaultBucketName)
-        XCTAssertEqual(decoded.publicDomain, original.publicDomain)
+        XCTAssertEqual(decoded.bucketNames, original.bucketNames)
+        XCTAssertEqual(decoded.publicDomains, original.publicDomains)
     }
 
     // MARK: - Equatable Tests

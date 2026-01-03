@@ -31,7 +31,7 @@ struct BucketListView: View {
             // 主内容区域
             mainContent
         }
-        .navigationTitle("选择存储桶")
+        .navigationTitle(L.Bucket.Select.title)
         .onAppear {
             handleViewAppear()
         }
@@ -48,7 +48,7 @@ struct BucketListView: View {
                     .fill(r2Service.isConnected ? .green : .red)
                     .frame(width: 8, height: 8)
                 
-                Text(r2Service.isConnected ? "已连接" : "未连接")
+                Text(r2Service.isConnected ? L.Common.Status.connected : L.Common.Status.notConnected)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -62,7 +62,7 @@ struct BucketListView: View {
                         .foregroundColor(.green)
                         .font(.caption)
                     
-                    Text("已选择: \(selectedBucket.name)")
+                    Text(L.Bucket.Status.selected(selectedBucket.name))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -97,10 +97,10 @@ struct BucketListView: View {
                 .foregroundColor(.secondary)
             
             VStack(spacing: 8) {
-                Text("未连接到 R2 服务")
+                Text(L.Files.State.notConnectedToR2)
                     .font(.headline)
-                
-                Text("请先在账户设置中配置并连接您的 R2 账户")
+
+                Text(L.Files.State.configureAccountPrompt)
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -120,25 +120,25 @@ struct BucketListView: View {
                     .font(.system(size: 64))
                     .foregroundColor(.green)
                 
-                Text("存储桶已选择")
+                Text(L.Bucket.Select.title)
                     .font(.largeTitle)
                     .fontWeight(.bold)
-                
-                Text("当前存储桶：\(bucket.name)")
+
+                Text(L.Welcome.Status.currentBucket(bucket.name))
                     .font(.title2)
                     .foregroundColor(.primary)
             }
             
             // 操作按钮
             VStack(spacing: 12) {
-                Button("进入文件管理") {
+                Button(L.Bucket.Action.enterFiles) {
                     // 这里可以触发导航到文件管理页面
                     // 或者发送通知让父视图处理导航
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
-                
-                Button("更换存储桶") {
+
+                Button(L.Bucket.Action.switchBucket) {
                     clearAndShowInput()
                 }
                 .buttonStyle(.bordered)
@@ -155,12 +155,12 @@ struct BucketListView: View {
             ProgressView()
                 .scaleEffect(1.5)
             
-            Text("正在连接存储桶...")
+            Text(L.Bucket.Select.connecting)
                 .font(.headline)
                 .foregroundColor(.secondary)
             
             if let defaultBucket = accountManager.currentAccount?.defaultBucketName {
-                Text("尝试连接到：\(defaultBucket)")
+                Text(L.Bucket.Action.attemptingConnection(defaultBucket))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -174,7 +174,7 @@ struct BucketListView: View {
             ProgressView()
                 .scaleEffect(1.2)
             
-            Text("检查存储桶配置...")
+            Text(L.Common.Label.loading)
                 .font(.headline)
                 .foregroundColor(.secondary)
         }
@@ -197,11 +197,11 @@ struct BucketListView: View {
                     .font(.system(size: 48))
                     .foregroundColor(.blue)
                 
-                Text("选择存储桶")
+                Text(L.Bucket.Select.title)
                     .font(.largeTitle)
                     .fontWeight(.bold)
-                
-                Text("请输入您要访问的 R2 存储桶名称")
+
+                Text(L.Bucket.Select.prompt)
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -210,15 +210,15 @@ struct BucketListView: View {
             // 输入区域
             VStack(spacing: 20) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("存储桶名称")
+                    Text(L.Bucket.Select.nameLabel)
                         .font(.headline)
-                    
-                    TextField("my-bucket-name", text: $bucketName)
+
+                    TextField(L.Bucket.Add.namePlaceholder, text: $bucketName)
                         .textFieldStyle(.roundedBorder)
                         .font(.body)
                         .disabled(isConnecting)
                     
-                    Text("存储桶名称通常为小写字母、数字和连字符的组合")
+                    Text(L.Bucket.Select.nameHint)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -235,7 +235,7 @@ struct BucketListView: View {
                                 .padding(.trailing, 4)
                         }
                         
-                        Text(isConnecting ? "连接中..." : "连接到存储桶")
+                        Text(isConnecting ? L.Bucket.Select.connecting : L.Bucket.Select.connectButton)
                     }
                 }
                 .buttonStyle(.borderedProminent)
@@ -248,14 +248,14 @@ struct BucketListView: View {
                     .frame(maxWidth: 300)
                 
                 VStack(spacing: 8) {
-                    Text("💡 小提示")
+                    Text(L.Bucket.Tips.title)
                         .font(.headline)
                         .foregroundColor(.blue)
-                    
+
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("• 确保存储桶已在 Cloudflare R2 控制台中创建")
-                        Text("• 确保您的 API Token 有访问该存储桶的权限")
-                        Text("• 存储桶名称区分大小写")
+                        Text("• " + L.Bucket.Tips.tip1)
+                        Text("• " + L.Bucket.Tips.tip2)
+                        Text("• " + L.Bucket.Tips.tip3)
                     }
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -310,7 +310,7 @@ struct BucketListView: View {
             
             await MainActor.run {
                 isConnecting = false
-                messageManager.showSuccess("自动连接成功", description: "已连接到配置的默认存储桶 '\(bucket.name)'")
+                messageManager.showSuccess(L.Message.Success.autoConnected, description: L.Message.Success.autoConnectedDescription(bucket.name))
             }
         } catch {
             await MainActor.run {
@@ -321,7 +321,7 @@ struct BucketListView: View {
                 if let r2Error = error as? R2ServiceError {
                     messageManager.showError(r2Error)
                 } else {
-                    messageManager.showError("自动连接失败", description: "无法连接到默认存储桶 '\(defaultBucketName)'，请手动重试")
+                    messageManager.showError(L.Message.Error.autoConnectionFailed, description: L.Message.Error.cannotConnectToBucket(defaultBucketName))
                 }
             }
         }
@@ -332,7 +332,7 @@ struct BucketListView: View {
         let trimmedName = bucketName.trimmingCharacters(in: .whitespacesAndNewlines)
         
         guard !trimmedName.isEmpty else {
-            messageManager.showError("请输入存储桶名称")
+            messageManager.showError(L.Message.Error.enterBucketName)
             return
         }
         
@@ -345,7 +345,7 @@ struct BucketListView: View {
                 await MainActor.run {
                     isConnecting = false
                     needsManualInput = false  // 成功后隐藏输入界面
-                    messageManager.showSuccess("连接成功", description: "已成功连接到存储桶 '\(bucket.name)'")
+                    messageManager.showSuccess(L.Message.Success.connected, description: L.Message.Success.connectedToBucket(bucket.name))
                 }
             } catch let error as R2ServiceError {
                 await MainActor.run {
@@ -355,7 +355,7 @@ struct BucketListView: View {
             } catch {
                 await MainActor.run {
                     isConnecting = false
-                    messageManager.showError("连接失败", description: error.localizedDescription)
+                    messageManager.showError(L.Message.Error.connectionFailed, description: error.localizedDescription)
                 }
             }
         }

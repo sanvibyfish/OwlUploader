@@ -53,10 +53,16 @@ class SelectionManager: ObservableObject {
     func select(_ key: String, mode: SelectionMode, allKeys: [String] = []) {
         switch mode {
         case .single:
-            // 单选：清除其他，只选中当前
-            selectedItems = [key]
-            anchorItem = key
-            lastSelectedItem = key
+            // 单选：如果点击已选中的唯一项，则取消选择；否则选中当前项
+            if selectedItems.count == 1 && selectedItems.contains(key) {
+                // 点击已选中的唯一项，取消选择
+                clearSelection()
+            } else {
+                // 选中新项，清除其他
+                selectedItems = [key]
+                anchorItem = key
+                lastSelectedItem = key
+            }
 
         case .toggle:
             // 切换：已选中则取消，未选中则添加
