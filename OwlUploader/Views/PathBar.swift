@@ -9,7 +9,7 @@
 import SwiftUI
 
 /// 底部路径栏
-/// 支持拖拽文件到路径组件上移动到对应目录
+/// 显示当前路径并支持点击导航
 struct PathBar: View {
     /// 存储桶名称
     let bucketName: String
@@ -19,12 +19,6 @@ struct PathBar: View {
 
     /// 导航回调
     let onNavigate: (String) -> Void
-    
-    /// 移动文件回调：(要移动的文件列表, 目标路径前缀)
-    var onMoveFiles: (([DraggedFileItem], String) -> Void)?
-    
-    /// 当前拖放目标的路径
-    @State private var dropTargetPath: String? = nil
 
     /// 路径组件
     private var pathComponents: [PathComponent] {
@@ -54,15 +48,8 @@ struct PathBar: View {
                     PathBarItem(
                         component: component,
                         isLast: component.id == pathComponents.last?.id,
-                        isDropTarget: dropTargetPath == component.path,
                         onTap: {
                             onNavigate(component.path)
-                        },
-                        onDrop: { items in
-                            onMoveFiles?(items, component.path)
-                        },
-                        onDropTargetChanged: { isTarget in
-                            dropTargetPath = isTarget ? component.path : nil
                         }
                     )
 
@@ -95,17 +82,8 @@ struct PathComponent: Identifiable {
 struct PathBarItem: View {
     let component: PathComponent
     let isLast: Bool
-    
-    /// 是否为拖放目标
-    var isDropTarget: Bool = false
-    
+
     let onTap: () -> Void
-    
-    /// 拖放回调
-    var onDrop: (([DraggedFileItem]) -> Void)?
-    
-    /// 拖放目标状态变化回调
-    var onDropTargetChanged: ((Bool) -> Void)?
 
     @State private var isHovering = false
 
@@ -129,10 +107,6 @@ struct PathBarItem: View {
                 RoundedRectangle(cornerRadius: 4)
                     .fill(backgroundFill)
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: 4)
-                    .stroke(isDropTarget ? Color.accentColor : Color.clear, lineWidth: 2)
-            )
         }
         .buttonStyle(.plain)
         .disabled(isLast)
@@ -141,26 +115,11 @@ struct PathBarItem: View {
                 isHovering = hovering
             }
         }
-        // 拖放目标
-        .dropDestination(for: DraggedFileItem.self) { items, _ in
-            // 不能拖到自己的子目录
-            for item in items {
-                if item.isDirectory && component.path.hasPrefix(item.key) {
-                    return false
-                }
-            }
-            onDrop?(items)
-            return true
-        } isTargeted: { isTargeted in
-            onDropTargetChanged?(isTargeted)
-        }
     }
     
     /// 背景填充色
     private var backgroundFill: Color {
-        if isDropTarget {
-            return Color.accentColor.opacity(0.2)
-        } else if isHovering && !isLast {
+        if isHovering && !isLast {
             return Color.gray.opacity(0.15)
         } else {
             return Color.clear

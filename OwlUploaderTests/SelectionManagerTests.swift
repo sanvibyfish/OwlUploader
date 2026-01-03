@@ -58,6 +58,21 @@ final class SelectionManagerTests: XCTestCase {
         XCTAssertEqual(manager.selectedCount, 1)
     }
 
+    @MainActor
+    func testSelect_singleSameItem_clearsSelection() {
+        // Given
+        let manager = SelectionManager()
+        let file = createTestFileObject(key: "file1.txt")
+
+        // When
+        manager.select(file, mode: .single, allFiles: [file])
+        manager.select(file, mode: .single, allFiles: [file])
+
+        // Then
+        XCTAssertTrue(manager.selectedItems.isEmpty)
+        XCTAssertFalse(manager.hasSelection)
+    }
+
     // MARK: - 多选测试 (Cmd+Click)
 
     @MainActor
@@ -97,6 +112,26 @@ final class SelectionManagerTests: XCTestCase {
         XCTAssertFalse(manager.isSelected(file1))
         XCTAssertTrue(manager.isSelected(file2))
         XCTAssertEqual(manager.selectedCount, 1)
+    }
+
+    // MARK: - 添加选择测试
+
+    @MainActor
+    func testSelect_additive_addsWithoutClearing() {
+        // Given
+        let manager = SelectionManager()
+        let file1 = createTestFileObject(key: "file1.txt")
+        let file2 = createTestFileObject(key: "file2.txt")
+        let allFiles = [file1, file2]
+
+        // When
+        manager.select(file1, mode: .single, allFiles: allFiles)
+        manager.select(file2, mode: .additive, allFiles: allFiles)
+
+        // Then
+        XCTAssertTrue(manager.isSelected(file1))
+        XCTAssertTrue(manager.isSelected(file2))
+        XCTAssertEqual(manager.selectedCount, 2)
     }
 
     // MARK: - 范围选择测试 (Shift+Click)
@@ -170,6 +205,58 @@ final class SelectionManagerTests: XCTestCase {
         for key in keys {
             XCTAssertTrue(manager.selectedItems.contains(key))
         }
+    }
+
+    // MARK: - 反选与取消选择测试
+
+    @MainActor
+    func testInvertSelection_invertsSelectedKeys() {
+        // Given
+        let manager = SelectionManager()
+        let keys = ["file1.txt", "file2.txt", "file3.txt"]
+        manager.select("file1.txt", mode: .single, allKeys: keys)
+
+        // When
+        manager.invertSelection(keys)
+
+        // Then
+        XCTAssertFalse(manager.selectedItems.contains("file1.txt"))
+        XCTAssertTrue(manager.selectedItems.contains("file2.txt"))
+        XCTAssertTrue(manager.selectedItems.contains("file3.txt"))
+        XCTAssertEqual(manager.selectedCount, 2)
+    }
+
+    @MainActor
+    func testDeselect_removesSingleKey() {
+        // Given
+        let manager = SelectionManager()
+        let keys = ["file1.txt", "file2.txt"]
+        manager.selectAll(keys)
+
+        // When
+        manager.deselect("file1.txt")
+
+        // Then
+        XCTAssertFalse(manager.selectedItems.contains("file1.txt"))
+        XCTAssertTrue(manager.selectedItems.contains("file2.txt"))
+        XCTAssertEqual(manager.selectedCount, 1)
+    }
+
+    @MainActor
+    func testDeselect_removesMultipleKeys() {
+        // Given
+        let manager = SelectionManager()
+        let keys = ["file1.txt", "file2.txt", "file3.txt"]
+        manager.selectAll(keys)
+
+        // When
+        manager.deselect(["file1.txt", "file3.txt"])
+
+        // Then
+        XCTAssertFalse(manager.selectedItems.contains("file1.txt"))
+        XCTAssertTrue(manager.selectedItems.contains("file2.txt"))
+        XCTAssertFalse(manager.selectedItems.contains("file3.txt"))
+        XCTAssertEqual(manager.selectedCount, 1)
     }
 
     // MARK: - 清除选择测试

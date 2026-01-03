@@ -413,6 +413,39 @@ final class R2AccountManagerTests: XCTestCase {
         XCTAssertEqual(accountManager.accounts.count, countAfterFirstSave)
     }
 
+    // MARK: - Bucket Management Tests
+
+    func testAddBucket_addsTrimmedBucketToAccount() throws {
+        // Given
+        let account = createTestAccount()
+        try accountManager.saveAccount(account, secretAccessKey: "test-secret")
+        testAccounts.append(account)
+        accountManager.setCurrentAccount(account)
+
+        // When
+        try accountManager.addBucket(to: account, bucketName: "  my-bucket  ")
+
+        // Then
+        let updated = accountManager.accounts.first { $0.id == account.id }
+        XCTAssertEqual(updated?.bucketNames, ["my-bucket"])
+        XCTAssertEqual(accountManager.currentAccount?.bucketNames, ["my-bucket"])
+    }
+
+    func testRemoveBucket_removesBucketFromAccount() throws {
+        // Given
+        let account = createTestAccount()
+        try accountManager.saveAccount(account, secretAccessKey: "test-secret")
+        testAccounts.append(account)
+        try accountManager.addBucket(to: account, bucketName: "bucket-to-remove")
+
+        // When
+        try accountManager.removeBucket(from: account, bucketName: "bucket-to-remove")
+
+        // Then
+        let updated = accountManager.accounts.first { $0.id == account.id }
+        XCTAssertTrue(updated?.bucketNames.isEmpty ?? false)
+    }
+
     // MARK: - Helper Methods
 
     private func createTestAccount() -> R2Account {
@@ -423,4 +456,3 @@ final class R2AccountManagerTests: XCTestCase {
         )
     }
 }
-

@@ -28,9 +28,6 @@ struct FileGridItemView: View {
     var onDownloadFile: ((FileObject) -> Void)?
     var onTap: (() -> Void)?
     var onDoubleTap: (() -> Void)?
-    
-    /// 移动文件回调：(要移动的文件列表, 目标文件夹)
-    var onMoveFiles: (([DraggedFileItem], FileObject) -> Void)?
 
     /// 移动到指定路径回调：(文件, 目标路径)
     var onMoveToPath: ((FileObject, String) -> Void)?
@@ -42,9 +39,6 @@ struct FileGridItemView: View {
     var currentPrefix: String = ""
 
     @State private var isHovering = false
-
-    /// 是否为拖放目标（悬停状态）
-    @State private var isDropTarget = false
 
     /// 缩略图URL
     private var thumbnailURL: String? {
@@ -64,13 +58,6 @@ struct FileGridItemView: View {
         isSelected ? AppColors.primary.opacity(0.3) : Color.clear
     }
 
-    private var dropTargetBorderColor: Color {
-        isDropTarget && fileObject.isDirectory ? Color.accentColor : Color.clear
-    }
-
-    private var dropTargetBackgroundColor: Color {
-        isDropTarget && fileObject.isDirectory ? Color.accentColor.opacity(0.15) : Color.clear
-    }
 
     // MARK: - 视图组件
 
@@ -92,15 +79,6 @@ struct FileGridItemView: View {
             .strokeBorder(selectionBorderColor, lineWidth: 2)
     }
 
-    private var dropTargetOverlay: some View {
-        RoundedRectangle(cornerRadius: 8)
-            .stroke(dropTargetBorderColor, lineWidth: 3)
-    }
-
-    private var dropTargetBackground: some View {
-        RoundedRectangle(cornerRadius: 8)
-            .fill(dropTargetBackgroundColor)
-    }
 
     @ViewBuilder
     private var contextMenuContent: some View {
@@ -188,30 +166,6 @@ struct FileGridItemView: View {
                 onTap?()
             }
             .contextMenu { contextMenuContent }
-            .draggable(DraggedFileItem(from: fileObject))
-            .dropDestination(for: DraggedFileItem.self) { items, _ in
-                handleDrop(items: items)
-            } isTargeted: { isTargeted in
-                handleDropTarget(isTargeted: isTargeted)
-            }
-            .overlay(dropTargetOverlay)
-            .background(dropTargetBackground)
-    }
-
-    // MARK: - 拖放处理
-
-    private func handleDrop(items: [DraggedFileItem]) -> Bool {
-        guard fileObject.isDirectory else { return false }
-        guard !items.contains(where: { $0.key == fileObject.key }) else { return false }
-        guard !items.contains(where: { fileObject.key.hasPrefix($0.key) }) else { return false }
-        onMoveFiles?(items, fileObject)
-        return true
-    }
-
-    private func handleDropTarget(isTargeted: Bool) {
-        if fileObject.isDirectory {
-            isDropTarget = isTargeted
-        }
     }
 
     private var iconView: some View {

@@ -7,7 +7,6 @@
 //
 
 import SwiftUI
-import UniformTypeIdentifiers
 
 /// 表格视图 - 使用原生 Table 组件
 struct FileTableView: View {
@@ -33,9 +32,6 @@ struct FileTableView: View {
     var onDeleteFile: ((FileObject) -> Void)?
     var onDownloadFile: ((FileObject) -> Void)?
 
-    /// 移动文件回调：(要移动的文件列表, 目标文件夹)
-    var onMoveFiles: (([DraggedFileItem], FileObject) -> Void)?
-
     /// 移动到指定路径回调：(文件, 目标路径)
     var onMoveToPath: ((FileObject, String) -> Void)?
 
@@ -53,9 +49,6 @@ struct FileTableView: View {
         KeyPathComparator(\.name, order: .forward)
     ]
     
-    /// 当前正在拖拽悬停的文件夹 ID
-    @State private var dropTargetFolderID: String? = nil
-
     var body: some View {
         Table(files, selection: $tableSelection, sortOrder: $sortComparators) {
             // 名称列
@@ -63,8 +56,7 @@ struct FileTableView: View {
                 FileNameCell(
                     fileObject: file,
                     r2Service: r2Service,
-                    bucketName: bucketName,
-                    isDropTarget: false
+                    bucketName: bucketName
                 )
             }
             .width(min: 200)
@@ -292,9 +284,6 @@ private struct FileNameCell: View {
     let fileObject: FileObject
     var r2Service: R2Service?
     var bucketName: String?
-    
-    /// 是否为拖放目标（悬停状态）
-    var isDropTarget: Bool = false
 
     /// 缩略图URL
     private var thumbnailURL: String? {
@@ -328,17 +317,8 @@ private struct FileNameCell: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
         }
-        // 拖放目标高亮效果
         .padding(.vertical, 2)
         .padding(.horizontal, 4)
-        .background(
-            RoundedRectangle(cornerRadius: 4)
-                .fill(isDropTarget && fileObject.isDirectory ? Color.accentColor.opacity(0.2) : Color.clear)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 4)
-                .stroke(isDropTarget && fileObject.isDirectory ? Color.accentColor : Color.clear, lineWidth: 2)
-        )
     }
 
     private var fileIcon: some View {

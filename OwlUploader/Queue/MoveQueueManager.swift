@@ -105,7 +105,7 @@ class MoveQueueManager: ObservableObject, TaskQueueManagerProtocol {
     /// - Parameters:
     ///   - items: 要移动的文件项列表
     ///   - destinationPath: 目标路径前缀
-    func addMoveTasks(_ items: [DraggedFileItem], to destinationPath: String) {
+    func addMoveTasks(_ items: [FileObject], to destinationPath: String) {
         for item in items {
             // 计算目标键
             let destKey = destinationPath + item.name + (item.isDirectory ? "/" : "")

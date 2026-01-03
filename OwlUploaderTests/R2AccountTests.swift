@@ -409,4 +409,48 @@ final class R2AccountTests: XCTestCase {
         // Then
         XCTAssertEqual(identifier, "abc123_AKIATEST")
     }
+
+    // MARK: - Bucket & Public Domain Tests
+
+    func testDefaultPublicDomain_returnsValueWhenIndexValid() {
+        // Given
+        let account = R2Account(
+            accountID: "abc123def456",
+            accessKeyID: "AKIAIOSFODNN7EXAMPLE",
+            publicDomains: ["cdn.example.com", "static.example.com"],
+            defaultPublicDomainIndex: 1
+        )
+
+        // Then
+        XCTAssertEqual(account.defaultPublicDomain, "static.example.com")
+    }
+
+    func testDefaultPublicDomain_returnsNilWhenIndexOutOfRange() {
+        // Given
+        let account = R2Account(
+            accountID: "abc123def456",
+            accessKeyID: "AKIAIOSFODNN7EXAMPLE",
+            publicDomains: ["cdn.example.com"],
+            defaultPublicDomainIndex: 3
+        )
+
+        // Then
+        XCTAssertNil(account.defaultPublicDomain)
+    }
+
+    func testAddingAndRemovingBucket_updatesBucketList() {
+        // Given
+        let account = R2Account(
+            accountID: "abc123def456",
+            accessKeyID: "AKIAIOSFODNN7EXAMPLE"
+        )
+
+        // When
+        let updated = account.addingBucket("my-bucket")
+        let removed = updated.removingBucket("my-bucket")
+
+        // Then
+        XCTAssertTrue(updated.hasBucket("my-bucket"))
+        XCTAssertFalse(removed.hasBucket("my-bucket"))
+    }
 }

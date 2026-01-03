@@ -45,7 +45,6 @@ struct FileListView: View {
     @State private var showingFileImporter: Bool = false
     
 
-    
     /// 上传队列管理器
     @StateObject private var uploadQueueManager = UploadQueueManager()
 
@@ -84,23 +83,6 @@ struct FileListView: View {
     
     /// 拖拽目标状态
     @State private var isTargeted: Bool = false
-    
-    // MARK: - 拖拽移动相关状态
-    
-    /// 当前文件冲突（用于显示冲突解决对话框）
-    @State private var currentConflict: FileConflict?
-    
-    /// 待处理的移动操作队列
-    @State private var pendingMoveItems: [DraggedFileItem] = []
-    
-    /// 移动操作的目标路径
-    @State private var moveDestinationPrefix: String = ""
-    
-    /// 应用到所有冲突的解决方式
-    @State private var applyToAllResolution: ConflictResolution?
-    
-    /// 是否正在执行移动操作
-    @State private var isMovingFiles: Bool = false
 
     /// 文件来源枚举
     private enum FileSource {
@@ -136,10 +118,7 @@ struct FileListView: View {
                 PathBar(
                     bucketName: bucket.name,
                     currentPrefix: currentPrefix,
-                    onNavigate: navigateToPath,
-                    onMoveFiles: { items, destinationPath in
-                        handleMoveFilesToPath(items: items, toPath: destinationPath)
-                    }
+                    onNavigate: navigateToPath
                 )
             }
         }
@@ -184,15 +163,6 @@ struct FileListView: View {
             DiagnosticsView(r2Service: r2Service)
         }
         // 冲突解决对话框
-        .sheet(item: $currentConflict) { conflict in
-            ConflictResolutionSheet(
-                conflict: conflict,
-                remainingCount: pendingMoveItems.count,
-                onResolve: { resolution, applyToAll in
-                    handleConflictDialogResult(resolution: resolution, applyToAll: applyToAll)
-                }
-            )
-        }
         .alert(L.Alert.Delete.title, isPresented: $showingDeleteConfirmation) {
             Button(L.Common.Button.cancel, role: .cancel) {
                 fileToDelete = nil
@@ -721,9 +691,6 @@ struct FileListView: View {
                     onDownloadFile: { file in
                         downloadFile(file)
                     },
-                    onMoveFiles: { items, targetFolder in
-                        handleMoveFiles(items: items, toFolder: targetFolder)
-                    },
                     onMoveToPath: { file, destinationPath in
                         handleMoveToPath(file: file, destinationPath: destinationPath)
                     },
@@ -749,9 +716,6 @@ struct FileListView: View {
                     },
                     onDownloadFile: { file in
                         downloadFile(file)
-                    },
-                    onMoveFiles: { items, targetFolder in
-                        handleMoveFiles(items: items, toFolder: targetFolder)
                     },
                     onMoveToPath: { file, destinationPath in
                         handleMoveToPath(file: file, destinationPath: destinationPath)
@@ -1308,39 +1272,26 @@ struct FileListView: View {
         }
     }
     
-    // MARK: - 拖拽移动文件
-    
-    /// 处理拖拽文件到文件夹
-    /// - Parameters:
-    ///   - items: 要移动的文件项列表
-    ///   - targetFolder: 目标文件夹对象
-    private func handleMoveFiles(items: [DraggedFileItem], toFolder targetFolder: FileObject) {
-        handleMoveFilesToPath(items: items, toPath: targetFolder.key)
-    }
+    // MARK: - 移动文件
 
     /// 处理右键菜单移动文件到指定路径
     /// 如果文件是多选的一部分，则移动所有选中的文件
     private func handleMoveToPath(file: FileObject, destinationPath: String) {
-        // 检查当前文件是否是多选的一部分
         let selectedKeys = selectionManager.getSelectedKeys()
 
         if selectedKeys.contains(file.key) && selectedKeys.count > 1 {
-            // 多选情况：移动所有选中的文件
             let selectedFiles = fileObjects.filter { selectedKeys.contains($0.key) }
-            let items = selectedFiles.map { DraggedFileItem(from: $0) }
-            handleMoveFilesToPath(items: items, toPath: destinationPath)
+            handleMoveFilesToPath(items: selectedFiles, toPath: destinationPath)
         } else {
-            // 单选情况：只移动右键点击的文件
-            let item = DraggedFileItem(from: file)
-            handleMoveFilesToPath(items: [item], toPath: destinationPath)
+            handleMoveFilesToPath(items: [file], toPath: destinationPath)
         }
     }
 
-    /// 处理拖拽文件到指定路径
+    /// 处理移动到指定路径
     /// - Parameters:
     ///   - items: 要移动的文件项列表
     ///   - destinationPath: 目标路径前缀
-    private func handleMoveFilesToPath(items: [DraggedFileItem], toPath destinationPath: String) {
+    private func handleMoveFilesToPath(items: [FileObject], toPath destinationPath: String) {
         guard let bucket = r2Service.selectedBucket else {
             messageManager.showError("移动失败", description: "未选择存储桶")
             return
@@ -1375,192 +1326,6 @@ struct FileListView: View {
         return ""
     }
     
-    /// 处理移动队列中的下一个项目
-    private func processMoveQueue() {
-        guard !pendingMoveItems.isEmpty else {
-            // 所有项目处理完毕
-            finishMoveOperation()
-            return
-        }
-        
-        let item = pendingMoveItems.removeFirst()
-        
-        Task {
-            await moveItem(item)
-        }
-    }
-    
-    /// 移动单个项目
-    private func moveItem(_ item: DraggedFileItem) async {
-        guard let bucket = r2Service.selectedBucket else { return }
-        
-        // 计算目标键
-        let destKey = moveDestinationPrefix + item.name + (item.isDirectory ? "/" : "")
-        
-        do {
-            // 检查目标是否存在
-            let exists = try await r2Service.objectExists(bucket: bucket.name, key: destKey)
-            
-            if exists {
-                // 存在冲突
-                if let resolution = applyToAllResolution {
-                    // 使用之前选择的解决方式
-                    await handleConflictResolution(item: item, destKey: destKey, resolution: resolution)
-                } else {
-                    // 显示冲突对话框
-                    await MainActor.run {
-                        currentConflict = FileConflict(
-                            sourceKey: item.key,
-                            destinationKey: destKey,
-                            fileName: item.name,
-                            isDirectory: item.isDirectory
-                        )
-                    }
-                }
-            } else {
-                // 没有冲突，直接移动
-                await performMove(item: item, destKey: destKey)
-            }
-        } catch {
-            await MainActor.run {
-                messageManager.showError("检查失败", description: error.localizedDescription)
-                processMoveQueue() // 继续处理下一个
-            }
-        }
-    }
-    
-    /// 处理冲突解决
-    private func handleConflictResolution(item: DraggedFileItem, destKey: String, resolution: ConflictResolution) async {
-        switch resolution {
-        case .replace:
-            // 先删除目标，再移动
-            await performMove(item: item, destKey: destKey, deleteFirst: true)
-        case .skip:
-            // 跳过此文件
-            await MainActor.run {
-                processMoveQueue()
-            }
-        case .rename:
-            // 生成新的文件名
-            let newDestKey = await generateUniqueKey(for: destKey)
-            await performMove(item: item, destKey: newDestKey)
-        case .cancel:
-            // 取消整个操作
-            await MainActor.run {
-                pendingMoveItems.removeAll()
-                finishMoveOperation()
-            }
-        }
-    }
-    
-    /// 生成唯一的目标键（添加序号）
-    private func generateUniqueKey(for key: String) async -> String {
-        guard let bucket = r2Service.selectedBucket else { return key }
-        
-        let isDirectory = key.hasSuffix("/")
-        let baseName: String
-        let ext: String
-        
-        if isDirectory {
-            baseName = String(key.dropLast())
-            ext = "/"
-        } else {
-            let nsPath = key as NSString
-            let name = nsPath.deletingPathExtension
-            let pathExt = nsPath.pathExtension
-            baseName = name
-            ext = pathExt.isEmpty ? "" : ".\(pathExt)"
-        }
-        
-        var counter = 1
-        var newKey = key
-        
-        while counter < 100 {
-            newKey = "\(baseName) (\(counter))\(ext)"
-            do {
-                let exists = try await r2Service.objectExists(bucket: bucket.name, key: newKey)
-                if !exists {
-                    return newKey
-                }
-            } catch {
-                return newKey
-            }
-            counter += 1
-        }
-        
-        return newKey
-    }
-    
-    /// 执行移动操作
-    private func performMove(item: DraggedFileItem, destKey: String, deleteFirst: Bool = false) async {
-        guard let bucket = r2Service.selectedBucket else { return }
-        
-        await MainActor.run {
-            isMovingFiles = true
-        }
-        
-        do {
-            if deleteFirst {
-                // 先删除目标
-                if item.isDirectory {
-                    _ = try await r2Service.deleteFolder(bucket: bucket.name, folderKey: destKey)
-                } else {
-                    try await r2Service.deleteObject(bucket: bucket.name, key: destKey)
-                }
-            }
-            
-            // 执行移动
-            if item.isDirectory {
-                let result = try await r2Service.moveFolder(bucket: bucket.name, sourceFolderKey: item.key, destinationFolderKey: destKey)
-                print("✅ 文件夹移动完成: \(result.movedCount) 个文件")
-            } else {
-                try await r2Service.moveObject(bucket: bucket.name, sourceKey: item.key, destinationKey: destKey)
-                print("✅ 文件移动完成: \(item.name)")
-            }
-            
-            await MainActor.run {
-                processMoveQueue() // 继续处理下一个
-            }
-        } catch {
-            await MainActor.run {
-                messageManager.showError("移动失败", description: "\(item.name): \(error.localizedDescription)")
-                processMoveQueue() // 继续处理下一个
-            }
-        }
-    }
-    
-    /// 完成移动操作
-    private func finishMoveOperation() {
-        isMovingFiles = false
-        currentConflict = nil
-        applyToAllResolution = nil
-        
-        // 刷新文件列表
-        loadFileList()
-        messageManager.showSuccess("移动完成", description: nil)
-    }
-    
-    /// 处理冲突对话框的选择
-    private func handleConflictDialogResult(resolution: ConflictResolution, applyToAll: Bool) {
-        guard let conflict = currentConflict else { return }
-        
-        if applyToAll {
-            applyToAllResolution = resolution
-        }
-        
-        currentConflict = nil
-        
-        // 找到对应的项目并处理
-        let item = DraggedFileItem(
-            key: conflict.sourceKey,
-            name: conflict.fileName,
-            isDirectory: conflict.isDirectory
-        )
-        
-        Task {
-            await handleConflictResolution(item: item, destKey: conflict.destinationKey, resolution: resolution)
-        }
-    }
 }
 
 // MARK: - 预览
