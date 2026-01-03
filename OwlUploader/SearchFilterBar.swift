@@ -44,52 +44,31 @@ enum FileFilterType: String, CaseIterable {
     }
 }
 
-/// 文件排序方式
+/// 文件排序方式 - Finder 标准选项
 enum FileSortOrder: String, CaseIterable {
-    case name = "name"
-    case nameDescending = "nameDescending"
-    case size = "size"
-    case sizeDescending = "sizeDescending"
-    case date = "date"
-    case dateDescending = "dateDescending"
-    case type = "type"
+    case name = "name"              // 名称
+    case kind = "kind"              // 类型
+    case dateModified = "dateModified"  // 修改日期
+    case size = "size"              // 大小
 
     /// 本地化显示名称
     var displayName: String {
         switch self {
-        case .name: return L.Files.Sort.name
-        case .nameDescending: return L.Files.Sort.nameDesc
-        case .size: return L.Files.Sort.size
-        case .sizeDescending: return L.Files.Sort.sizeDesc
-        case .date: return L.Files.Sort.date
-        case .dateDescending: return L.Files.Sort.dateDesc
-        case .type: return L.Files.Sort.type
+        case .name: return "Name"
+        case .kind: return "Kind"
+        case .dateModified: return "Date Modified"
+        case .size: return "Size"
         }
     }
 
     /// 排序方式对应的图标名称
     var iconName: String {
         switch self {
-        case .name, .nameDescending: return "textformat"
-        case .size, .sizeDescending: return "internaldrive"
-        case .date, .dateDescending: return "calendar"
-        case .type: return "doc"
+        case .name: return "textformat"
+        case .kind: return "doc"
+        case .dateModified: return "calendar"
+        case .size: return "internaldrive"
         }
-    }
-
-    /// 是否为降序
-    var isDescending: Bool {
-        switch self {
-        case .nameDescending, .sizeDescending, .dateDescending:
-            return true
-        default:
-            return false
-        }
-    }
-
-    /// 基础排序类型（用于菜单显示）
-    static var menuCases: [FileSortOrder] {
-        [.name, .size, .date, .type]
     }
 }
 
@@ -149,11 +128,18 @@ struct SearchFilterBar: View {
 
 extension SearchFilterBar {
     /// 根据当前筛选条件过滤和排序文件
+    /// - Parameters:
+    ///   - files: 文件列表
+    ///   - searchText: 搜索文本
+    ///   - filterType: 筛选类型
+    ///   - sortOrder: 排序方式
+    ///   - ascending: 是否升序（true = 升序 A→Z，false = 降序 Z→A）
     static func filterAndSort(
         files: [FileObject],
         searchText: String,
         filterType: FileFilterType,
-        sortOrder: FileSortOrder
+        sortOrder: FileSortOrder,
+        ascending: Bool = true
     ) -> [FileObject] {
         var result = files
 
@@ -180,22 +166,33 @@ extension SearchFilterBar {
             result = result.filter { !$0.isDirectory && !$0.isImage && !$0.isVideo && !$0.isDocument && !$0.isArchive }
         }
 
-        // 排序
+        // 排序 - 根据排序方式和方向
         switch sortOrder {
         case .name:
-            result.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-        case .nameDescending:
-            result.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedDescending }
+            if ascending {
+                result.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            } else {
+                result.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedDescending }
+            }
+        case .kind:
+            // 使用 sortableKind 保持与 Table 列排序一致
+            if ascending {
+                result.sort { $0.sortableKind < $1.sortableKind }
+            } else {
+                result.sort { $0.sortableKind > $1.sortableKind }
+            }
+        case .dateModified:
+            if ascending {
+                result.sort { ($0.lastModifiedDate ?? Date.distantPast) < ($1.lastModifiedDate ?? Date.distantPast) }
+            } else {
+                result.sort { ($0.lastModifiedDate ?? Date.distantPast) > ($1.lastModifiedDate ?? Date.distantPast) }
+            }
         case .size:
-            result.sort { ($0.size ?? 0) < ($1.size ?? 0) }
-        case .sizeDescending:
-            result.sort { ($0.size ?? 0) > ($1.size ?? 0) }
-        case .date:
-            result.sort { ($0.lastModifiedDate ?? Date.distantPast) < ($1.lastModifiedDate ?? Date.distantPast) }
-        case .dateDescending:
-            result.sort { ($0.lastModifiedDate ?? Date.distantPast) > ($1.lastModifiedDate ?? Date.distantPast) }
-        case .type:
-            result.sort { $0.fileExtension.lowercased() < $1.fileExtension.lowercased() }
+            if ascending {
+                result.sort { ($0.size ?? 0) < ($1.size ?? 0) }
+            } else {
+                result.sort { ($0.size ?? 0) > ($1.size ?? 0) }
+            }
         }
 
         // 文件夹始终在前面

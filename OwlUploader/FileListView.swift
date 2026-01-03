@@ -29,6 +29,9 @@ struct FileListView: View {
     /// 当前路径前缀
     @State private var currentPrefix: String = ""
     
+    /// 浏览历史管理器
+    @StateObject private var navigationHistory = NavigationHistoryManager()
+    
     /// 文件对象列表
     @State private var fileObjects: [FileObject] = []
     
@@ -45,7 +48,10 @@ struct FileListView: View {
     
     /// 上传队列管理器
     @StateObject private var uploadQueueManager = UploadQueueManager()
-    
+
+    /// 移动队列管理器
+    @StateObject private var moveQueueManager = MoveQueueManager()
+
     /// 是否显示诊断信息
     @State private var showingDiagnostics: Bool = false
     
@@ -70,11 +76,31 @@ struct FileListView: View {
     /// 排序方式
     @State private var sortOrder: FileSortOrder = .name
     
+    /// 排序方向（true = 升序，false = 降序）
+    @State private var sortAscending: Bool = true
+    
     /// 要预览的文件对象
     @State private var fileToPreview: FileObject?
     
     /// 拖拽目标状态
     @State private var isTargeted: Bool = false
+    
+    // MARK: - 拖拽移动相关状态
+    
+    /// 当前文件冲突（用于显示冲突解决对话框）
+    @State private var currentConflict: FileConflict?
+    
+    /// 待处理的移动操作队列
+    @State private var pendingMoveItems: [DraggedFileItem] = []
+    
+    /// 移动操作的目标路径
+    @State private var moveDestinationPrefix: String = ""
+    
+    /// 应用到所有冲突的解决方式
+    @State private var applyToAllResolution: ConflictResolution?
+    
+    /// 是否正在执行移动操作
+    @State private var isMovingFiles: Bool = false
 
     /// 文件来源枚举
     private enum FileSource {
@@ -97,10 +123,10 @@ struct FileListView: View {
                     }
                 }
 
-            // 上传队列面板
-            if uploadQueueManager.isQueuePanelVisible {
+            // 组合队列面板（上传 + 移动）
+            if uploadQueueManager.isQueuePanelVisible || moveQueueManager.isQueuePanelVisible {
                 Divider()
-                UploadQueueView(queueManager: uploadQueueManager)
+                CombinedQueueView(uploadManager: uploadQueueManager, moveManager: moveQueueManager)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
@@ -110,172 +136,31 @@ struct FileListView: View {
                 PathBar(
                     bucketName: bucket.name,
                     currentPrefix: currentPrefix,
-                    onNavigate: navigateToPath
+                    onNavigate: navigateToPath,
+                    onMoveFiles: { items, destinationPath in
+                        handleMoveFilesToPath(items: items, toPath: destinationPath)
+                    }
                 )
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: uploadQueueManager.isQueuePanelVisible)
+        .animation(.easeInOut(duration: 0.2), value: uploadQueueManager.isQueuePanelVisible || moveQueueManager.isQueuePanelVisible)
         .navigationTitle(r2Service.selectedBucket?.name ?? "Files")
         .navigationSubtitle(currentPrefix.isEmpty ? "" : currentPrefix)
-        .toolbar {
-            // 左侧导航区
-            ToolbarItemGroup(placement: .navigation) {
-                if r2Service.isConnected, r2Service.selectedBucket != nil {
-                    Button(action: goUpOneLevel) {
-                        Image(systemName: "chevron.up")
-                    }
-                    .disabled(currentPrefix.isEmpty || !canLoadFiles || r2Service.isLoading)
-                    .help(L.Help.goUp)
-
-                    Button(action: loadFileList) {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .disabled(!canLoadFiles || r2Service.isLoading)
-                    .help(L.Help.refresh)
-
-                    if r2Service.isLoading && !isInitialLoading {
-                        ProgressView()
-                            .scaleEffect(0.7)
-                            .frame(width: 16, height: 16)
-                    }
-                }
-            }
-
-            // 右侧操作区 - 使用 primaryAction 确保右对齐
-            ToolbarItemGroup(placement: .primaryAction) {
-                if r2Service.isConnected, r2Service.selectedBucket != nil {
-                    // 批量操作区域（当有选择时显示）
-                    if selectionManager.selectedCount > 0 {
-                        Text("\(selectionManager.selectedCount) \(L.Files.itemsSelected(selectionManager.selectedCount))")
-                            .font(.system(size: 12))
-                            .foregroundColor(.secondary)
-
-                        Button(action: { selectionManager.clearSelection() }) {
-                            Image(systemName: "xmark.circle")
-                        }
-                        .help(L.Help.clearSelection)
-
-                        Button(action: batchDownloadSelectedFiles) {
-                            Label(L.Files.Toolbar.download, systemImage: "arrow.down.circle")
-                        }
-                        .disabled(!canLoadFiles || r2Service.isLoading)
-
-                        Button(action: batchDeleteSelectedFiles) {
-                            Label(L.Files.Toolbar.deleteAction, systemImage: "trash")
-                        }
-                        .disabled(!canLoadFiles || r2Service.isLoading)
-                    } else {
-                        // 搜索框
-                        HStack(spacing: 4) {
-                            Image(systemName: "magnifyingglass")
-                                .font(.system(size: 11))
-                                .foregroundColor(.secondary)
-
-                            TextField(L.Files.Toolbar.searchPlaceholder, text: $searchText)
-                                .textFieldStyle(.plain)
-                                .font(.system(size: 12))
-                                .frame(width: 150)
-
-                            if !searchText.isEmpty {
-                                Button {
-                                    searchText = ""
-                                } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(.secondary)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(Color(nsColor: .controlBackgroundColor))
-                        .cornerRadius(4)
-
-                        // 筛选菜单
-                        Menu {
-                            ForEach(FileFilterType.allCases, id: \.self) { type in
-                                Button {
-                                    filterType = type
-                                } label: {
-                                    HStack {
-                                        Label(type.rawValue, systemImage: type.iconName)
-                                        if filterType == type {
-                                            Spacer()
-                                            Image(systemName: "checkmark")
-                                        }
-                                    }
-                                }
-                            }
-                        } label: {
-                            Image(systemName: filterType == .all ? "line.3.horizontal.decrease" : "line.3.horizontal.decrease.circle.fill")
-                                .foregroundColor(filterType == .all ? .primary : AppColors.primary)
-                        }
-                        .help(L.Help.filter)
-
-                        // 排序菜单
-                        Menu {
-                            ForEach(FileSortOrder.allCases, id: \.self) { order in
-                                Button {
-                                    sortOrder = order
-                                } label: {
-                                    HStack {
-                                        Label(order.rawValue, systemImage: order.iconName)
-                                        if sortOrder == order {
-                                            Spacer()
-                                            Image(systemName: "checkmark")
-                                        }
-                                    }
-                                }
-                            }
-                        } label: {
-                            Image(systemName: "arrow.up.arrow.down")
-                        }
-                        .help(L.Help.sort)
-
-                        Divider()
-
-                        // 视图模式切换
-                        ForEach(FileViewMode.allCases) { mode in
-                            Button {
-                                withAnimation(AppAnimations.fast) {
-                                    viewModeManager.setMode(mode)
-                                }
-                            } label: {
-                                Image(systemName: mode.iconName)
-                                    .foregroundColor(viewModeManager.currentMode == mode ? AppColors.primary : .secondary)
-                            }
-                            .help(mode.displayName)
-                        }
-
-                        Divider()
-
-                        // 新建文件夹
-                        Button(action: { showingCreateFolderSheet = true }) {
-                            Image(systemName: "folder.badge.plus")
-                        }
-                        .disabled(!canLoadFiles || r2Service.isLoading)
-                        .help(L.Help.newFolder)
-
-                        // 上传文件
-                        Button(action: { showingFileImporter = true }) {
-                            Image(systemName: "arrow.up.doc")
-                        }
-                        .disabled(!canLoadFiles || r2Service.isLoading)
-                        .help(L.Help.uploadFile)
-                    }
-                }
-            }
-        }
+        .toolbar { fileListToolbarContent }
         .onAppear {
             loadFileList()
             // 设置上传完成回调，自动刷新文件列表
             uploadQueueManager.onQueueComplete = {
                 loadFileList()
             }
+            // 设置移动完成回调，自动刷新文件列表
+            moveQueueManager.onQueueComplete = {
+                loadFileList()
+            }
         }
         .onChange(of: r2Service.selectedBucket) { _ in
             currentPrefix = ""
+            navigationHistory.reset(to: "")  // 切换存储桶时重置历史
             loadFileList()
         }
         .onChange(of: isActive) { active in
@@ -297,6 +182,16 @@ struct FileListView: View {
         )
         .sheet(isPresented: $showingDiagnostics) {
             DiagnosticsView(r2Service: r2Service)
+        }
+        // 冲突解决对话框
+        .sheet(item: $currentConflict) { conflict in
+            ConflictResolutionSheet(
+                conflict: conflict,
+                remainingCount: pendingMoveItems.count,
+                onResolve: { resolution, applyToAll in
+                    handleConflictDialogResult(resolution: resolution, applyToAll: applyToAll)
+                }
+            )
         }
         .alert(L.Alert.Delete.title, isPresented: $showingDeleteConfirmation) {
             Button(L.Common.Button.cancel, role: .cancel) {
@@ -326,7 +221,7 @@ struct FileListView: View {
         // 键盘快捷键支持
         .focusedValue(\.fileActions, FileActions(
             selectAll: {
-                let filteredFiles = SearchFilterBar.filterAndSort(files: fileObjects, searchText: searchText, filterType: filterType, sortOrder: sortOrder)
+                let filteredFiles = SearchFilterBar.filterAndSort(files: fileObjects, searchText: searchText, filterType: filterType, sortOrder: sortOrder, ascending: sortAscending)
                 selectionManager.selectAll(filteredFiles.map { $0.key })
             },
             deselectAll: {
@@ -339,11 +234,11 @@ struct FileListView: View {
                     requestDeleteFile(file)
                 }
             },
-            refresh: loadFileList,
-            goUp: goUpOneLevel,
+            refresh: { loadFileList() },
+            goUp: navigateBack,
             newFolder: { showingCreateFolderSheet = true },
             hasSelection: selectionManager.hasSelection,
-            canGoUp: !currentPrefix.isEmpty
+            canGoUp: navigationHistory.canGoBack
         ))
         .focusedValue(\.viewModeActions, ViewModeActions(
             setTableMode: { viewModeManager.setMode(.table) },
@@ -352,7 +247,209 @@ struct FileListView: View {
         ))
     }
     
+    // MARK: - Toolbar Content
+    
+    /// 工具栏内容
+    @ToolbarContentBuilder
+    private var fileListToolbarContent: some ToolbarContent {
+        // 左侧导航区
+        ToolbarItemGroup(placement: .navigation) {
+            navigationToolbarButtons
+        }
+        
+        // 中间：视图模式切换
+        ToolbarItem(placement: .principal) {
+            if r2Service.isConnected, r2Service.selectedBucket != nil {
+                viewModePicker
+            }
+        }
+        
+        // 右侧操作区
+        ToolbarItemGroup(placement: .automatic) {
+            if r2Service.isConnected, r2Service.selectedBucket != nil {
+                rightToolbarContent
+            }
+        }
+    }
+    
+    /// 导航工具栏按钮
+    @ViewBuilder
+    private var navigationToolbarButtons: some View {
+        if r2Service.isConnected, r2Service.selectedBucket != nil {
+            Button(action: navigateBack) {
+                Image(systemName: "chevron.left")
+            }
+            .disabled(!navigationHistory.canGoBack || !canLoadFiles || r2Service.isLoading)
+            .help("Back")
+            
+            Button(action: navigateForward) {
+                Image(systemName: "chevron.right")
+            }
+            .disabled(!navigationHistory.canGoForward || !canLoadFiles || r2Service.isLoading)
+            .help("Forward")
+            
+            Button {
+                loadFileList()
+            } label: {
+                Image(systemName: "arrow.clockwise")
+            }
+            .disabled(!canLoadFiles || r2Service.isLoading)
+            .help(L.Help.refresh)
+            
+            if r2Service.isLoading && !isInitialLoading {
+                ProgressView()
+                    .scaleEffect(0.7)
+                    .frame(width: 16, height: 16)
+            }
+        }
+    }
+    
+    /// 右侧工具栏内容
+    @ViewBuilder
+    private var rightToolbarContent: some View {
+        if selectionManager.selectedCount > 0 {
+            batchOperationButtons
+        } else {
+            normalOperationButtons
+        }
+    }
+    
+    /// 批量操作按钮
+    @ViewBuilder
+    private var batchOperationButtons: some View {
+        Text("\(selectionManager.selectedCount) \(L.Files.itemsSelected(selectionManager.selectedCount))")
+            .font(.system(size: 12))
+            .foregroundColor(.secondary)
+        
+        Button(action: { selectionManager.clearSelection() }) {
+            Image(systemName: "xmark.circle")
+        }
+        .help(L.Help.clearSelection)
+        
+        Button(action: batchDownloadSelectedFiles) {
+            Label(L.Files.Toolbar.download, systemImage: "arrow.down.circle")
+        }
+        .disabled(!canLoadFiles || r2Service.isLoading)
+        
+        Button(action: batchDeleteSelectedFiles) {
+            Label(L.Files.Toolbar.deleteAction, systemImage: "trash")
+        }
+        .disabled(!canLoadFiles || r2Service.isLoading)
+    }
+    
+    /// 正常操作按钮
+    @ViewBuilder
+    private var normalOperationButtons: some View {
+        // 更多菜单
+        moreOptionsMenu
+        
+        // 新建文件夹
+        Button(action: { showingCreateFolderSheet = true }) {
+            Image(systemName: "folder.badge.plus")
+        }
+        .disabled(!canLoadFiles || r2Service.isLoading)
+        .help(L.Help.newFolder)
+        
+        // 上传文件
+        Button(action: { showingFileImporter = true }) {
+            Image(systemName: "arrow.up.doc")
+        }
+        .disabled(!canLoadFiles || r2Service.isLoading)
+        .help(L.Help.uploadFile)
+        
+        // 搜索框
+        toolbarSearchField
+    }
+    
+    /// 更多选项菜单
+    private var moreOptionsMenu: some View {
+        Menu {
+            Section("筛选") {
+                ForEach(FileFilterType.allCases, id: \.self) { type in
+                    Button {
+                        filterType = type
+                    } label: {
+                        HStack {
+                            Label(type.displayName, systemImage: type.iconName)
+                            if filterType == type {
+                                Spacer()
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            }
+            
+            Section("排序") {
+                ForEach(FileSortOrder.allCases, id: \.self) { order in
+                    Button {
+                        sortOrder = order
+                    } label: {
+                        HStack {
+                            Label(order.displayName, systemImage: order.iconName)
+                            if sortOrder == order {
+                                Spacer()
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+        }
+        .help("更多选项")
+    }
+    
     // MARK: - Subviews & Builders
+    
+    /// 视图模式选择器
+    private var viewModePicker: some View {
+        Picker("", selection: Binding(
+            get: { viewModeManager.currentMode },
+            set: { newMode in
+                withAnimation(AppAnimations.fast) {
+                    viewModeManager.setMode(newMode)
+                }
+            }
+        )) {
+            ForEach(FileViewMode.allCases) { mode in
+                Image(systemName: mode.iconName)
+                    .tag(mode)
+            }
+        }
+        .pickerStyle(.segmented)
+        .frame(width: 80)
+    }
+    
+    /// 工具栏搜索框
+    private var toolbarSearchField: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+            
+            TextField("Search", text: $searchText)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12))
+                .frame(width: 100)
+            
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .cornerRadius(6)
+    }
 
     /// 拖拽区域覆盖层
     private var dropZoneOverlay: some View {
@@ -498,7 +595,9 @@ struct FileListView: View {
                 }
                 
                 // 重试按钮
-                Button(action: loadFileList) {
+                Button {
+                    loadFileList()
+                } label: {
                     Label(L.Common.Button.retry, systemImage: "arrow.clockwise")
                         .font(.system(size: 14, weight: .medium))
                 }
@@ -565,7 +664,7 @@ struct FileListView: View {
     
     /// 文件列表视图
     private var fileListView: some View {
-        let filteredFiles = SearchFilterBar.filterAndSort(files: fileObjects, searchText: searchText, filterType: filterType, sortOrder: sortOrder)
+        let filteredFiles = SearchFilterBar.filterAndSort(files: fileObjects, searchText: searchText, filterType: filterType, sortOrder: sortOrder, ascending: sortAscending)
 
         return ZStack {
             // 拖拽区域背景
@@ -609,6 +708,7 @@ struct FileListView: View {
                     files: filteredFiles,
                     selectionManager: selectionManager,
                     sortOrder: $sortOrder,
+                    sortAscending: $sortAscending,
                     r2Service: r2Service,
                     bucketName: r2Service.selectedBucket?.name,
                     messageManager: messageManager,
@@ -620,11 +720,19 @@ struct FileListView: View {
                     },
                     onDownloadFile: { file in
                         downloadFile(file)
-                    }
+                    },
+                    onMoveFiles: { items, targetFolder in
+                        handleMoveFiles(items: items, toFolder: targetFolder)
+                    },
+                    onMoveToPath: { file, destinationPath in
+                        handleMoveToPath(file: file, destinationPath: destinationPath)
+                    },
+                    currentFolders: filteredFiles.filter { $0.isDirectory },
+                    currentPrefix: currentPrefix
                 )
                 .zIndex(viewModeManager.currentMode == .table ? 1 : 0)
                 .allowsHitTesting(viewModeManager.currentMode == .table)
-                
+
                 // 图标网格视图
                 FileGridView(
                     files: filteredFiles,
@@ -641,7 +749,15 @@ struct FileListView: View {
                     },
                     onDownloadFile: { file in
                         downloadFile(file)
-                    }
+                    },
+                    onMoveFiles: { items, targetFolder in
+                        handleMoveFiles(items: items, toFolder: targetFolder)
+                    },
+                    onMoveToPath: { file, destinationPath in
+                        handleMoveToPath(file: file, destinationPath: destinationPath)
+                    },
+                    currentFolders: filteredFiles.filter { $0.isDirectory },
+                    currentPrefix: currentPrefix
                 )
                 .zIndex(viewModeManager.currentMode == .icons ? 1 : 0)
                 .allowsHitTesting(viewModeManager.currentMode == .icons)
@@ -649,8 +765,8 @@ struct FileListView: View {
             // 移除阻塞式 loading 覆盖层，改为在工具栏显示加载状态
             // 用户可以在加载过程中继续交互
             .sheet(item: $fileToPreview) { file in
-                let filteredFiles = SearchFilterBar.filterAndSort(files: fileObjects, searchText: searchText, filterType: filterType, sortOrder: sortOrder)
-                
+                let filteredFiles = SearchFilterBar.filterAndSort(files: fileObjects, searchText: searchText, filterType: filterType, sortOrder: sortOrder, ascending: sortAscending)
+
                 FilePreviewView(
                     r2Service: r2Service,
                     fileObject: file,
@@ -671,6 +787,25 @@ struct FileListView: View {
                     onDismiss: { fileToPreview = nil }
                 )
             }
+            // 空格键触发预览（类似 Finder Quick Look）
+            .onKeyPress(.space) {
+                togglePreview()
+                return .handled
+            }
+        }
+    }
+
+    /// 切换预览状态（空格键）
+    private func togglePreview() {
+        if fileToPreview != nil {
+            // 已有预览，关闭
+            fileToPreview = nil
+        } else {
+            // 没有预览，打开选中的第一个非目录文件
+            if let firstSelectedKey = selectionManager.selectedItems.first,
+               let file = fileObjects.first(where: { $0.key == firstSelectedKey && !$0.isDirectory }) {
+                fileToPreview = file
+            }
         }
     }
 
@@ -681,15 +816,15 @@ struct FileListView: View {
     }
     
     /// 加载文件列表
-    private func loadFileList() {
+    /// - Parameter showLoadingState: 是否显示全屏加载状态（导航操作时应传入 false）
+    private func loadFileList(showLoadingState: Bool = true) {
         guard canLoadFiles else { return }
         
         guard let bucket = r2Service.selectedBucket else { return }
         
-        // 只在首次加载（列表为空）时显示全屏加载界面
-        // 后续导航保持当前列表显示，后台加载完成后再切换
-        let isFirstLoad = fileObjects.isEmpty
-        if isFirstLoad {
+        // 只在首次加载且允许显示加载状态时才显示全屏加载界面
+        // 导航操作（前进/后退/进入文件夹）时不显示，保持流畅体验
+        if showLoadingState && fileObjects.isEmpty {
             isInitialLoading = true
         }
         
@@ -725,10 +860,11 @@ struct FileListView: View {
         // 只有文件夹可以点击进入
         guard fileObject.isDirectory else { return }
 
-        // 更新当前路径并重新加载列表
+        // 使用历史管理器记录导航
+        navigationHistory.navigateTo(fileObject.key)
         currentPrefix = fileObject.key
         selectionManager.clearSelection()
-        loadFileList()
+        loadFileList(showLoadingState: false)  // 导航时不显示全屏加载
     }
 
     /// 处理文件列表项单击
@@ -750,10 +886,11 @@ struct FileListView: View {
     /// - Parameter fileObject: 被双击的文件对象
     private func handleFileItemDoubleTap(_ fileObject: FileObject) {
         if fileObject.isDirectory {
-            // 文件夹：进入目录
+            // 文件夹：进入目录，记录历史
+            navigationHistory.navigateTo(fileObject.key)
             currentPrefix = fileObject.key
             selectionManager.clearSelection()
-            loadFileList()
+            loadFileList(showLoadingState: false)  // 导航时不显示全屏加载
         } else {
             // 文件：打开预览
             fileToPreview = fileObject
@@ -915,28 +1052,31 @@ struct FileListView: View {
     }
 
     /// 返回上一级目录
-    private func goUpOneLevel() {
-        // 计算上一级路径
-        if currentPrefix.hasSuffix("/") {
-            let trimmed = String(currentPrefix.dropLast())
-            if let lastSlashIndex = trimmed.lastIndex(of: "/") {
-                currentPrefix = String(trimmed[...lastSlashIndex])
-            } else {
-                currentPrefix = ""
-            }
-        } else {
-            currentPrefix = ""
-        }
+    /// 后退到上一个浏览位置
+    private func navigateBack() {
+        guard let previousPath = navigationHistory.goBack() else { return }
         
-        loadFileList()
+        currentPrefix = previousPath
+        selectionManager.clearSelection()
+        loadFileList(showLoadingState: false)  // 导航时不显示全屏加载
+    }
+    
+    /// 前进到下一个浏览位置
+    private func navigateForward() {
+        guard let nextPath = navigationHistory.goForward() else { return }
+        
+        currentPrefix = nextPath
+        selectionManager.clearSelection()
+        loadFileList(showLoadingState: false)  // 导航时不显示全屏加载
     }
     
     /// 导航到指定路径
     /// 用于面包屑导航的路径跳转
     /// - Parameter path: 目标路径
     private func navigateToPath(_ path: String) {
+        navigationHistory.navigateTo(path)
         currentPrefix = path
-        loadFileList()
+        loadFileList(showLoadingState: false)  // 导航时不显示全屏加载
     }
     
     /// 验证文件夹名称是否有效
@@ -1165,6 +1305,260 @@ struct FileListView: View {
                     loadFileList()
                 }
             }
+        }
+    }
+    
+    // MARK: - 拖拽移动文件
+    
+    /// 处理拖拽文件到文件夹
+    /// - Parameters:
+    ///   - items: 要移动的文件项列表
+    ///   - targetFolder: 目标文件夹对象
+    private func handleMoveFiles(items: [DraggedFileItem], toFolder targetFolder: FileObject) {
+        handleMoveFilesToPath(items: items, toPath: targetFolder.key)
+    }
+
+    /// 处理右键菜单移动文件到指定路径
+    /// 如果文件是多选的一部分，则移动所有选中的文件
+    private func handleMoveToPath(file: FileObject, destinationPath: String) {
+        // 检查当前文件是否是多选的一部分
+        let selectedKeys = selectionManager.getSelectedKeys()
+
+        if selectedKeys.contains(file.key) && selectedKeys.count > 1 {
+            // 多选情况：移动所有选中的文件
+            let selectedFiles = fileObjects.filter { selectedKeys.contains($0.key) }
+            let items = selectedFiles.map { DraggedFileItem(from: $0) }
+            handleMoveFilesToPath(items: items, toPath: destinationPath)
+        } else {
+            // 单选情况：只移动右键点击的文件
+            let item = DraggedFileItem(from: file)
+            handleMoveFilesToPath(items: [item], toPath: destinationPath)
+        }
+    }
+
+    /// 处理拖拽文件到指定路径
+    /// - Parameters:
+    ///   - items: 要移动的文件项列表
+    ///   - destinationPath: 目标路径前缀
+    private func handleMoveFilesToPath(items: [DraggedFileItem], toPath destinationPath: String) {
+        guard let bucket = r2Service.selectedBucket else {
+            messageManager.showError("移动失败", description: "未选择存储桶")
+            return
+        }
+
+        // 过滤掉无效的移动（移动到当前位置）
+        let validItems = items.filter { item in
+            let itemParentPath = getParentPath(of: item.key)
+            return itemParentPath != destinationPath
+        }
+
+        guard !validItems.isEmpty else {
+            messageManager.showInfo("无需移动", description: "文件已在目标位置")
+            return
+        }
+
+        print("📦 开始移动 \(validItems.count) 个项目到: \(destinationPath.isEmpty ? "根目录" : destinationPath)")
+
+        // 配置移动队列管理器
+        moveQueueManager.configure(r2Service: r2Service, bucketName: bucket.name)
+
+        // 添加到移动队列
+        moveQueueManager.addMoveTasks(validItems, to: destinationPath)
+    }
+    
+    /// 获取路径的父目录
+    private func getParentPath(of key: String) -> String {
+        let trimmedKey = key.hasSuffix("/") ? String(key.dropLast()) : key
+        if let lastSlashIndex = trimmedKey.lastIndex(of: "/") {
+            return String(trimmedKey[..<lastSlashIndex]) + "/"
+        }
+        return ""
+    }
+    
+    /// 处理移动队列中的下一个项目
+    private func processMoveQueue() {
+        guard !pendingMoveItems.isEmpty else {
+            // 所有项目处理完毕
+            finishMoveOperation()
+            return
+        }
+        
+        let item = pendingMoveItems.removeFirst()
+        
+        Task {
+            await moveItem(item)
+        }
+    }
+    
+    /// 移动单个项目
+    private func moveItem(_ item: DraggedFileItem) async {
+        guard let bucket = r2Service.selectedBucket else { return }
+        
+        // 计算目标键
+        let destKey = moveDestinationPrefix + item.name + (item.isDirectory ? "/" : "")
+        
+        do {
+            // 检查目标是否存在
+            let exists = try await r2Service.objectExists(bucket: bucket.name, key: destKey)
+            
+            if exists {
+                // 存在冲突
+                if let resolution = applyToAllResolution {
+                    // 使用之前选择的解决方式
+                    await handleConflictResolution(item: item, destKey: destKey, resolution: resolution)
+                } else {
+                    // 显示冲突对话框
+                    await MainActor.run {
+                        currentConflict = FileConflict(
+                            sourceKey: item.key,
+                            destinationKey: destKey,
+                            fileName: item.name,
+                            isDirectory: item.isDirectory
+                        )
+                    }
+                }
+            } else {
+                // 没有冲突，直接移动
+                await performMove(item: item, destKey: destKey)
+            }
+        } catch {
+            await MainActor.run {
+                messageManager.showError("检查失败", description: error.localizedDescription)
+                processMoveQueue() // 继续处理下一个
+            }
+        }
+    }
+    
+    /// 处理冲突解决
+    private func handleConflictResolution(item: DraggedFileItem, destKey: String, resolution: ConflictResolution) async {
+        switch resolution {
+        case .replace:
+            // 先删除目标，再移动
+            await performMove(item: item, destKey: destKey, deleteFirst: true)
+        case .skip:
+            // 跳过此文件
+            await MainActor.run {
+                processMoveQueue()
+            }
+        case .rename:
+            // 生成新的文件名
+            let newDestKey = await generateUniqueKey(for: destKey)
+            await performMove(item: item, destKey: newDestKey)
+        case .cancel:
+            // 取消整个操作
+            await MainActor.run {
+                pendingMoveItems.removeAll()
+                finishMoveOperation()
+            }
+        }
+    }
+    
+    /// 生成唯一的目标键（添加序号）
+    private func generateUniqueKey(for key: String) async -> String {
+        guard let bucket = r2Service.selectedBucket else { return key }
+        
+        let isDirectory = key.hasSuffix("/")
+        let baseName: String
+        let ext: String
+        
+        if isDirectory {
+            baseName = String(key.dropLast())
+            ext = "/"
+        } else {
+            let nsPath = key as NSString
+            let name = nsPath.deletingPathExtension
+            let pathExt = nsPath.pathExtension
+            baseName = name
+            ext = pathExt.isEmpty ? "" : ".\(pathExt)"
+        }
+        
+        var counter = 1
+        var newKey = key
+        
+        while counter < 100 {
+            newKey = "\(baseName) (\(counter))\(ext)"
+            do {
+                let exists = try await r2Service.objectExists(bucket: bucket.name, key: newKey)
+                if !exists {
+                    return newKey
+                }
+            } catch {
+                return newKey
+            }
+            counter += 1
+        }
+        
+        return newKey
+    }
+    
+    /// 执行移动操作
+    private func performMove(item: DraggedFileItem, destKey: String, deleteFirst: Bool = false) async {
+        guard let bucket = r2Service.selectedBucket else { return }
+        
+        await MainActor.run {
+            isMovingFiles = true
+        }
+        
+        do {
+            if deleteFirst {
+                // 先删除目标
+                if item.isDirectory {
+                    _ = try await r2Service.deleteFolder(bucket: bucket.name, folderKey: destKey)
+                } else {
+                    try await r2Service.deleteObject(bucket: bucket.name, key: destKey)
+                }
+            }
+            
+            // 执行移动
+            if item.isDirectory {
+                let result = try await r2Service.moveFolder(bucket: bucket.name, sourceFolderKey: item.key, destinationFolderKey: destKey)
+                print("✅ 文件夹移动完成: \(result.movedCount) 个文件")
+            } else {
+                try await r2Service.moveObject(bucket: bucket.name, sourceKey: item.key, destinationKey: destKey)
+                print("✅ 文件移动完成: \(item.name)")
+            }
+            
+            await MainActor.run {
+                processMoveQueue() // 继续处理下一个
+            }
+        } catch {
+            await MainActor.run {
+                messageManager.showError("移动失败", description: "\(item.name): \(error.localizedDescription)")
+                processMoveQueue() // 继续处理下一个
+            }
+        }
+    }
+    
+    /// 完成移动操作
+    private func finishMoveOperation() {
+        isMovingFiles = false
+        currentConflict = nil
+        applyToAllResolution = nil
+        
+        // 刷新文件列表
+        loadFileList()
+        messageManager.showSuccess("移动完成", description: nil)
+    }
+    
+    /// 处理冲突对话框的选择
+    private func handleConflictDialogResult(resolution: ConflictResolution, applyToAll: Bool) {
+        guard let conflict = currentConflict else { return }
+        
+        if applyToAll {
+            applyToAllResolution = resolution
+        }
+        
+        currentConflict = nil
+        
+        // 找到对应的项目并处理
+        let item = DraggedFileItem(
+            key: conflict.sourceKey,
+            name: conflict.fileName,
+            isDirectory: conflict.isDirectory
+        )
+        
+        Task {
+            await handleConflictResolution(item: item, destKey: conflict.destinationKey, resolution: resolution)
         }
     }
 }

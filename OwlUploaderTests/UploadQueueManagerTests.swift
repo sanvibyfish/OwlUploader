@@ -11,95 +11,100 @@ import XCTest
 
 final class UploadQueueManagerTests: XCTestCase {
 
-    // MARK: - UploadStatus Tests
+    // MARK: - TaskStatus Tests
 
-    func testUploadStatus_pending_hasCorrectDisplayText() {
+    func testTaskStatus_pending_hasCorrectIcon() {
         // Given
-        let status = UploadStatus.pending
+        let status = TaskStatus.pending
 
         // Then
-        XCTAssertEqual(status.displayText, "等待中")
         XCTAssertEqual(status.iconName, "clock")
+        XCTAssertTrue(status.isActive)
+        XCTAssertFalse(status.isCompleted)
     }
 
-    func testUploadStatus_uploading_hasCorrectDisplayText() {
+    func testTaskStatus_processing_hasCorrectIcon() {
         // Given
-        let status = UploadStatus.uploading
+        let status = TaskStatus.processing
 
         // Then
-        XCTAssertEqual(status.displayText, "上传中")
-        XCTAssertEqual(status.iconName, "arrow.up.circle")
+        XCTAssertEqual(status.iconName, "arrow.triangle.2.circlepath")
+        XCTAssertTrue(status.isActive)
+        XCTAssertFalse(status.isCompleted)
     }
 
-    func testUploadStatus_completed_hasCorrectDisplayText() {
+    func testTaskStatus_completed_hasCorrectIcon() {
         // Given
-        let status = UploadStatus.completed
+        let status = TaskStatus.completed
 
         // Then
-        XCTAssertEqual(status.displayText, "已完成")
         XCTAssertEqual(status.iconName, "checkmark.circle.fill")
+        XCTAssertFalse(status.isActive)
+        XCTAssertTrue(status.isCompleted)
     }
 
-    func testUploadStatus_failed_includesErrorMessage() {
+    func testTaskStatus_failed_hasCorrectIcon() {
         // Given
         let errorMessage = "网络连接超时"
-        let status = UploadStatus.failed(errorMessage)
+        let status = TaskStatus.failed(errorMessage)
 
         // Then
-        XCTAssertTrue(status.displayText.contains(errorMessage))
         XCTAssertEqual(status.iconName, "exclamationmark.circle.fill")
+        XCTAssertFalse(status.isActive)
+        XCTAssertTrue(status.isFailed)
     }
 
-    func testUploadStatus_cancelled_hasCorrectDisplayText() {
+    func testTaskStatus_cancelled_hasCorrectIcon() {
         // Given
-        let status = UploadStatus.cancelled
+        let status = TaskStatus.cancelled
 
         // Then
-        XCTAssertEqual(status.displayText, "已取消")
         XCTAssertEqual(status.iconName, "xmark.circle")
+        XCTAssertFalse(status.isActive)
+        XCTAssertTrue(status.isCancelled)
     }
 
-    // MARK: - UploadStatus Equality Tests
+    // MARK: - TaskStatus Equality Tests
 
-    func testUploadStatus_equality_sameStatusAreEqual() {
+    func testTaskStatus_equality_sameStatusAreEqual() {
         // Given
-        let status1 = UploadStatus.pending
-        let status2 = UploadStatus.pending
+        let status1 = TaskStatus.pending
+        let status2 = TaskStatus.pending
 
         // Then
         XCTAssertEqual(status1, status2)
     }
 
-    func testUploadStatus_equality_differentStatusAreNotEqual() {
+    func testTaskStatus_equality_differentStatusAreNotEqual() {
         // Given
-        let status1 = UploadStatus.pending
-        let status2 = UploadStatus.uploading
+        let status1 = TaskStatus.pending
+        let status2 = TaskStatus.processing
 
         // Then
         XCTAssertNotEqual(status1, status2)
     }
 
-    func testUploadStatus_equality_failedWithSameMessageAreEqual() {
+    func testTaskStatus_equality_failedWithSameMessageAreEqual() {
         // Given
-        let status1 = UploadStatus.failed("Error")
-        let status2 = UploadStatus.failed("Error")
+        let status1 = TaskStatus.failed("Error")
+        let status2 = TaskStatus.failed("Error")
 
         // Then
         XCTAssertEqual(status1, status2)
     }
 
-    func testUploadStatus_equality_failedWithDifferentMessageAreNotEqual() {
+    func testTaskStatus_equality_failedWithDifferentMessageAreNotEqual() {
         // Given
-        let status1 = UploadStatus.failed("Error 1")
-        let status2 = UploadStatus.failed("Error 2")
+        let status1 = TaskStatus.failed("Error 1")
+        let status2 = TaskStatus.failed("Error 2")
 
         // Then
         XCTAssertNotEqual(status1, status2)
     }
 
-    // MARK: - UploadTask Tests
+    // MARK: - UploadQueueTask Tests
 
-    func testUploadTask_formattedSize_formatsCorrectly() {
+    func testUploadQueueTask_formattedSize_formatsCorrectly() {
         // Given
         let task = createTestTask(fileSize: 1024 * 1024) // 1 MB
 
@@ -109,7 +114,7 @@ final class UploadQueueManagerTests: XCTestCase {
                      task.formattedSize.contains("1"))
     }
 
-    func testUploadTask_formattedSize_forSmallFile() {
+    func testUploadQueueTask_formattedSize_forSmallFile() {
         // Given
         let task = createTestTask(fileSize: 512) // 512 bytes
 
@@ -117,7 +122,7 @@ final class UploadQueueManagerTests: XCTestCase {
         XCTAssertFalse(task.formattedSize.isEmpty)
     }
 
-    func testUploadTask_formattedSize_forLargeFile() {
+    func testUploadQueueTask_formattedSize_forLargeFile() {
         // Given
         let task = createTestTask(fileSize: 1024 * 1024 * 1024 * 2) // 2 GB
 
@@ -126,7 +131,7 @@ final class UploadQueueManagerTests: XCTestCase {
         XCTAssertTrue(task.formattedSize.contains("GB"))
     }
 
-    func testUploadTask_equality_sameIdAndStatusAreEqual() {
+    func testUploadQueueTask_equality_sameIdAndStatusAreEqual() {
         // Given
         let id = UUID()
         var task1 = createTestTask(id: id)
@@ -138,7 +143,7 @@ final class UploadQueueManagerTests: XCTestCase {
         XCTAssertEqual(task1, task2)
     }
 
-    func testUploadTask_equality_differentIdAreNotEqual() {
+    func testUploadQueueTask_equality_differentIdAreNotEqual() {
         // Given
         let task1 = createTestTask()
         let task2 = createTestTask()
@@ -147,7 +152,7 @@ final class UploadQueueManagerTests: XCTestCase {
         XCTAssertNotEqual(task1, task2)
     }
 
-    func testUploadTask_equality_sameIdButDifferentProgressAreNotEqual() {
+    func testUploadQueueTask_equality_sameIdButDifferentProgressAreNotEqual() {
         // Given
         let id = UUID()
         var task1 = createTestTask(id: id)
@@ -159,13 +164,13 @@ final class UploadQueueManagerTests: XCTestCase {
         XCTAssertNotEqual(task1, task2)
     }
 
-    func testUploadTask_equality_sameIdButDifferentStatusAreNotEqual() {
+    func testUploadQueueTask_equality_sameIdButDifferentStatusAreNotEqual() {
         // Given
         let id = UUID()
         var task1 = createTestTask(id: id)
         var task2 = createTestTask(id: id)
         task1.status = .pending
-        task2.status = .uploading
+        task2.status = .processing
 
         // Then
         XCTAssertNotEqual(task1, task2)
@@ -190,7 +195,7 @@ final class UploadQueueManagerTests: XCTestCase {
         let manager = UploadQueueManager()
         manager.tasks = [
             createTestTask(status: .pending),
-            createTestTask(status: .uploading),
+            createTestTask(status: .processing),
             createTestTask(status: .completed),
             createTestTask(status: .pending)
         ]
@@ -209,17 +214,17 @@ final class UploadQueueManagerTests: XCTestCase {
         let manager = UploadQueueManager()
         manager.tasks = [
             createTestTask(status: .pending),
-            createTestTask(status: .uploading),
-            createTestTask(status: .uploading),
+            createTestTask(status: .processing),
+            createTestTask(status: .processing),
             createTestTask(status: .completed)
         ]
 
         // When
-        let uploading = manager.uploadingTasks
+        let uploading = manager.processingTasks
 
         // Then
         XCTAssertEqual(uploading.count, 2)
-        XCTAssertTrue(uploading.allSatisfy { $0.status == .uploading })
+        XCTAssertTrue(uploading.allSatisfy { $0.status == .processing })
     }
 
     @MainActor
@@ -304,7 +309,7 @@ final class UploadQueueManagerTests: XCTestCase {
     func testUploadQueueManager_hasActiveTasks_withUploadingTasks() {
         // Given
         let manager = UploadQueueManager()
-        manager.tasks = [createTestTask(status: .uploading)]
+        manager.tasks = [createTestTask(status: .processing)]
 
         // Then
         XCTAssertTrue(manager.hasActiveTasks)
@@ -410,7 +415,7 @@ final class UploadQueueManagerTests: XCTestCase {
         manager.tasks = [
             createTestTask(status: .pending),
             createTestTask(status: .completed),
-            createTestTask(status: .uploading),
+            createTestTask(status: .processing),
             createTestTask(status: .completed),
             createTestTask(status: .failed("Error"))
         ]
@@ -431,7 +436,7 @@ final class UploadQueueManagerTests: XCTestCase {
         let manager = UploadQueueManager()
         manager.tasks = [
             createTestTask(status: .pending),
-            createTestTask(status: .uploading),
+            createTestTask(status: .processing),
             createTestTask(status: .completed)
         ]
         manager.isQueuePanelVisible = true
@@ -567,9 +572,9 @@ final class UploadQueueManagerTests: XCTestCase {
         id: UUID = UUID(),
         fileName: String = "test.txt",
         fileSize: Int64 = 1024,
-        status: UploadStatus = .pending
-    ) -> UploadTask {
-        var task = UploadTask(
+        status: TaskStatus = .pending
+    ) -> UploadQueueTask {
+        var task = UploadQueueTask(
             id: id,
             fileName: fileName,
             fileSize: fileSize,

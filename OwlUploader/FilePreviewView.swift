@@ -115,115 +115,21 @@ struct FilePreviewView: View {
     // MARK: - 子视图
     
     /// 现代化工具栏（类似Quick Look）
+    /// 使用 ZStack 三层布局：文件信息左对齐、导航按钮固定居中、操作按钮右对齐
     private var modernToolbar: some View {
-        HStack(spacing: 16) {
-            // 左侧：文件信息
-            HStack(spacing: 12) {
-                // 文件类型图标
-                Image(systemName: fileIcon)
-                    .font(.system(size: 20))
-                    .foregroundColor(iconColor)
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(fileObject.name)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(Color(nsColor: .labelColor))
-                        .lineLimit(1)
-                    
-                    HStack(spacing: 6) {
-                        Text(fileObject.formattedSize)
-                            .font(.system(size: 11))
-                            .foregroundColor(Color(nsColor: .secondaryLabelColor))
-                        
-                        Text("·")
-                            .foregroundColor(Color(nsColor: .tertiaryLabelColor))
-                        
-                        Text(fileType.displayName)
-                            .font(.system(size: 11))
-                            .foregroundColor(Color(nsColor: .secondaryLabelColor))
-                    }
-                }
-            }
+        ZStack {
+            // 中层：导航按钮（固定居中，不受文件名长度影响）
+            toolbarNavigationButtons
             
-            Spacer()
-            
-            // 中间：导航按钮
-            HStack(spacing: 8) {
-                Button(action: navigateToPrevious) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Color(nsColor: .labelColor))
-                        .frame(width: 32, height: 32)
-                        .background(hasPrevious ? Color(nsColor: .controlAccentColor).opacity(0.2) : Color.clear)
-                        .cornerRadius(6)
-                }
-                .buttonStyle(.plain)
-                .disabled(!hasPrevious)
-                .opacity(hasPrevious ? 1.0 : 0.3)
-                .help("Previous (←)")
+            // 左右两侧使用 HStack
+            HStack(spacing: 0) {
+                // 左侧：文件信息
+                toolbarFileInfo
                 
-                Button(action: navigateToNext) {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(Color(nsColor: .labelColor))
-                        .frame(width: 32, height: 32)
-                        .background(hasNext ? Color(nsColor: .controlAccentColor).opacity(0.2) : Color.clear)
-                        .cornerRadius(6)
-                }
-                .buttonStyle(.plain)
-                .disabled(!hasNext)
-                .opacity(hasNext ? 1.0 : 0.3)
-                .help("Next (→)")
-            }
-            
-            Spacer()
-            
-            // 右侧：快速操作按钮
-            HStack(spacing: 12) {
-                // 下载按钮
-                if !fileObject.isDirectory {
-                    Button(action: { onDownload?(fileObject) }) {
-                        Image(systemName: "arrow.down.circle")
-                            .font(.system(size: 18))
-                            .foregroundColor(Color(nsColor: .controlAccentColor))
-                    }
-                    .buttonStyle(.plain)
-                    .help(L.Help.download)
-                }
+                Spacer(minLength: 100) // 确保导航按钮有足够空间
                 
-                // 复制链接按钮
-                if !fileObject.isDirectory {
-                    Button(action: copyFileURL) {
-                        Image(systemName: "link")
-                            .font(.system(size: 18))
-                            .foregroundColor(Color(nsColor: .controlAccentColor))
-                    }
-                    .buttonStyle(.plain)
-                    .help(L.Help.copyLink)
-                }
-                
-                // 删除按钮
-                Button(action: { onDelete?(fileObject) }) {
-                    Image(systemName: "trash")
-                        .font(.system(size: 18))
-                        .foregroundColor(Color(nsColor: .systemRed))
-                }
-                .buttonStyle(.plain)
-                .help(L.Help.delete)
-                
-                // 分隔线
-                Rectangle()
-                    .fill(Color(nsColor: .separatorColor))
-                    .frame(width: 1, height: 20)
-                
-                // 关闭按钮
-                Button(action: onDismiss) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(Color(nsColor: .secondaryLabelColor))
-                }
-                .buttonStyle(.plain)
-                .help("Close (ESC)")
+                // 右侧：操作按钮
+                toolbarActionButtons
             }
         }
         .padding(.horizontal, 20)
@@ -232,6 +138,119 @@ struct FilePreviewView: View {
             Color(nsColor: .windowBackgroundColor)
                 .opacity(0.95)
         )
+    }
+    
+    /// 工具栏 - 文件信息（左侧）
+    private var toolbarFileInfo: some View {
+        HStack(spacing: 12) {
+            // 文件类型图标
+            Image(systemName: fileIcon)
+                .font(.system(size: 20))
+                .foregroundColor(iconColor)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(fileObject.name)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(Color(nsColor: .labelColor))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                
+                HStack(spacing: 6) {
+                    Text(fileObject.formattedSize)
+                        .font(.system(size: 11))
+                        .foregroundColor(Color(nsColor: .secondaryLabelColor))
+                    
+                    Text("·")
+                        .foregroundColor(Color(nsColor: .tertiaryLabelColor))
+                    
+                    Text(fileType.displayName)
+                        .font(.system(size: 11))
+                        .foregroundColor(Color(nsColor: .secondaryLabelColor))
+                }
+            }
+        }
+        .frame(maxWidth: 280, alignment: .leading) // 限制最大宽度，防止挤压导航按钮
+    }
+    
+    /// 工具栏 - 导航按钮（居中）
+    private var toolbarNavigationButtons: some View {
+        HStack(spacing: 8) {
+            Button(action: navigateToPrevious) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(Color(nsColor: .labelColor))
+                    .frame(width: 32, height: 32)
+                    .background(hasPrevious ? Color(nsColor: .controlAccentColor).opacity(0.2) : Color.clear)
+                    .cornerRadius(6)
+            }
+            .buttonStyle(.plain)
+            .disabled(!hasPrevious)
+            .opacity(hasPrevious ? 1.0 : 0.3)
+            .help("Previous (←)")
+            
+            Button(action: navigateToNext) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(Color(nsColor: .labelColor))
+                    .frame(width: 32, height: 32)
+                    .background(hasNext ? Color(nsColor: .controlAccentColor).opacity(0.2) : Color.clear)
+                    .cornerRadius(6)
+            }
+            .buttonStyle(.plain)
+            .disabled(!hasNext)
+            .opacity(hasNext ? 1.0 : 0.3)
+            .help("Next (→)")
+        }
+    }
+    
+    /// 工具栏 - 操作按钮（右侧）
+    private var toolbarActionButtons: some View {
+        HStack(spacing: 12) {
+            // 下载按钮
+            if !fileObject.isDirectory {
+                Button(action: { onDownload?(fileObject) }) {
+                    Image(systemName: "arrow.down.circle")
+                        .font(.system(size: 18))
+                        .foregroundColor(Color(nsColor: .controlAccentColor))
+                }
+                .buttonStyle(.plain)
+                .help(L.Help.download)
+            }
+            
+            // 复制链接按钮
+            if !fileObject.isDirectory {
+                Button(action: copyFileURL) {
+                    Image(systemName: "link")
+                        .font(.system(size: 18))
+                        .foregroundColor(Color(nsColor: .controlAccentColor))
+                }
+                .buttonStyle(.plain)
+                .help(L.Help.copyLink)
+            }
+            
+            // 删除按钮
+            Button(action: { onDelete?(fileObject) }) {
+                Image(systemName: "trash")
+                    .font(.system(size: 18))
+                    .foregroundColor(Color(nsColor: .systemRed))
+            }
+            .buttonStyle(.plain)
+            .help(L.Help.delete)
+            
+            // 分隔线
+            Rectangle()
+                .fill(Color(nsColor: .separatorColor))
+                .frame(width: 1, height: 20)
+            
+            // 关闭按钮
+            Button(action: onDismiss) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 20))
+                    .foregroundColor(Color(nsColor: .secondaryLabelColor))
+            }
+            .buttonStyle(.plain)
+            .help("Close (ESC)")
+        }
     }
     
     /// 内容视图

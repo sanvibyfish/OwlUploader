@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "" : {
+
+    },
     "·" : {
 
     },
@@ -727,6 +730,9 @@
           }
         }
       }
+    },
+    "Back" : {
+
     },
     "bucket.action.attemptingConnection" : {
       "extractionState" : "extracted_with_value",
@@ -2516,6 +2522,28 @@
         }
       }
     },
+    "files.contextMenu.moveTo" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Move to"
+          }
+        }
+      }
+    },
+    "files.contextMenu.parentFolder" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Parent Folder (..)"
+          }
+        }
+      }
+    },
     "files.defaultFileName" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -3553,6 +3581,9 @@
         }
       }
     },
+    "Forward" : {
+
+    },
     "help.clearSelection" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -3756,6 +3787,9 @@
           }
         }
       }
+    },
+    "Kind" : {
+
     },
     "message.error.allFilesInvalid" : {
       "extractionState" : "extracted_with_value",
@@ -4811,6 +4845,50 @@
         }
       }
     },
+    "move.queue.title" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Move Queue"
+          }
+        }
+      }
+    },
+    "move.status.completed" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Moved"
+          }
+        }
+      }
+    },
+    "move.status.failed" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Move failed: %@"
+          }
+        }
+      }
+    },
+    "move.status.moving" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Moving"
+          }
+        }
+      }
+    },
     "Next (→)" : {
 
     },
@@ -4986,6 +5064,9 @@
           }
         }
       }
+    },
+    "Search" : {
+
     },
     "settings.followSystem" : {
       "extractionState" : "extracted_with_value",
@@ -5887,6 +5968,39 @@
           }
         }
       }
+    },
+    "保留两者" : {
+
+    },
+    "取消" : {
+
+    },
+    "对剩余 %lld 个冲突应用相同操作" : {
+
+    },
+    "将被移动到的位置已存在" : {
+
+    },
+    "排序" : {
+
+    },
+    "文件已存在" : {
+
+    },
+    "更多选项" : {
+
+    },
+    "替换" : {
+
+    },
+    "目标位置已存在同名%@" : {
+
+    },
+    "筛选" : {
+
+    },
+    "跳过" : {
+
     }
   },
   "version" : "1.0"

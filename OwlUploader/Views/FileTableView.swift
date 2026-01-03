@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// 表格视图 - 使用原生 Table 组件
 struct FileTableView: View {
@@ -18,6 +19,9 @@ struct FileTableView: View {
 
     /// 排序方式
     @Binding var sortOrder: FileSortOrder
+    
+    /// 排序方向（true = 升序，false = 降序）
+    @Binding var sortAscending: Bool
 
     // Dependencies
     var r2Service: R2Service?
@@ -29,6 +33,18 @@ struct FileTableView: View {
     var onDeleteFile: ((FileObject) -> Void)?
     var onDownloadFile: ((FileObject) -> Void)?
 
+    /// 移动文件回调：(要移动的文件列表, 目标文件夹)
+    var onMoveFiles: (([DraggedFileItem], FileObject) -> Void)?
+
+    /// 移动到指定路径回调：(文件, 目标路径)
+    var onMoveToPath: ((FileObject, String) -> Void)?
+
+    /// 当前目录下的文件夹列表（用于移动到子菜单）
+    var currentFolders: [FileObject] = []
+
+    /// 当前路径前缀
+    var currentPrefix: String = ""
+
     /// 原生 Table 使用的选择状态
     @State private var tableSelection: Set<String> = []
     
@@ -36,6 +52,9 @@ struct FileTableView: View {
     @State private var sortComparators: [KeyPathComparator<FileObject>] = [
         KeyPathComparator(\.name, order: .forward)
     ]
+    
+    /// 当前正在拖拽悬停的文件夹 ID
+    @State private var dropTargetFolderID: String? = nil
 
     var body: some View {
         Table(files, selection: $tableSelection, sortOrder: $sortComparators) {
@@ -44,10 +63,19 @@ struct FileTableView: View {
                 FileNameCell(
                     fileObject: file,
                     r2Service: r2Service,
-                    bucketName: bucketName
+                    bucketName: bucketName,
+                    isDropTarget: false
                 )
             }
             .width(min: 200)
+
+            // 修改日期列
+            TableColumn(L.Files.TableColumn.modified, value: \.sortableDate) { file in
+                Text(file.formattedLastModified)
+                    .font(.system(size: 12))
+                    .foregroundColor(AppColors.textSecondary)
+            }
+            .width(140)
 
             // 大小列
             TableColumn(L.Files.TableColumn.size, value: \.sortableSize) { file in
@@ -57,13 +85,13 @@ struct FileTableView: View {
             }
             .width(90)
 
-            // 修改日期列
-            TableColumn(L.Files.TableColumn.modified, value: \.sortableDate) { file in
-                Text(file.formattedLastModified)
+            // 类型列 (Kind)
+            TableColumn("Kind", value: \.sortableKind) { file in
+                Text(file.kindDescription)
                     .font(.system(size: 12))
                     .foregroundColor(AppColors.textSecondary)
             }
-            .width(140)
+            .width(100)
         }
         .tableStyle(.inset(alternatesRowBackgrounds: false))
         // 双击和右键菜单
@@ -80,6 +108,12 @@ struct FileTableView: View {
                     }
                     Divider()
                 }
+
+                // 移动到子菜单
+                moveToMenu(for: file)
+
+                Divider()
+
                 Button(role: .destructive, action: { onDeleteFile?(file) }) {
                     Label(L.Files.ContextMenu.delete, systemImage: "trash")
                 }
@@ -100,9 +134,16 @@ struct FileTableView: View {
                 tableSelection = newValue
             }
         }
-        // 同步排序状态
+        // 同步排序状态：列头 → 菜单
         .onChange(of: sortComparators) { _, newValue in
             syncSortOrderFromComparators(newValue)
+        }
+        // 同步排序状态：菜单 → 列头
+        .onChange(of: sortOrder) { _, _ in
+            syncSortComparatorsFromOrder()
+        }
+        .onChange(of: sortAscending) { _, _ in
+            syncSortComparatorsFromOrder()
         }
         .onAppear {
             // 初始化排序描述符
@@ -120,42 +161,69 @@ struct FileTableView: View {
         selectionManager.setSelection(selectedFiles)
     }
 
-    /// 从 FileSortOrder 同步到原生排序描述符
+    /// 从 FileSortOrder 和 sortAscending 同步到原生排序描述符（菜单 → 列头）
     private func syncSortComparatorsFromOrder() {
+        let order: SortOrder = sortAscending ? .forward : .reverse
+        let newComparators: [KeyPathComparator<FileObject>]
+        
         switch sortOrder {
         case .name:
-            sortComparators = [KeyPathComparator(\.name, order: .forward)]
-        case .nameDescending:
-            sortComparators = [KeyPathComparator(\.name, order: .reverse)]
+            newComparators = [KeyPathComparator(\.name, order: order)]
+        case .kind:
+            newComparators = [KeyPathComparator(\.sortableKind, order: order)]
+        case .dateModified:
+            newComparators = [KeyPathComparator(\.sortableDate, order: order)]
         case .size:
-            sortComparators = [KeyPathComparator(\.sortableSize, order: .forward)]
-        case .sizeDescending:
-            sortComparators = [KeyPathComparator(\.sortableSize, order: .reverse)]
-        case .date:
-            sortComparators = [KeyPathComparator(\.sortableDate, order: .forward)]
-        case .dateDescending:
-            sortComparators = [KeyPathComparator(\.sortableDate, order: .reverse)]
-        case .type:
-            // 按类型排序：使用名称作为备选（原生 Table 不直接支持自定义类型排序）
-            sortComparators = [KeyPathComparator(\.name, order: .forward)]
+            newComparators = [KeyPathComparator(\.sortableSize, order: order)]
+        }
+        
+        // 避免无限循环：只有当排序描述符真正不同时才更新
+        if !comparatorsMatch(sortComparators, newComparators) {
+            sortComparators = newComparators
         }
     }
 
-    /// 从原生排序描述符同步到 FileSortOrder
+    /// 从原生排序描述符同步到 FileSortOrder 和 sortAscending（列头 → 菜单）
     private func syncSortOrderFromComparators(_ comparators: [KeyPathComparator<FileObject>]) {
         guard let first = comparators.first else { return }
         
-        // 根据 KeyPath 和排序方向确定 FileSortOrder
-        // 使用字符串比较来判断 keyPath 类型
+        // 根据 KeyPath 确定排序类型
         let keyPathString = String(describing: first.keyPath)
         
+        let newSortOrder: FileSortOrder
         if keyPathString.contains("name") {
-            sortOrder = first.order == .forward ? .name : .nameDescending
+            newSortOrder = .name
+        } else if keyPathString.contains("sortableKind") {
+            newSortOrder = .kind
         } else if keyPathString.contains("sortableSize") {
-            sortOrder = first.order == .forward ? .size : .sizeDescending
+            newSortOrder = .size
         } else if keyPathString.contains("sortableDate") {
-            sortOrder = first.order == .forward ? .date : .dateDescending
+            newSortOrder = .dateModified
+        } else {
+            return
         }
+        
+        // 更新排序方向
+        let newAscending = first.order == .forward
+        if sortAscending != newAscending {
+            sortAscending = newAscending
+        }
+        
+        // 更新排序类型
+        if sortOrder != newSortOrder {
+            sortOrder = newSortOrder
+        }
+    }
+    
+    /// 比较两个排序描述符是否匹配
+    private func comparatorsMatch(_ a: [KeyPathComparator<FileObject>], _ b: [KeyPathComparator<FileObject>]) -> Bool {
+        guard a.count == b.count else { return false }
+        for (c1, c2) in zip(a, b) {
+            if String(describing: c1.keyPath) != String(describing: c2.keyPath) || c1.order != c2.order {
+                return false
+            }
+        }
+        return true
     }
 
     /// 复制文件 URL
@@ -169,6 +237,52 @@ struct FileTableView: View {
         NSPasteboard.general.setString(fileURL, forType: .string)
         messageManager?.showSuccess(L.Message.Success.linkCopied, description: L.Message.Success.linkCopiedDescription)
     }
+
+    /// 移动到子菜单
+    @ViewBuilder
+    private func moveToMenu(for file: FileObject) -> some View {
+        let availableFolders = currentFolders.filter { $0.key != file.key && !$0.key.hasPrefix(file.key) }
+        let hasParent = !currentPrefix.isEmpty
+        let hasTargets = hasParent || !availableFolders.isEmpty
+
+        if hasTargets {
+            Menu {
+                // 上级目录
+                if hasParent {
+                    Button(action: {
+                        let parentPath = getParentPath(of: currentPrefix)
+                        onMoveToPath?(file, parentPath)
+                    }) {
+                        Label(L.Files.ContextMenu.parentFolder, systemImage: "folder")
+                    }
+
+                    if !availableFolders.isEmpty {
+                        Divider()
+                    }
+                }
+
+                // 当前目录下的文件夹
+                ForEach(availableFolders) { folder in
+                    Button(action: {
+                        onMoveToPath?(file, folder.key)
+                    }) {
+                        Label(folder.name, systemImage: "folder.fill")
+                    }
+                }
+            } label: {
+                Label(L.Files.ContextMenu.moveTo, systemImage: "folder")
+            }
+        }
+    }
+
+    /// 获取上级目录路径
+    private func getParentPath(of path: String) -> String {
+        let trimmed = path.hasSuffix("/") ? String(path.dropLast()) : path
+        if let lastSlash = trimmed.lastIndex(of: "/") {
+            return String(trimmed[..<lastSlash]) + "/"
+        }
+        return ""
+    }
 }
 
 // MARK: - 文件名单元格
@@ -178,6 +292,9 @@ private struct FileNameCell: View {
     let fileObject: FileObject
     var r2Service: R2Service?
     var bucketName: String?
+    
+    /// 是否为拖放目标（悬停状态）
+    var isDropTarget: Bool = false
 
     /// 缩略图URL
     private var thumbnailURL: String? {
@@ -211,6 +328,17 @@ private struct FileNameCell: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
         }
+        // 拖放目标高亮效果
+        .padding(.vertical, 2)
+        .padding(.horizontal, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 4)
+                .fill(isDropTarget && fileObject.isDirectory ? Color.accentColor.opacity(0.2) : Color.clear)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 4)
+                .stroke(isDropTarget && fileObject.isDirectory ? Color.accentColor : Color.clear, lineWidth: 2)
+        )
     }
 
     private var fileIcon: some View {
@@ -244,6 +372,59 @@ extension FileObject {
     var sortableDate: Date {
         lastModifiedDate ?? Date.distantPast
     }
+    
+    /// 可排序的类型值（用于 Table 排序）
+    var sortableKind: String {
+        if isDirectory {
+            return "Folder"
+        }
+        return fileExtension.lowercased()
+    }
+    
+    /// 类型描述（用于显示）
+    var kindDescription: String {
+        if isDirectory {
+            return "Folder"
+        }
+        
+        let ext = fileExtension.lowercased()
+        switch ext {
+        case "jpg", "jpeg", "png", "gif", "webp", "heic", "bmp", "tiff":
+            return "Image"
+        case "mp4", "mov", "avi", "mkv", "webm", "m4v":
+            return "Video"
+        case "mp3", "wav", "m4a", "aac", "flac", "ogg":
+            return "Audio"
+        case "pdf":
+            return "PDF Document"
+        case "doc", "docx":
+            return "Word Document"
+        case "xls", "xlsx":
+            return "Excel Spreadsheet"
+        case "ppt", "pptx":
+            return "PowerPoint"
+        case "txt":
+            return "Text File"
+        case "zip", "rar", "7z", "tar", "gz":
+            return "Archive"
+        case "html", "htm":
+            return "HTML Document"
+        case "css":
+            return "CSS Stylesheet"
+        case "js":
+            return "JavaScript"
+        case "json":
+            return "JSON File"
+        case "xml":
+            return "XML File"
+        case "swift":
+            return "Swift Source"
+        case "md":
+            return "Markdown"
+        default:
+            return ext.isEmpty ? "Document" : "\(ext.uppercased()) File"
+        }
+    }
 }
 
 // MARK: - SelectionManager 扩展
@@ -275,7 +456,8 @@ extension SelectionManager {
             FileObject(name: "document.pdf", key: "document.pdf", size: 2048 * 1024, lastModifiedDate: Date(), isDirectory: false, eTag: "b"),
         ],
         selectionManager: SelectionManager(),
-        sortOrder: .constant(.name)
+        sortOrder: .constant(.name),
+        sortAscending: .constant(true)
     )
     .frame(width: 600, height: 300)
 }

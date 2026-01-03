@@ -48,6 +48,9 @@ enum R2ServiceError: Error, LocalizedError {
     case sslCertificateError
     case endpointNotReachable(String)
     
+    // 新增：操作逻辑错误
+    case invalidOperation(String)
+
     var errorDescription: String? {
         switch self {
         case .accountNotConfigured:
@@ -92,9 +95,11 @@ enum R2ServiceError: Error, LocalizedError {
             return L.Error.Network.sslCertificateError
         case .endpointNotReachable(let endpoint):
             return L.Error.Network.endpointNotReachable(endpoint)
+        case .invalidOperation(let message):
+            return message
         }
     }
-    
+
     /// 获取错误的建议操作
     var suggestedAction: String? {
         switch self {
@@ -143,6 +148,8 @@ enum R2ServiceError: Error, LocalizedError {
         case .connectionTimeout, .dnsResolutionFailed, .endpointNotReachable:
             return true
         case .sslCertificateError:
+            return false
+        case .invalidOperation(_):
             return false
         }
     }
@@ -1327,7 +1334,7 @@ class R2Service: ObservableObject {
             
             isLoading = false
             print("✅ 重命名完成")
-            
+
         } catch {
             isLoading = false
             print("❌ 重命名失败: \(error.localizedDescription)")
@@ -1338,6 +1345,198 @@ class R2Service: ObservableObject {
         }
     }
     
+    // MARK: - 移动操作
+    
+    /// 检查对象是否存在
+    /// - Parameters:
+    ///   - bucket: 存储桶名称
+    ///   - key: 对象键
+    /// - Returns: 是否存在
+    func objectExists(bucket: String, key: String) async throws -> Bool {
+        guard let s3Client = s3Client else {
+            throw R2ServiceError.accountNotConfigured
+        }
+        
+        do {
+            let input = HeadObjectInput(bucket: bucket, key: key)
+            let _ = try await s3Client.headObject(input: input)
+            return true
+        } catch {
+            // 如果是 404 类型错误，表示对象不存在
+            let errorDescription = String(describing: error).lowercased()
+            if errorDescription.contains("notfound") || errorDescription.contains("404") || errorDescription.contains("nosuchkey") {
+                return false
+            }
+            // 其他错误抛出
+            throw mapError(error)
+        }
+    }
+    
+    /// 移动单个对象（通过复制后删除实现）
+    /// - Parameters:
+    ///   - bucket: 存储桶名称
+    ///   - sourceKey: 源对象键
+    ///   - destinationKey: 目标对象键
+    func moveObject(bucket: String, sourceKey: String, destinationKey: String) async throws {
+        guard let s3Client = s3Client else {
+            throw R2ServiceError.accountNotConfigured
+        }
+        
+        // 如果源和目标相同，不需要移动
+        if sourceKey == destinationKey {
+            print("⚠️ 源和目标相同，跳过移动: \(sourceKey)")
+            return
+        }
+        
+        print("📦 移动文件: \(sourceKey) -> \(destinationKey)")
+
+        do {
+            // 1. 复制对象到新位置
+            // copySource 需要 URL 编码以支持特殊字符（包括泰语、中文等）
+            guard let encodedSourceKey = sourceKey.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else {
+                throw R2ServiceError.invalidOperation("无法编码源文件名")
+            }
+            let copySource = "\(bucket)/\(encodedSourceKey)"
+            let copyInput = CopyObjectInput(
+                bucket: bucket,
+                copySource: copySource,
+                key: destinationKey
+            )
+            
+            print("📋 步骤 1/2: 复制对象...")
+            let _ = try await s3Client.copyObject(input: copyInput)
+            
+            // 2. 删除原对象
+            print("🗑️ 步骤 2/2: 删除原对象...")
+            let deleteInput = DeleteObjectInput(
+                bucket: bucket,
+                key: sourceKey
+            )
+            let _ = try await s3Client.deleteObject(input: deleteInput)
+            
+            print("✅ 移动完成")
+            
+        } catch {
+            print("❌ 移动失败: \(error.localizedDescription)")
+            throw mapError(error)
+        }
+    }
+    
+    /// 移动文件夹及其所有内容
+    /// - Parameters:
+    ///   - bucket: 存储桶名称
+    ///   - sourceFolderKey: 源文件夹路径（以 / 结尾）
+    ///   - destinationFolderKey: 目标文件夹路径（以 / 结尾）
+    /// - Returns: 移动的文件数量和失败的文件列表
+    func moveFolder(bucket: String, sourceFolderKey: String, destinationFolderKey: String) async throws -> (movedCount: Int, failedKeys: [String]) {
+        guard let s3Client = s3Client else {
+            throw R2ServiceError.accountNotConfigured
+        }
+        
+        // 确保路径以 / 结尾
+        let sourcePrefix = sourceFolderKey.hasSuffix("/") ? sourceFolderKey : sourceFolderKey + "/"
+        let destPrefix = destinationFolderKey.hasSuffix("/") ? destinationFolderKey : destinationFolderKey + "/"
+        
+        // 检查是否试图移动到自身的子目录
+        if destPrefix.hasPrefix(sourcePrefix) {
+            print("❌ 不能移动文件夹到自身的子目录")
+            throw R2ServiceError.invalidOperation("不能移动文件夹到自身的子目录")
+        }
+        
+        // 如果源和目标相同，不需要移动
+        if sourcePrefix == destPrefix {
+            print("⚠️ 源和目标相同，跳过移动")
+            return (0, [])
+        }
+        
+        print("📁 开始移动文件夹: \(sourcePrefix) -> \(destPrefix)")
+        print("   存储桶: \(bucket)")
+        
+        isLoading = true
+        lastError = nil
+        
+        var allKeys: [String] = []
+        var continuationToken: String? = nil
+        var failedKeys: [String] = []
+        var movedCount = 0
+        
+        do {
+            // 1. 列出源文件夹内所有对象
+            repeat {
+                let input = ListObjectsV2Input(
+                    bucket: bucket,
+                    continuationToken: continuationToken,
+                    prefix: sourcePrefix
+                )
+                
+                let response = try await s3Client.listObjectsV2(input: input)
+                
+                if let contents = response.contents {
+                    let keys = contents.compactMap { $0.key }
+                    allKeys.append(contentsOf: keys)
+                }
+                
+                continuationToken = response.nextContinuationToken
+            } while continuationToken != nil
+            
+            // 添加文件夹标记对象本身
+            if !allKeys.contains(sourcePrefix) {
+                allKeys.append(sourcePrefix)
+            }
+            
+            print("📋 找到 \(allKeys.count) 个对象需要移动")
+            
+            // 2. 逐个移动对象
+            for sourceKey in allKeys {
+                // 计算目标路径：将源前缀替换为目标前缀
+                let relativePath = String(sourceKey.dropFirst(sourcePrefix.count))
+                let destKey = destPrefix + relativePath
+                
+                do {
+                    // 复制对象（copySource 需要 URL 编码）
+                    guard let encodedSourceKey = sourceKey.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else {
+                        print("⚠️ 无法编码文件名，跳过: \(sourceKey)")
+                        failedKeys.append(sourceKey)
+                        continue
+                    }
+                    let copySource = "\(bucket)/\(encodedSourceKey)"
+                    let copyInput = CopyObjectInput(
+                        bucket: bucket,
+                        copySource: copySource,
+                        key: destKey
+                    )
+                    let _ = try await s3Client.copyObject(input: copyInput)
+                    
+                    // 删除原对象
+                    let deleteInput = DeleteObjectInput(
+                        bucket: bucket,
+                        key: sourceKey
+                    )
+                    let _ = try await s3Client.deleteObject(input: deleteInput)
+                    
+                    movedCount += 1
+                    print("✅ 移动: \(sourceKey) -> \(destKey)")
+                    
+                } catch {
+                    failedKeys.append(sourceKey)
+                    print("❌ 移动失败: \(sourceKey) - \(error.localizedDescription)")
+                }
+            }
+            
+            isLoading = false
+            print("✅ 文件夹移动完成，成功 \(movedCount) 个，失败 \(failedKeys.count) 个")
+            
+            return (movedCount, failedKeys)
+            
+        } catch {
+            isLoading = false
+            print("❌ 移动文件夹失败: \(error.localizedDescription)")
+            let serviceError = mapError(error)
+            lastError = serviceError
+            throw serviceError
+        }
+    }
+
     /// 断开连接
     func disconnect() {
         // 清理 S3 客户端和账户信息

@@ -160,6 +160,8 @@ enum L {
             static let download = String(localized: "files.contextMenu.download", defaultValue: "Download")
             static let copyLink = String(localized: "files.contextMenu.copyLink", defaultValue: "Copy Link")
             static let delete = String(localized: "files.contextMenu.delete", defaultValue: "Delete")
+            static let moveTo = String(localized: "files.contextMenu.moveTo", defaultValue: "Move to")
+            static let parentFolder = String(localized: "files.contextMenu.parentFolder", defaultValue: "Parent Folder (..)")
         }
 
         static let defaultFileName = String(localized: "files.defaultFileName", defaultValue: "File")
@@ -215,6 +217,23 @@ enum L {
 
         static func uploadingFile(_ name: String) -> String {
             String(format: NSLocalizedString("upload.uploadingFile", value: "Uploading '%@'...", comment: ""), name)
+        }
+    }
+
+    // MARK: - Move
+
+    enum Move {
+        enum Queue {
+            static let title = String(localized: "move.queue.title", defaultValue: "Move Queue")
+        }
+
+        enum Status {
+            static let moving = String(localized: "move.status.moving", defaultValue: "Moving")
+            static let completed = String(localized: "move.status.completed", defaultValue: "Moved")
+
+            static func failed(_ error: String) -> String {
+                String(format: NSLocalizedString("move.status.failed", value: "Move failed: %@", comment: ""), error)
+            }
         }
     }
 

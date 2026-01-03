@@ -28,6 +28,18 @@ struct FileGridView: View {
     var onNavigate: ((FileObject) -> Void)?
     var onDeleteFile: ((FileObject) -> Void)?
     var onDownloadFile: ((FileObject) -> Void)?
+    
+    /// 移动文件回调：(要移动的文件列表, 目标文件夹)
+    var onMoveFiles: (([DraggedFileItem], FileObject) -> Void)?
+
+    /// 移动到指定路径回调：(文件, 目标路径)
+    var onMoveToPath: ((FileObject, String) -> Void)?
+
+    /// 当前目录下的文件夹列表（用于移动到子菜单）
+    var currentFolders: [FileObject] = []
+
+    /// 当前路径前缀
+    var currentPrefix: String = ""
 
     /// 网格列配置
     private var columns: [GridItem] {
@@ -52,7 +64,11 @@ struct FileGridView: View {
                         },
                         onDoubleTap: {
                             handleDoubleTap(file)
-                        }
+                        },
+                        onMoveFiles: onMoveFiles,
+                        onMoveToPath: onMoveToPath,
+                        currentFolders: currentFolders,
+                        currentPrefix: currentPrefix
                     )
                 }
             }

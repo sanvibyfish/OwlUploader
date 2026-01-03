@@ -365,7 +365,7 @@ struct ViewModePicker: View {
         FinderToolbar(
             searchText: .constant("test"),
             viewMode: .constant(.icons),
-            sortOrder: .constant(.date),
+            sortOrder: .constant(.dateModified),
             filterType: .constant(.images),
             canGoUp: false,
             isDisabled: false,
