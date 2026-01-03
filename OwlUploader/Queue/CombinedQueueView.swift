@@ -43,18 +43,7 @@ struct CombinedQueueView: View {
                 taskListView
             }
         }
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color(NSColor.controlBackgroundColor))
-        )
-        .clipShape(
-            .rect(
-                topLeadingRadius: 12,
-                bottomLeadingRadius: 0,
-                bottomTrailingRadius: 0,
-                topTrailingRadius: 12
-            )
-        )
+        .background(Color(NSColor.controlBackgroundColor))
         .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: -2)
     }
 
@@ -63,17 +52,10 @@ struct CombinedQueueView: View {
     /// 标题栏
     private var headerView: some View {
         HStack(spacing: 12) {
-            // 展开/收起按钮
-            Button(action: {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    isExpanded.toggle()
-                }
-            }) {
-                Image(systemName: isExpanded ? "chevron.down" : "chevron.up")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .buttonStyle(.plain)
+            // 展开/收起图标
+            Image(systemName: isExpanded ? "chevron.down" : "chevron.up")
+                .font(.caption)
+                .foregroundColor(.secondary)
 
             // 标题和进度信息
             VStack(alignment: .leading, spacing: 2) {
@@ -129,6 +111,12 @@ struct CombinedQueueView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isExpanded.toggle()
+            }
+        }
     }
 
     /// 进度信息
