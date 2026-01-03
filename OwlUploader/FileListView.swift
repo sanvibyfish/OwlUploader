@@ -84,6 +84,11 @@ struct FileListView: View {
     
     var body: some View {
         VStack(spacing: 0) {
+            // 工具栏和内容区分隔线
+            if r2Service.isConnected, r2Service.selectedBucket != nil {
+                Divider()
+            }
+            
             // 主内容区域
             mainContentView
                 .overlay {
@@ -379,13 +384,13 @@ struct FileListView: View {
         } else if r2Service.selectedBucket == nil {
             // 未选择存储桶状态
             noBucketSelectedView
-        } else if r2Service.isLoading && isInitialLoading {
-            // 初始加载状态
+        } else if isInitialLoading {
+            // 初始加载状态 - 最高优先级，确保切换时立即显示
             loadingView
         } else if let error = r2Service.lastError {
             // 错误状态
             errorView(error)
-        } else if fileObjects.isEmpty && !r2Service.isLoading {
+        } else if fileObjects.isEmpty {
             // 空列表状态 - 使用新的拖拽视图
             emptyListView
         } else {
@@ -412,85 +417,99 @@ struct FileListView: View {
         )
     }
     
-    /// 加载中视图
+    /// 加载中视图 - 类似空文件夹样式
     private var loadingView: some View {
-        VStack(spacing: 24) {
-            // 进度指示器 - 使用更大的尺寸和背景
-            ZStack {
-                Circle()
-                    .fill(Color.blue.opacity(0.08))
-                    .frame(width: 80, height: 80)
+        VStack {
+            Spacer()
+            
+            VStack(spacing: 28) {
+                // 图标层 - 使用文件夹图标
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.blue.opacity(0.08), Color.blue.opacity(0.12)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 100, height: 100)
+                    
+                    Image(systemName: currentPrefix.isEmpty ? "externaldrive" : "folder")
+                        .font(.system(size: 40, weight: .light))
+                        .foregroundStyle(.blue)
+                        .symbolRenderingMode(.hierarchical)
+                }
                 
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: .blue))
-                    .scaleEffect(1.3)
+                // 文字区 - 只保留文字，不显示进度条
+                Text(L.Files.State.loadingFileList)
+                    .font(.system(size: 24, weight: .medium))
+                    .foregroundColor(.primary)
             }
             
-            // 加载文字 - 更清晰的层次
-            VStack(spacing: 6) {
-                Text(L.Files.State.loadingFileList)
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundColor(.primary)
-                
-                Text(L.Common.Label.pleaseWait)
-                    .font(.system(size: 14))
-                    .foregroundColor(.secondary)
-            }
+            Spacer()
         }
-        .padding(.vertical, 60)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(AppColors.contentBackground)
     }
     
     /// 错误视图
     /// - Parameter error: 要显示的错误
     private func errorView(_ error: R2ServiceError) -> some View {
-        VStack(spacing: 28) {
-            // 错误图标 - 使用渐变
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.orange.opacity(0.1), Color.red.opacity(0.12)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+        VStack {
+            Spacer()
+            
+            VStack(spacing: 28) {
+                // 错误图标 - 使用渐变
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.orange.opacity(0.1), Color.red.opacity(0.12)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
                         )
-                    )
-                    .frame(width: 100, height: 100)
+                        .frame(width: 100, height: 100)
+                    
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 40, weight: .light))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.orange, .red.opacity(0.8)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .symbolRenderingMode(.hierarchical)
+                }
                 
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 40, weight: .light))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.orange, .red.opacity(0.8)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .symbolRenderingMode(.hierarchical)
+                // 错误文字
+                VStack(spacing: 12) {
+                    Text(L.Files.State.loadFailed)
+                        .font(.system(size: 24, weight: .medium))
+                        .foregroundColor(.primary)
+                    
+                    Text(error.localizedDescription)
+                        .font(.system(size: 14, design: .monospaced))
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 20)
+                }
+                
+                // 重试按钮
+                Button(action: loadFileList) {
+                    Label(L.Common.Button.retry, systemImage: "arrow.clockwise")
+                        .font(.system(size: 14, weight: .medium))
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
             }
             
-            // 错误文字
-            VStack(spacing: 12) {
-                Text(L.Files.State.loadFailed)
-                    .font(.system(size: 24, weight: .medium))
-                    .foregroundColor(.primary)
-                
-                Text(error.localizedDescription)
-                    .font(.system(size: 14, design: .monospaced))
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 20)
-            }
-            
-            // 重试按钮
-            Button(action: loadFileList) {
-                Label(L.Common.Button.retry, systemImage: "arrow.clockwise")
-                    .font(.system(size: 14, weight: .medium))
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            Spacer()
         }
-        .padding(.horizontal, 60)
-        .padding(.vertical, 40)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(AppColors.contentBackground)
     }
     
     /// 空列表视图
@@ -582,9 +601,6 @@ struct FileListView: View {
                 }
             )
 
-            // 工具栏和内容区分隔线
-            Divider()
-            
             // 根据视图模式显示不同的文件列表
             Group {
                 switch viewModeManager.currentMode {
@@ -651,12 +667,13 @@ struct FileListView: View {
     private func loadFileList() {
         guard canLoadFiles else { return }
         
-        // 立即重置状态以防止显示 stale data
-        fileObjects = []
-        isInitialLoading = true
-        selectionManager.clearSelection()
-        
         guard let bucket = r2Service.selectedBucket else { return }
+        
+        // 立即设置加载状态并清空列表，显示加载视图
+        isInitialLoading = true
+        fileObjects = []
+        selectionManager.clearSelection()
+        r2Service.lastError = nil  // 清除旧的错误状态
         
         Task {
             do {
@@ -671,6 +688,8 @@ struct FileListView: View {
             } catch {
                 await MainActor.run {
                     self.isInitialLoading = false
+                    // 清空列表，显示错误状态
+                    self.fileObjects = []
                     if let r2Error = error as? R2ServiceError {
                         messageManager.showError(r2Error)
                     }

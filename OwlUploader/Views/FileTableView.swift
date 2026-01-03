@@ -353,11 +353,7 @@ struct FileTableRow: View {
     }
 
     private var backgroundFillColor: Color {
-        if isHovering && !isSelected {
-            return Color(nsColor: .quaternaryLabelColor).opacity(0.5)
-        } else {
-            return Color.clear
-        }
+        return Color.clear
     }
 
     private var fileIcon: some View {
