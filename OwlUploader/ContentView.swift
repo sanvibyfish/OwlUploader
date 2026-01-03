@@ -9,7 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
     /// 当前显示的主视图
-    @State private var selectedView: MainViewSelection? = .welcome
+    @State private var selectedView: MainViewSelection? = nil
 
     /// R2 服务实例
     @StateObject private var r2Service = R2Service.shared
@@ -29,10 +29,11 @@ struct ContentView: View {
     /// 断开连接确认对话框
     @State private var showDisconnectConfirmation: Bool = false
     
+    /// 显示设置页面
+    @State private var showSettings: Bool = false
+    
     /// 主视图选择枚举
     enum MainViewSelection: Hashable {
-        case welcome
-        case settings
         case buckets
         case files
     }
@@ -44,14 +45,10 @@ struct ContentView: View {
                 r2Service: r2Service,
                 accountManager: accountManager
             )
-            .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 300)
+            .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 280)
         } detail: {
             Group {
                 switch selectedView {
-                case .welcome:
-                    WelcomeView(selectedView: $selectedView, r2Service: r2Service)
-                case .settings:
-                    AccountSettingsView()
                 case .buckets:
                     BucketListView(r2Service: r2Service)
                 case .files:
@@ -63,7 +60,7 @@ struct ContentView: View {
                     )
                     .id("files-\(r2Service.selectedBucket?.name ?? "")")
                 case .none:
-                    WelcomeView(selectedView: $selectedView, r2Service: r2Service)
+                    WelcomeView(r2Service: r2Service)
                 }
             }
             .frame(minWidth: 600, minHeight: 400)
@@ -71,6 +68,11 @@ struct ContentView: View {
         .environmentObject(r2Service)
         .environmentObject(accountManager)
         .environmentObject(messageManager)
+        .focusedValue(\.settingsActions, SettingsActions(openSettings: { showSettings = true }))
+        .sheet(isPresented: $showSettings) {
+            AccountSettingsView()
+                .frame(width: 600, height: 500)
+        }
         .overlay(alignment: .topTrailing) {
             MessageBannerContainer(messageManager: messageManager)
                 .padding()
@@ -99,6 +101,9 @@ struct ContentView: View {
     
     /// 执行初始设置和状态检测
     private func performInitialSetup() {
+        guard !ProcessInfo.processInfo.arguments.contains("--ui-testing") else {
+            return
+        }
         // 触发 R2Service 的自动加载和连接
         Task {
             await r2Service.loadAccountAndInitialize()
@@ -117,14 +122,12 @@ struct ContentView: View {
         
         if isConnected {
             // 连接成功，如果当前在欢迎页面，自动导航到存储桶选择
-            if selectedView == .welcome {
+            if selectedView == nil {
                 selectedView = .buckets
             }
         } else {
-            // 连接断开，如果当前不在账户设置页面，导航到欢迎页面
-            if selectedView != .settings {
-                selectedView = .welcome
-            }
+            // 连接断开，导航到欢迎页面
+            selectedView = nil
         }
     }
     
@@ -147,17 +150,16 @@ struct ContentView: View {
         messageManager.showSuccess(L.Message.Success.disconnected, description: L.Message.Success.disconnectedDescription)
         
         // 导航回欢迎页面
-        selectedView = .welcome
+        selectedView = nil
     }
 }
 
 /// 欢迎页面视图
 struct WelcomeView: View {
-    /// 当前选中的视图绑定
-    @Binding var selectedView: ContentView.MainViewSelection?
-    
     /// R2 服务实例
     let r2Service: R2Service
+    
+    @Environment(\.openWindow) private var openWindow
     var body: some View {
         VStack(spacing: 30) {
             // 应用图标和标题
@@ -224,31 +226,17 @@ struct WelcomeView: View {
             }
             
             if !r2Service.isConnected {
-                VStack(spacing: 12) {
-                    Text(L.Welcome.Status.configurePrompt)
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-
-                    Button(L.Welcome.Status.configureAccount) {
-                        selectedView = .settings
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
+                Text(L.Welcome.Status.configurePrompt)
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
             } else if r2Service.selectedBucket == nil {
-                VStack(spacing: 12) {
-                    Text(L.Welcome.Status.selectBucketPrompt)
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-
-                    Button(L.Welcome.Status.selectBucket) {
-                        selectedView = .buckets
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
+                Text(L.Welcome.Status.selectBucketPrompt)
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
             } else {
-                VStack(spacing: 12) {
+                VStack(spacing: 8) {
                     Text(L.Welcome.Status.currentBucket(r2Service.selectedBucket!.name))
                         .font(.body)
                         .foregroundColor(.primary)
@@ -257,24 +245,7 @@ struct WelcomeView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
-
-                    Button(L.Welcome.Status.startManaging) {
-                        selectedView = .files
-                    }
-                    .buttonStyle(.borderedProminent)
                 }
-            }
-            
-            // 始终显示重新配置选项
-            VStack(spacing: 8) {
-                Divider()
-                    .padding(.horizontal, 20)
-                
-                Button(L.Welcome.Status.reconfigureAccount) {
-                    selectedView = .settings
-                }
-                .buttonStyle(.bordered)
-                .foregroundColor(.secondary)
             }
         }
     }
@@ -312,7 +283,6 @@ struct FeatureRow: View {
 }
 
 #Preview("WelcomeView") {
-    WelcomeView(selectedView: .constant(.welcome), r2Service: R2Service.preview)
+    WelcomeView(r2Service: R2Service.preview)
         .environmentObject(R2Service.preview)
 }
-

@@ -160,6 +160,10 @@ enum R2ServiceError: Error, LocalizedError {
 @MainActor
 class R2Service: ObservableObject {
     // MARK: - Properties
+
+    private static var isUITesting: Bool {
+        ProcessInfo.processInfo.arguments.contains("--ui-testing")
+    }
     
     /// S3 客户端实例
     private var s3Client: S3Client?
@@ -189,8 +193,10 @@ class R2Service: ObservableObject {
         self.accountManager = accountManager
         
         // 尝试加载现有账户配置
-        Task {
-            await loadAccountAndInitialize()
+        if !Self.isUITesting {
+            Task {
+                await loadAccountAndInitialize()
+            }
         }
     }
     

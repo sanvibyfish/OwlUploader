@@ -36,10 +36,35 @@ struct FileActions {
 
 // MARK: - 应用命令
 
+/// 设置操作焦点值
+struct SettingsActionsKey: FocusedValueKey {
+    typealias Value = SettingsActions
+}
+
+extension FocusedValues {
+    var settingsActions: SettingsActions? {
+        get { self[SettingsActionsKey.self] }
+        set { self[SettingsActionsKey.self] = newValue }
+    }
+}
+
+struct SettingsActions {
+    var openSettings: () -> Void
+}
+
 struct AppCommands: Commands {
     @FocusedValue(\.fileActions) var fileActions
+    @FocusedValue(\.settingsActions) var settingsActions
 
     var body: some Commands {
+        // 设置菜单
+        CommandGroup(replacing: .appSettings) {
+            Button("Settings...") {
+                settingsActions?.openSettings()
+            }
+            .keyboardShortcut(",", modifiers: .command)
+        }
+        
         // 文件菜单
         CommandGroup(after: .newItem) {
             Button(L.Commands.newFolder) {

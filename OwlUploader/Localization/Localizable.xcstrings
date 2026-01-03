@@ -5068,6 +5068,9 @@
     "Search" : {
 
     },
+    "Settings..." : {
+
+    },
     "settings.followSystem" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {

@@ -115,13 +115,11 @@ OwlUploader/
 │   ├── AccountSettingsView.swift # 账户配置界面
 │   ├── BucketListView.swift      # 存储桶选择界面
 │   ├── FileListView.swift        # 文件列表界面
-│   ├── FileListItemView.swift    # 文件列表项组件
 │   ├── FileDropView.swift        # 拖拽上传组件
 │   ├── FilePreviewView.swift     # 文件预览组件
 │   ├── CreateFolderSheet.swift   # 创建文件夹弹窗
 │   ├── BreadcrumbView.swift      # 面包屑导航组件
 │   ├── DiagnosticsView.swift     # 系统诊断界面
-│   ├── UploadQueueView.swift     # 上传队列界面
 │   ├── SearchFilterBar.swift     # 搜索过滤栏组件
 │   ├── FinderToolbar.swift       # Finder风格工具栏
 │   ├── PathBar.swift             # 路径导航栏
@@ -129,20 +127,36 @@ OwlUploader/
 │   ├── FileGridItemView.swift    # 网格项组件（缩略图）
 │   └── FileTableView.swift       # 表格视图（列头+排序）
 │
+├── Queue/
+│   ├── CombinedQueueView.swift   # 合并队列视图（上传+移动）
+│   ├── MoveQueueManager.swift    # 移动队列管理器
+│   ├── QueueTask.swift           # 队列任务协议
+│   └── UploadQueueManager.swift  # 上传队列管理器
+│
 ├── DesignSystem/
 │   ├── ViewModeManager.swift     # 视图模式管理器
 │   ├── SelectionManager.swift    # 选择状态管理器
+│   ├── NavigationHistoryManager.swift # 导航历史管理器
 │   ├── AnimationConstants.swift  # 动画与过渡常量
 │   ├── ThumbnailCache.swift      # 缩略图缓存管理
 │   ├── AppColors.swift           # 语义颜色定义
 │   ├── AppTypography.swift       # 字体规范
-│   └── AppSpacing.swift          # 间距规范
+│   ├── AppSpacing.swift          # 间距规范
+│   └── Components/
+│       ├── StatusBadge.swift     # 状态徽章
+│       ├── EmptyStateView.swift  # 空状态视图
+│       ├── AppButtonStyles.swift # 按钮样式
+│       └── ActionHintCard.swift  # 操作提示卡片
+│
+├── Localization/
+│   ├── LanguageManager.swift     # 语言管理器
+│   ├── AppStrings.swift          # 类型安全字符串命名空间
+│   └── Localizable.xcstrings     # 本地化字符串资源
 │
 ├── Services/
 │   ├── R2Service.swift           # R2 服务核心（S3 API 封装）
 │   ├── R2AccountManager.swift    # 账户管理器
-│   ├── KeychainService.swift     # Keychain 安全存储服务
-│   └── UploadQueueManager.swift  # 上传队列管理器
+│   └── KeychainService.swift     # Keychain 安全存储服务
 │
 ├── Models/
 │   ├── R2Account.swift           # 账户数据模型
@@ -266,17 +280,18 @@ OwlUploader/
 - [x] 深色模式适配
 - [x] Finder 风格 UI（视图模式、工具栏、路径导航）
 - [x] 图片缩略图预览
-
-### 进行中
-- [ ] 文件预览功能（QuickLook 风格）
-- [ ] 文件下载功能
-- [ ] 批量操作（多选删除、下载）
-- [ ] 文件夹上传
+- [x] 文件预览功能（图片、视频、音频、PDF、文本）
+- [x] 文件下载功能
+- [x] 批量操作（多选删除、下载）
+- [x] 文件移动功能（右键菜单移动到其他目录）
+- [x] 本地化支持（中文/英文）
+- [x] 导航历史（前进/后退）
+- [x] 合并队列视图（上传+移动）
 
 ### 规划中
+- [ ] 文件夹上传（保持目录结构）
 - [ ] 上传/下载历史记录
 - [ ] 文件共享链接生成（过期设置）
-- [ ] 视频预览支持
 
 ---
 

@@ -26,20 +26,8 @@ struct SidebarView: View {
 
     var body: some View {
         List(selection: $selectedView) {
-            // MARK: - General
-            Section(L.Sidebar.Section.general) {
-                NavigationLink(value: ContentView.MainViewSelection.welcome) {
-                    Label(L.Sidebar.Item.home, systemImage: "house")
-                }
-
-                NavigationLink(value: ContentView.MainViewSelection.settings) {
-                    Label(L.Sidebar.Item.settings, systemImage: "gear")
-                }
-            }
-            .collapsible(false)
-
             // MARK: - Accounts
-            Section(L.Sidebar.Section.accounts) {
+            Section {
                 ForEach(accountManager.accounts) { account in
                     AccountRow(
                         account: account,
@@ -55,15 +43,18 @@ struct SidebarView: View {
                         onDisconnect: { confirmDisconnect(account) }
                     )
                 }
-
-                // 添加账户按钮 - 始终显示在底部
-                Button {
-                    showAddAccountDialog = true
-                } label: {
-                    Label(L.Sidebar.Action.addAccount, systemImage: "plus.circle")
-                        .foregroundColor(AppColors.primary)
+            } header: {
+                Text(L.Sidebar.Section.accounts.uppercased())
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.secondary)
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button(action: { showAddAccountDialog = true }) {
+                    Image(systemName: "plus")
                 }
-                .buttonStyle(.plain)
+                .help(L.Sidebar.Action.addAccount)
             }
         }
         .sheet(isPresented: $showAddBucketDialog) {
@@ -264,34 +255,33 @@ struct AccountRow: View {
             )
         ) {
             if loading {
-                ProgressView().scaleEffect(0.5)
+                ProgressView()
+                    .scaleEffect(0.5)
+                    .frame(maxWidth: .infinity, alignment: .center)
             } else {
-                // 显示所有存储桶
                 ForEach(buckets) { bucket in
-                    BucketRowItem(
-                        bucket: bucket,
-                        isSelected: bucket.name == selectedBucketName,
-                        action: { onSelectBucket(bucket) }
-                    )
+                    let isSelected = bucket.name == selectedBucketName
+                    Button(action: { onSelectBucket(bucket) }) {
+                        HStack {
+                            Image(systemName: "cylinder.split.1x2")
+                                .font(.system(size: 16))
+                                .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                            Text(bucket.name)
+                            Spacer()
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
-
-                // 添加存储桶按钮 - 始终显示
-                Button {
-                    onAddBucket()
-                } label: {
-                    Label(L.Sidebar.Action.addBucket, systemImage: "plus")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.primary)
-                }
-                .buttonStyle(.plain)
             }
         } label: {
-            HStack {
-                Image(systemName: "cloud.fill")
-                    .foregroundColor(isConnected ? AppColors.success : AppColors.textSecondary)
+            Label {
                 Text(account.displayName.isEmpty ? account.accessKeyID : account.displayName)
-                    .font(AppTypography.body)
                     .lineLimit(1)
+            } icon: {
+                Image(systemName: "cloud.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(isConnected ? AppColors.success : .secondary)
             }
         }
         .contextMenu {
@@ -303,26 +293,6 @@ struct AccountRow: View {
             Divider()
             Button(L.Sidebar.Action.disconnect, role: .destructive, action: onDisconnect)
         }
-    }
-}
-
-struct BucketRowItem: View {
-    let bucket: BucketItem
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack {
-                Image(systemName: isSelected ? "cylinder.split.1x2.fill" : "cylinder.split.1x2")
-                    .foregroundColor(isSelected ? AppColors.primary : AppColors.textSecondary)
-                Text(bucket.name)
-                    .foregroundColor(isSelected ? AppColors.primary : AppColors.textPrimary)
-                Spacer()
-            }
-        }
-        .buttonStyle(.plain)
-        .listRowBackground(isSelected ? AppColors.primary.opacity(0.1) : nil)
     }
 }
 

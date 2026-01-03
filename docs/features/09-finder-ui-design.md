@@ -31,9 +31,8 @@ OwlUploader 采用 macOS Finder 风格的界面设计，提供熟悉、直观的
 
 | 模式 | 图标 | 快捷键 | 描述 |
 |------|:----:|:------:|------|
-| **列表 (List)** | `list.bullet` | `Cmd+1` | 简洁紧凑的列表显示 |
-| **表格 (Table)** | `tablecells` | `Cmd+2` | 带可排序列头的详细视图 |
-| **图标 (Icons)** | `square.grid.2x2` | `Cmd+3` | 网格布局，显示缩略图 |
+| **表格 (Table)** | `tablecells` | `Cmd+1` | 带可排序列头的详细视图 |
+| **图标 (Icons)** | `square.grid.2x2` | `Cmd+2` | 网格布局，显示缩略图 |
 
 ### 2.2 ViewModeManager
 
@@ -83,6 +82,8 @@ class ViewModeManager: ObservableObject {
 
 | 按钮 | 图标 | 快捷键 | 功能 |
 |------|:----:|:------:|------|
+| 后退 | `chevron.left` | `Cmd+[` | 返回上一个访问的目录 |
+| 前进 | `chevron.right` | `Cmd+]` | 前往下一个目录（后退后可用） |
 | 返回上级 | `chevron.up` | `Cmd+↑` | 导航到父目录 |
 | 刷新 | `arrow.clockwise` | `Cmd+R` | 重新加载列表 |
 
@@ -178,9 +179,63 @@ class SelectionManager: ObservableObject {
 
 ---
 
-## 6. 动画与过渡
+## 6. 导航历史管理 (NavigationHistoryManager)
 
-### 6.1 动画常量 (AnimationConstants)
+### 6.1 功能概述
+
+类似 Finder 和浏览器的前进/后退导航，记录用户访问的目录历史。
+
+```
+后退栈 ← [当前路径] → 前进栈
+```
+
+### 6.2 API 接口
+
+```swift
+@MainActor
+class NavigationHistoryManager: ObservableObject {
+    @Published var canGoBack: Bool         // 是否可后退
+    @Published var canGoForward: Bool      // 是否可前进
+
+    /// 导航到新路径（清空前进栈）
+    func navigateTo(_ path: String)
+
+    /// 返回上一个位置
+    func goBack() -> String?
+
+    /// 前进到下一个位置
+    func goForward() -> String?
+
+    /// 清空所有历史
+    func clearHistory()
+
+    /// 重置到初始状态
+    func reset(to initialPath: String)
+}
+```
+
+### 6.3 交互行为
+
+| 操作 | 快捷键 | 行为 |
+|------|:------:|------|
+| 后退 | `Cmd+[` | 返回上一个访问的目录 |
+| 前进 | `Cmd+]` | 前往下一个目录（后退后可用） |
+| 导航 | 点击目录 | 清空前进栈，添加到后退栈 |
+
+### 6.4 按钮状态
+
+| 状态 | 后退按钮 | 前进按钮 |
+|------|:--------:|:--------:|
+| 初始 | 禁用 | 禁用 |
+| 已导航 | 启用 | 禁用 |
+| 已后退 | 启用/禁用 | 启用 |
+| 新导航 | 启用 | 禁用 |
+
+---
+
+## 7. 动画与过渡
+
+### 7.1 动画常量 (AnimationConstants)
 
 #### 标准动画
 
@@ -206,7 +261,7 @@ class SelectionManager: ObservableObject {
 | `selection` | 0.12s | 选中状态 |
 | `buttonPress` | 0.1s | 按钮按压 |
 
-### 6.2 过渡效果 (AppTransitions)
+### 7.2 过渡效果 (AppTransitions)
 
 ```swift
 enum AppTransitions {
@@ -219,7 +274,7 @@ enum AppTransitions {
 }
 ```
 
-### 6.3 View 扩展
+### 7.3 View 扩展
 
 ```swift
 extension View {
@@ -232,9 +287,9 @@ extension View {
 
 ---
 
-## 7. 缩略图系统 (ThumbnailCache)
+## 8. 缩略图系统 (ThumbnailCache)
 
-### 7.1 架构
+### 8.1 架构
 
 ```swift
 class ThumbnailCache: ObservableObject {
@@ -247,7 +302,7 @@ class ThumbnailCache: ObservableObject {
 }
 ```
 
-### 7.2 缓存策略
+### 8.2 缓存策略
 
 | 参数 | 值 | 说明 |
 |------|:----:|------|
@@ -255,13 +310,13 @@ class ThumbnailCache: ObservableObject {
 | 最大容量 | 100MB | 内存占用限制 |
 | 分辨率 | 2x | Retina 屏幕适配 |
 
-### 7.3 支持的格式
+### 8.3 支持的格式
 
 - JPEG, PNG, GIF, WebP, HEIC
 - 自动检测 Content-Type
 - 需要公共访问 URL
 
-### 7.4 使用方式
+### 8.4 使用方式
 
 ```swift
 AsyncThumbnailView(urlString: url, size: 64) {
@@ -272,9 +327,9 @@ AsyncThumbnailView(urlString: url, size: 64) {
 
 ---
 
-## 8. 颜色规范 (AppColors)
+## 9. 颜色规范 (AppColors)
 
-### 8.1 语义颜色
+### 9.1 语义颜色
 
 | 名称 | 用途 | 系统颜色 |
 |------|------|----------|
@@ -284,7 +339,7 @@ AsyncThumbnailView(urlString: url, size: 64) {
 | `textSecondary` | 次要文字 | `.secondaryLabelColor` |
 | `textTertiary` | 占位文字 | `.tertiaryLabelColor` |
 
-### 8.2 强调色
+### 9.2 强调色
 
 | 名称 | 用途 | 系统颜色 |
 |------|------|----------|
@@ -294,7 +349,7 @@ AsyncThumbnailView(urlString: url, size: 64) {
 | `warning` | 警告状态 | `.systemOrange` |
 | `info` | 信息提示 | `.systemBlue` |
 
-### 8.3 界面元素
+### 9.3 界面元素
 
 | 名称 | 用途 | 系统颜色 |
 |------|------|----------|
@@ -303,9 +358,9 @@ AsyncThumbnailView(urlString: url, size: 64) {
 
 ---
 
-## 9. 排版规范 (AppTypography)
+## 10. 排版规范 (AppTypography)
 
-### 9.1 字体规范
+### 10.1 字体规范
 
 | 场景 | 大小 | 权重 |
 |------|:----:|------|
@@ -315,7 +370,7 @@ AsyncThumbnailView(urlString: url, size: 64) {
 | 小字 | 11pt | Regular |
 | 数字 | 12pt | Monospaced Digit |
 
-### 9.2 图标规范
+### 10.2 图标规范
 
 | 场景 | 大小 | 权重 |
 |------|:----:|------|
@@ -325,21 +380,22 @@ AsyncThumbnailView(urlString: url, size: 64) {
 
 ---
 
-## 10. 组件清单
+## 11. 组件清单
 
-### 10.1 DesignSystem
+### 11.1 DesignSystem
 
 | 文件 | 职责 |
 |------|------|
 | `ViewModeManager.swift` | 视图模式管理 |
 | `SelectionManager.swift` | 选择状态管理 |
+| `NavigationHistoryManager.swift` | 导航历史管理（前进/后退） |
 | `AnimationConstants.swift` | 动画/过渡常量 |
 | `ThumbnailCache.swift` | 缩略图缓存 |
 | `AppColors.swift` | 颜色定义 |
 | `AppTypography.swift` | 字体定义 |
 | `AppSpacing.swift` | 间距定义 |
 
-### 10.2 Views
+### 11.2 Views
 
 | 文件 | 职责 |
 |------|------|
@@ -351,27 +407,28 @@ AsyncThumbnailView(urlString: url, size: 64) {
 
 ---
 
-## 11. 快捷键
+## 12. 快捷键
 
-### 11.1 导航快捷键
+### 12.1 导航快捷键
 
 | 快捷键 | 功能 |
 |--------|------|
+| `Cmd+[` | 后退（上一个访问的目录） |
+| `Cmd+]` | 前进（后退后可用） |
 | `Cmd+↑` | 返回上级目录 |
 | `Cmd+R` | 刷新列表 |
 | `Cmd+F` | 聚焦搜索框 |
 
-### 11.2 视图快捷键
+### 12.2 视图快捷键
 
 | 快捷键 | 功能 |
 |--------|------|
-| `Cmd+1` | 列表视图 |
-| `Cmd+2` | 表格视图 |
-| `Cmd+3` | 图标视图 |
+| `Cmd+1` | 表格视图 |
+| `Cmd+2` | 图标视图 |
 | `Cmd++` | 放大图标 |
 | `Cmd+-` | 缩小图标 |
 
-### 11.3 选择快捷键
+### 12.3 选择快捷键
 
 | 快捷键 | 功能 |
 |--------|------|
@@ -382,7 +439,7 @@ AsyncThumbnailView(urlString: url, size: 64) {
 
 ---
 
-## 12. 深色模式
+## 13. 深色模式
 
 所有颜色使用 `NSColor` 系统语义颜色，自动适配深色模式：
 

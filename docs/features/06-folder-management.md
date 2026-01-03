@@ -128,6 +128,58 @@ func deleteFolder(bucket: String, prefix: String) async throws {
 }
 ```
 
+## 文件/文件夹移动
+
+通过右键菜单可以将文件或文件夹移动到其他目录。
+
+### 触发方式
+
+1. 右键点击文件或文件夹
+2. 选择「移动到...」菜单
+3. 从子菜单中选择目标目录
+4. 确认移动操作
+
+### 移动目标选项
+
+| 选项 | 说明 |
+|------|------|
+| 根目录 | 移动到存储桶根目录 |
+| 上级目录 | 移动到当前目录的父目录 |
+| 同级文件夹 | 移动到当前目录下的其他文件夹 |
+
+### 移动流程
+
+```mermaid
+flowchart TD
+    A[右键点击文件] --> B[选择移动到...]
+    B --> C[选择目标目录]
+    C --> D{目标存在同名文件?}
+    D -->|是| E[覆盖目标文件]
+    D -->|否| F[直接移动]
+    E --> G[添加到移动队列]
+    F --> G
+    G --> H[执行移动操作]
+    H --> I[刷新文件列表]
+```
+
+### 核心组件
+
+| 文件 | 职责 |
+|------|------|
+| `Queue/MoveQueueManager.swift` | 移动队列管理 |
+| `Queue/CombinedQueueView.swift` | 合并队列 UI |
+| `R2Service.swift` | 移动 API 实现 |
+
+### API 实现
+
+```swift
+// 移动单个对象
+func moveObject(bucket: String, sourceKey: String, destinationKey: String) async throws
+
+// 移动文件夹（递归移动所有内容）
+func moveFolder(bucket: String, sourceFolderKey: String, destinationFolderKey: String) async throws -> Int
+```
+
 ## 错误类型
 
 | 错误 | 描述 |
@@ -136,6 +188,7 @@ func deleteFolder(bucket: String, prefix: String) async throws {
 | `invalidFolderName` | 文件夹名称无效 |
 | `folderAlreadyExists` | 文件夹已存在 |
 | `deleteFolderFailed` | 删除文件夹失败 |
+| `moveFailed` | 移动文件/文件夹失败 |
 | `networkError` | 网络连接错误 |
 
 ## 相关链接
