@@ -14,6 +14,8 @@ struct OwlUploaderApp: App {
             ContentView()
         }
         .defaultSize(width: 1200, height: 800)
+        .windowStyle(.hiddenTitleBar)  // 隐藏标题栏，使用统一工具栏
+        .windowToolbarStyle(.unified(showsTitle: true))  // Finder 风格统一工具栏
         .commands {
             CommandGroup(replacing: .newItem) { }
             AppCommands()

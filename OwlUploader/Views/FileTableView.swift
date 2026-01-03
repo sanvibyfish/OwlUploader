@@ -33,6 +33,7 @@ struct FileTableView: View {
         VStack(spacing: 0) {
             // 列头
             TableHeader(sortOrder: $sortOrder)
+                .shadow(color: Color.black.opacity(0.05), radius: 1, x: 0, y: 1)
 
             Divider()
 
@@ -131,7 +132,12 @@ struct TableHeader: View {
         }
         .padding(.horizontal, 12)
         .frame(height: 28)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(
+            Color(nsColor: .windowBackgroundColor)
+                .overlay(
+                    Color(nsColor: .separatorColor).opacity(0.15)
+                )
+        )
     }
 
     private func toggleSort(_ ascending: FileSortOrder, _ descending: FileSortOrder) {

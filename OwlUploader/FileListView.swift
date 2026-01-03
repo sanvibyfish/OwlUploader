@@ -84,29 +84,6 @@ struct FileListView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Finder风格工具栏
-            if r2Service.isConnected, r2Service.selectedBucket != nil {
-                FinderToolbar(
-                    searchText: $searchText,
-                    viewMode: $viewModeManager.currentMode,
-                    sortOrder: $sortOrder,
-                    filterType: $filterType,
-                    canGoUp: !currentPrefix.isEmpty,
-                    isDisabled: !canLoadFiles || r2Service.isLoading,
-                    isLoading: r2Service.isLoading && !isInitialLoading,
-                    selectedCount: selectionManager.selectedCount,
-                    onGoUp: goUpOneLevel,
-                    onRefresh: loadFileList,
-                    onNewFolder: { showingCreateFolderSheet = true },
-                    onUpload: { showingFileImporter = true },
-                    onBatchDelete: batchDeleteSelectedFiles,
-                    onBatchDownload: batchDownloadSelectedFiles,
-                    onClearSelection: { selectionManager.clearSelection() }
-                )
-
-                Divider()
-            }
-
             // 主内容区域
             mainContentView
                 .overlay {
@@ -134,6 +111,157 @@ struct FileListView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: uploadQueueManager.isQueuePanelVisible)
         .navigationTitle(r2Service.selectedBucket?.name ?? "Files")
+        .navigationSubtitle(currentPrefix.isEmpty ? "" : currentPrefix)
+        .toolbar {
+            // 左侧导航区
+            ToolbarItemGroup(placement: .navigation) {
+                if r2Service.isConnected, r2Service.selectedBucket != nil {
+                    Button(action: goUpOneLevel) {
+                        Image(systemName: "chevron.up")
+                    }
+                    .disabled(currentPrefix.isEmpty || !canLoadFiles || r2Service.isLoading)
+                    .help(L.Help.goUp)
+
+                    Button(action: loadFileList) {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .disabled(!canLoadFiles || r2Service.isLoading)
+                    .help(L.Help.refresh)
+
+                    if r2Service.isLoading && !isInitialLoading {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                            .frame(width: 16, height: 16)
+                    }
+                }
+            }
+
+            // 右侧操作区 - 使用 primaryAction 确保右对齐
+            ToolbarItemGroup(placement: .primaryAction) {
+                if r2Service.isConnected, r2Service.selectedBucket != nil {
+                    // 批量操作区域（当有选择时显示）
+                    if selectionManager.selectedCount > 0 {
+                        Text("\(selectionManager.selectedCount) \(L.Files.itemsSelected(selectionManager.selectedCount))")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+
+                        Button(action: { selectionManager.clearSelection() }) {
+                            Image(systemName: "xmark.circle")
+                        }
+                        .help(L.Help.clearSelection)
+
+                        Button(action: batchDownloadSelectedFiles) {
+                            Label(L.Files.Toolbar.download, systemImage: "arrow.down.circle")
+                        }
+                        .disabled(!canLoadFiles || r2Service.isLoading)
+
+                        Button(action: batchDeleteSelectedFiles) {
+                            Label(L.Files.Toolbar.deleteAction, systemImage: "trash")
+                        }
+                        .disabled(!canLoadFiles || r2Service.isLoading)
+                    } else {
+                        // 搜索框
+                        HStack(spacing: 4) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+
+                            TextField(L.Files.Toolbar.searchPlaceholder, text: $searchText)
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 12))
+                                .frame(width: 150)
+
+                            if !searchText.isEmpty {
+                                Button {
+                                    searchText = ""
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(Color(nsColor: .controlBackgroundColor))
+                        .cornerRadius(4)
+
+                        // 筛选菜单
+                        Menu {
+                            ForEach(FileFilterType.allCases, id: \.self) { type in
+                                Button {
+                                    filterType = type
+                                } label: {
+                                    HStack {
+                                        Label(type.rawValue, systemImage: type.iconName)
+                                        if filterType == type {
+                                            Spacer()
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
+                        } label: {
+                            Image(systemName: filterType == .all ? "line.3.horizontal.decrease" : "line.3.horizontal.decrease.circle.fill")
+                                .foregroundColor(filterType == .all ? .primary : AppColors.primary)
+                        }
+                        .help(L.Help.filter)
+
+                        // 排序菜单
+                        Menu {
+                            ForEach(FileSortOrder.allCases, id: \.self) { order in
+                                Button {
+                                    sortOrder = order
+                                } label: {
+                                    HStack {
+                                        Label(order.rawValue, systemImage: order.iconName)
+                                        if sortOrder == order {
+                                            Spacer()
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "arrow.up.arrow.down")
+                        }
+                        .help(L.Help.sort)
+
+                        Divider()
+
+                        // 视图模式切换
+                        ForEach(FileViewMode.allCases) { mode in
+                            Button {
+                                withAnimation(AppAnimations.fast) {
+                                    viewModeManager.setMode(mode)
+                                }
+                            } label: {
+                                Image(systemName: mode.iconName)
+                                    .foregroundColor(viewModeManager.currentMode == mode ? AppColors.primary : .secondary)
+                            }
+                            .help(mode.displayName)
+                        }
+
+                        Divider()
+
+                        // 新建文件夹
+                        Button(action: { showingCreateFolderSheet = true }) {
+                            Image(systemName: "folder.badge.plus")
+                        }
+                        .disabled(!canLoadFiles || r2Service.isLoading)
+                        .help(L.Help.newFolder)
+
+                        // 上传文件
+                        Button(action: { showingFileImporter = true }) {
+                            Image(systemName: "arrow.up.doc")
+                        }
+                        .disabled(!canLoadFiles || r2Service.isLoading)
+                        .help(L.Help.uploadFile)
+                    }
+                }
+            }
+        }
         .onAppear {
             loadFileList()
             // 设置上传完成回调，自动刷新文件列表
@@ -268,90 +396,101 @@ struct FileListView: View {
     
     /// 未连接提示视图
     private var notConnectedView: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "wifi.slash")
-                .font(.system(size: 48))
-                .foregroundColor(.secondary)
-
-            Text(L.Files.State.notConnectedToR2)
-                .font(.headline)
-
-            Text(L.Files.State.configureAccountPrompt)
-                .font(.body)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .padding(.horizontal, 40)
+        EmptyStateView(
+            icon: "network.slash",
+            title: L.Files.State.notConnectedToR2,
+            description: L.Files.State.configureAccountPrompt
+        )
     }
     
     /// 未选择存储桶提示视图
     private var noBucketSelectedView: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "externaldrive")
-                .font(.system(size: 48))
-                .foregroundColor(.secondary)
-
-            Text(L.Files.State.selectBucket)
-                .font(.headline)
-
-            Text(L.Files.State.selectBucketPrompt)
-                .font(.body)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .padding(.horizontal, 40)
+        EmptyStateView(
+            icon: "externaldrive",
+            title: L.Files.State.selectBucket,
+            description: L.Files.State.selectBucketPrompt
+        )
     }
     
     /// 加载中视图
     private var loadingView: some View {
-        VStack(spacing: 20) {
-            // 自定义进度指示器
+        VStack(spacing: 24) {
+            // 进度指示器 - 使用更大的尺寸和背景
             ZStack {
                 Circle()
-                    .fill(Color.blue.opacity(0.1))
-                    .frame(width: 60, height: 60)
-
+                    .fill(Color.blue.opacity(0.08))
+                    .frame(width: 80, height: 80)
+                
                 ProgressView()
                     .progressViewStyle(CircularProgressViewStyle(tint: .blue))
-                    .scaleEffect(1.2)
+                    .scaleEffect(1.3)
             }
-
-            VStack(spacing: 4) {
+            
+            // 加载文字 - 更清晰的层次
+            VStack(spacing: 6) {
                 Text(L.Files.State.loadingFileList)
-                    .font(.body)
-                    .fontWeight(.medium)
+                    .font(.system(size: 17, weight: .medium))
                     .foregroundColor(.primary)
-
+                
                 Text(L.Common.Label.pleaseWait)
-                    .font(.caption)
+                    .font(.system(size: 14))
                     .foregroundColor(.secondary)
             }
         }
-        .padding(.vertical, 40)
+        .padding(.vertical, 60)
     }
     
     /// 错误视图
     /// - Parameter error: 要显示的错误
     private func errorView(_ error: R2ServiceError) -> some View {
-        VStack(spacing: 16) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 48))
-                .foregroundColor(.orange)
-
-            Text(L.Files.State.loadFailed)
-                .font(.headline)
-
-            Text(error.localizedDescription)
-                .font(.body)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-
-            Button(L.Common.Button.retry) {
-                loadFileList()
+        VStack(spacing: 28) {
+            // 错误图标 - 使用渐变
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.orange.opacity(0.1), Color.red.opacity(0.12)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 100, height: 100)
+                
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 40, weight: .light))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.orange, .red.opacity(0.8)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .symbolRenderingMode(.hierarchical)
+            }
+            
+            // 错误文字
+            VStack(spacing: 12) {
+                Text(L.Files.State.loadFailed)
+                    .font(.system(size: 24, weight: .medium))
+                    .foregroundColor(.primary)
+                
+                Text(error.localizedDescription)
+                    .font(.system(size: 14, design: .monospaced))
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 20)
+            }
+            
+            // 重试按钮
+            Button(action: loadFileList) {
+                Label(L.Common.Button.retry, systemImage: "arrow.clockwise")
+                    .font(.system(size: 14, weight: .medium))
             }
             .buttonStyle(.borderedProminent)
+            .controlSize(.large)
         }
-        .padding(.horizontal, 40)
+        .padding(.horizontal, 60)
+        .padding(.vertical, 40)
     }
     
     /// 空列表视图
@@ -390,68 +529,17 @@ struct FileListView: View {
                 }
             )
             
-            // 前景内容
-            VStack(spacing: 20) {
-                // 图标
-                ZStack {
-                    Circle()
-                        .fill(Color.blue.opacity(0.1))
-                        .frame(width: 80, height: 80)
-                    
-                    Image(systemName: currentPrefix.isEmpty ? "externaldrive" : "folder")
-                        .font(.system(size: 32, weight: .light))
-                        .foregroundColor(.blue)
-                }
-                
-                // 标题和描述
-                VStack(spacing: 8) {
-                    Text(L.Files.Empty.title)
-                        .font(.title2)
-                        .fontWeight(.medium)
-
-                    if currentPrefix.isEmpty {
-                        Text(L.Files.Empty.bucketDescription)
-                            .font(.body)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                    } else {
-                        Text(L.Files.Empty.folderDescription)
-                            .font(.body)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
-                }
-
-                // 操作提示
-                VStack(spacing: 12) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "plus.circle.fill")
-                            .foregroundColor(.blue)
-                        Text(L.Files.Empty.clickUpload)
-                            .font(.subheadline)
-                            .foregroundColor(.primary)
-                    }
-
-                    HStack(spacing: 8) {
-                        Image(systemName: "folder.badge.plus")
-                            .foregroundColor(.green)
-                        Text(L.Files.Empty.clickNewFolder)
-                            .font(.subheadline)
-                            .foregroundColor(.primary)
-                    }
-
-                    HStack(spacing: 8) {
-                        Image(systemName: "arrow.down.circle.dotted")
-                            .foregroundColor(.purple)
-                        Text(L.Files.Empty.orDragDrop)
-                            .font(.subheadline)
-                            .foregroundColor(.primary)
-                    }
-                }
-                .padding(.top, 8)
-            }
-            .padding(.horizontal, 40)
-            .padding(.vertical, 20)
+            // 前景内容 - 使用 EmptyStateView
+            EmptyStateView(
+                icon: currentPrefix.isEmpty ? "externaldrive" : "folder",
+                title: L.Files.Empty.title,
+                description: currentPrefix.isEmpty ? L.Files.Empty.bucketDescription : L.Files.Empty.folderDescription,
+                hints: [
+                    (icon: "plus.circle.fill", color: .blue, text: L.Files.Empty.clickUpload),
+                    (icon: "folder.badge.plus", color: .green, text: L.Files.Empty.clickNewFolder),
+                    (icon: "arrow.down.circle.dotted", color: .purple, text: L.Files.Empty.orDragDrop)
+                ]
+            )
             .allowsHitTesting(false) // 让触摸事件穿透到背景的拖拽视图
         }
     }
@@ -494,6 +582,9 @@ struct FileListView: View {
                 }
             )
 
+            // 工具栏和内容区分隔线
+            Divider()
+            
             // 根据视图模式显示不同的文件列表
             Group {
                 switch viewModeManager.currentMode {
