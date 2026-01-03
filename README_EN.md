@@ -125,7 +125,7 @@ Detailed development records can be found in the [`docs/dev/`](docs/dev/) direct
 
 ## 📄 License
 
-This project is open sourced under the [MIT License](LICENSE).
+This project is open sourced under the [GNU GPL v3](LICENSE).
 
 ## 🙏 Acknowledgments
 

@@ -6,22 +6,22 @@ enum MessageType {
     case error
     case warning
     case info
-    
-    var color: Color {
-        switch self {
-        case .success: return AppColors.success
-        case .error: return AppColors.error
-        case .warning: return AppColors.warning
-        case .info: return AppColors.info
-        }
-    }
-    
+
     var iconName: String {
         switch self {
         case .success: return "checkmark.circle.fill"
         case .error: return "xmark.circle.fill"
         case .warning: return "exclamationmark.triangle.fill"
         case .info: return "info.circle.fill"
+        }
+    }
+
+    var iconColor: Color {
+        switch self {
+        case .success: return .green
+        case .error: return .red
+        case .warning: return .orange
+        case .info: return .blue
         }
     }
 }
@@ -103,69 +103,49 @@ class MessageManager: ObservableObject {
     }
 }
 
-/// 消息横幅视图
+/// 消息提示视图 - macOS HUD 风格
 struct MessageBannerView: View {
     let message: Message
     let onDismiss: () -> Void
-    
+
     var body: some View {
-        HStack(alignment: .top, spacing: AppSpacing.medium) {
+        HStack(spacing: 12) {
             Image(systemName: message.type.iconName)
-                .font(.title3)
-                .foregroundColor(.white)
-            
+                .font(.system(size: 20))
+                .foregroundColor(message.type.iconColor)
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(message.title)
-                    .font(AppTypography.headline)
-                    .foregroundColor(.white)
-                
+                    .font(.headline)
+
                 if let description = message.description {
                     Text(description)
-                        .font(AppTypography.caption)
-                        .foregroundColor(.white.opacity(0.9))
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
                         .lineLimit(2)
                 }
             }
-            
+
             Spacer()
-            
+
             if let actionTitle = message.actionTitle, let action = message.action {
-                Button(action: action) {
-                    Text(actionTitle)
-                        .fontWeight(.medium)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.white.opacity(0.2))
-                .foregroundColor(.white)
+                Button(actionTitle, action: action)
+                    .buttonStyle(.bordered)
             }
-            
-            Button(action: onDismiss) {
-                Image(systemName: "xmark")
-                    .foregroundColor(.white.opacity(0.8))
-            }
-            .buttonStyle(.plain)
         }
-        .padding(AppSpacing.medium)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(message.type.color)
-                .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
-        )
-        // Add a clean border
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color.white.opacity(0.2), lineWidth: 1)
-        )
-        .padding(.horizontal)
+        .padding(12)
+        .frame(minWidth: 280, maxWidth: 400)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+        .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
     }
 }
 
-/// 消息横幅容器
+/// 消息容器
 struct MessageBannerContainer: View {
     @ObservedObject var messageManager: MessageManager
-    
+
     var body: some View {
-        VStack(spacing: AppSpacing.small) {
+        VStack(spacing: 8) {
             ForEach(messageManager.messages) { message in
                 MessageBannerView(message: message) {
                     messageManager.hide(message)
@@ -173,7 +153,7 @@ struct MessageBannerContainer: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .padding(.top, AppSpacing.medium)
-        .animation(.spring(), value: messageManager.messages.count)
+        .padding(.top, 12)
+        .animation(.easeInOut(duration: 0.25), value: messageManager.messages.count)
     }
 }
