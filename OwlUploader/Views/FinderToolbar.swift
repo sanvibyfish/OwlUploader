@@ -32,6 +32,9 @@ struct FinderToolbar: View {
     /// 是否禁用操作（加载中等）
     let isDisabled: Bool
 
+    /// 是否正在加载
+    var isLoading: Bool = false
+
     /// 选中的文件数量
     var selectedCount: Int = 0
 
@@ -158,6 +161,13 @@ struct FinderToolbar: View {
             .buttonStyle(ToolbarButtonStyle())
             .disabled(isDisabled)
             .help(L.Help.refresh)
+
+            // 加载指示器（内联，不阻塞）
+            if isLoading {
+                ProgressView()
+                    .scaleEffect(0.6)
+                    .frame(width: 20, height: 20)
+            }
         }
     }
 
@@ -339,7 +349,7 @@ struct ViewModePicker: View {
     VStack {
         FinderToolbar(
             searchText: .constant(""),
-            viewMode: .constant(.list),
+            viewMode: .constant(.table),
             sortOrder: .constant(.name),
             filterType: .constant(.all),
             canGoUp: true,

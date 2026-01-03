@@ -89,42 +89,48 @@ struct TableHeader: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            // 名称列
+            // 名称列（带最小宽度）
             TableColumnHeader(
                 title: L.Files.TableColumn.name,
                 isActive: sortOrder == .name || sortOrder == .nameDescending,
                 isAscending: sortOrder == .name,
-                width: nil
+                width: nil,
+                minWidth: 200,
+                alignment: .leading
             ) {
                 toggleSort(.name, .nameDescending)
             }
 
-            // 大小列
+            // 大小列（右对齐）
             TableColumnHeader(
                 title: L.Files.TableColumn.size,
                 isActive: sortOrder == .size || sortOrder == .sizeDescending,
                 isAscending: sortOrder == .size,
-                width: 80
+                width: 90,
+                alignment: .trailing
             ) {
                 toggleSort(.size, .sizeDescending)
             }
+            .padding(.trailing, 16)
 
             // 修改日期列
             TableColumnHeader(
                 title: L.Files.TableColumn.modified,
                 isActive: sortOrder == .date || sortOrder == .dateDescending,
                 isAscending: sortOrder == .date,
-                width: 120
+                width: 140,
+                alignment: .leading
             ) {
                 toggleSort(.date, .dateDescending)
             }
+            .padding(.trailing, 16)
 
             // 占位（操作区域）
             Spacer()
                 .frame(width: 80)
         }
         .padding(.horizontal, 12)
-        .frame(height: 24)
+        .frame(height: 28)
         .background(Color(nsColor: .controlBackgroundColor))
     }
 
@@ -144,6 +150,8 @@ struct TableColumnHeader: View {
     let isActive: Bool
     let isAscending: Bool
     let width: CGFloat?
+    var minWidth: CGFloat? = nil
+    var alignment: Alignment = .leading
     let onTap: () -> Void
 
     @State private var isHovering = false
@@ -151,6 +159,10 @@ struct TableColumnHeader: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 4) {
+                if alignment == .trailing {
+                    Spacer()
+                }
+
                 Text(title)
                     .font(.system(size: 11, weight: isActive ? .semibold : .regular))
                     .foregroundColor(isActive ? AppColors.primary : AppColors.textSecondary)
@@ -161,15 +173,17 @@ struct TableColumnHeader: View {
                         .foregroundColor(AppColors.primary)
                 }
 
-                Spacer()
+                if alignment == .leading {
+                    Spacer()
+                }
             }
             .padding(.horizontal, 8)
-            .frame(maxWidth: width ?? .infinity)
+            .frame(minWidth: minWidth ?? 0, idealWidth: width, maxWidth: width ?? .infinity)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .background(
-            isHovering ? Color.gray.opacity(0.1) : Color.clear
+            isHovering ? Color.gray.opacity(0.08) : Color.clear
         )
         .onHover { hovering in
             withAnimation(AppAnimations.hover) {
@@ -198,34 +212,60 @@ struct FileTableRow: View {
 
     @State private var isHovering = false
 
+    /// 缩略图URL
+    private var thumbnailURL: String? {
+        guard fileObject.isImage,
+              let r2Service = r2Service,
+              let bucketName = bucketName else { return nil }
+        return r2Service.generateFileURL(for: fileObject, in: bucketName)
+    }
+
     var body: some View {
         HStack(spacing: 0) {
-            // 图标 + 名称
-            HStack(spacing: 10) {
-                fileIcon
-                    .font(.system(size: 16))
-                    .frame(width: 20)
+            // 图标/缩略图 + 名称
+            HStack(spacing: 12) {
+                // 图标或缩略图（32x32）
+                ZStack {
+                    if fileObject.isImage, let url = thumbnailURL {
+                        // 图片文件显示缩略图
+                        AsyncThumbnailView(urlString: url, size: 32) {
+                            // 加载占位图（淡化，不阻塞）
+                            Image(systemName: "photo")
+                                .font(.system(size: 16))
+                                .foregroundColor(.purple.opacity(0.4))
+                                .frame(width: 32, height: 32)
+                        }
+                    } else {
+                        // 其他文件显示图标
+                        fileIcon
+                            .font(.system(size: 18))
+                            .frame(width: 32, height: 32)
+                    }
+                }
 
                 Text(fileObject.name)
-                    .font(.system(size: 13))
+                    .font(.system(size: 13, weight: isHovering ? .semibold : .regular))
                     .foregroundColor(AppColors.textPrimary)
                     .lineLimit(1)
                     .truncationMode(.middle)
 
                 Spacer()
             }
+            .frame(minWidth: 200)
 
-            // 大小
+            // 大小（右对齐，等宽数字）
             Text(fileObject.isDirectory ? "--" : fileObject.formattedSize)
                 .font(.system(size: 12).monospacedDigit())
                 .foregroundColor(AppColors.textSecondary)
-                .frame(width: 80, alignment: .leading)
+                .frame(width: 90, alignment: .trailing)
+                .padding(.trailing, 16)
 
             // 修改日期
             Text(fileObject.formattedLastModified)
                 .font(.system(size: 12))
                 .foregroundColor(AppColors.textSecondary)
-                .frame(width: 120, alignment: .leading)
+                .frame(width: 140, alignment: .leading)
+                .padding(.trailing, 16)
 
             // 操作按钮
             HStack(spacing: 8) {
@@ -259,12 +299,24 @@ struct FileTableRow: View {
             .transition(AppTransitions.hoverActions)
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(backgroundFillColor)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 0)
+                .fill(backgroundFillColor)
+        )
         .overlay(
             Rectangle()
-                .strokeBorder(isSelected ? AppColors.primary.opacity(0.5) : Color.clear, lineWidth: 1)
+                .fill(isSelected ? AppColors.primary.opacity(0.08) : Color.clear)
         )
+        .overlay(
+            alignment: .leading
+        ) {
+            if isSelected {
+                Rectangle()
+                    .fill(AppColors.primary)
+                    .frame(width: 3)
+            }
+        }
         .contentShape(Rectangle())
         .onHover { hovering in
             withAnimation(AppAnimations.hover) {
@@ -295,10 +347,8 @@ struct FileTableRow: View {
     }
 
     private var backgroundFillColor: Color {
-        if isSelected {
-            return AppColors.primary.opacity(0.12)
-        } else if isHovering {
-            return Color.gray.opacity(0.06)
+        if isHovering && !isSelected {
+            return Color(nsColor: .quaternaryLabelColor).opacity(0.5)
         } else {
             return Color.clear
         }

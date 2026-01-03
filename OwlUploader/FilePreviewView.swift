@@ -39,10 +39,24 @@ struct FilePreviewView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // 标题栏
+            // 标题栏（始终可见，包含关闭按钮）
             headerView
             
             Divider()
+            
+            // 内联加载指示器（不阻塞）
+            if isLoading {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text(L.Preview.loading)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity)
+                .background(Color(nsColor: .controlBackgroundColor))
+            }
             
             // 预览内容
             contentView
@@ -96,26 +110,16 @@ struct FilePreviewView: View {
     /// 内容视图
     @ViewBuilder
     private var contentView: some View {
-        if isLoading {
-            loadingView
-        } else if let error = errorMessage {
+        if let error = errorMessage {
             errorView(error)
-        } else {
+        } else if !isLoading {
+            // 只在加载完成后显示预览内容
             previewContent
+        } else {
+            // 加载中时显示空白（顶部有内联指示器）
+            Color.clear
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-    }
-    
-    /// 加载中视图
-    private var loadingView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .scaleEffect(1.5)
-
-            Text(L.Preview.loading)
-                .font(.body)
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     /// 错误视图

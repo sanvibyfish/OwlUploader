@@ -93,6 +93,7 @@ struct FileListView: View {
                     filterType: $filterType,
                     canGoUp: !currentPrefix.isEmpty,
                     isDisabled: !canLoadFiles || r2Service.isLoading,
+                    isLoading: r2Service.isLoading && !isInitialLoading,
                     selectedCount: selectionManager.selectedCount,
                     onGoUp: goUpOneLevel,
                     onRefresh: loadFileList,
@@ -212,7 +213,6 @@ struct FileListView: View {
             canGoUp: !currentPrefix.isEmpty
         ))
         .focusedValue(\.viewModeActions, ViewModeActions(
-            setListMode: { viewModeManager.setMode(.list) },
             setTableMode: { viewModeManager.setMode(.table) },
             setIconsMode: { viewModeManager.setMode(.icons) },
             currentMode: viewModeManager.currentMode
@@ -497,9 +497,6 @@ struct FileListView: View {
             // 根据视图模式显示不同的文件列表
             Group {
                 switch viewModeManager.currentMode {
-                case .list:
-                    // 旧列表视图（简化版）
-                    listModeView(files: filteredFiles)
                 case .table:
                     // 表格视图（带列头）
                     FileTableView(
@@ -540,30 +537,8 @@ struct FileListView: View {
                     )
                 }
             }
-            .overlay(
-                // 仅在加载文件列表时显示覆盖层（上传使用队列面板，不阻塞界面）
-                Group {
-                    if r2Service.isLoading && !isInitialLoading && !uploadQueueManager.isProcessing {
-                        Rectangle()
-                            .fill(Color.black.opacity(0.1))
-                            .overlay(
-                                VStack(spacing: 8) {
-                                    ProgressView()
-                                        .scaleEffect(1.2)
-                                    Text(L.Common.Label.loading)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                .padding()
-                                .background(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill(Color(NSColor.controlBackgroundColor))
-                                        .shadow(radius: 2)
-                                )
-                            )
-                    }
-                }
-            )
+            // 移除阻塞式 loading 覆盖层，改为在工具栏显示加载状态
+            // 用户可以在加载过程中继续交互
             .sheet(item: $fileToPreview) { file in
                 FilePreviewView(
                     r2Service: r2Service,
@@ -575,34 +550,6 @@ struct FileListView: View {
         }
     }
 
-    /// 列表模式视图
-    private func listModeView(files: [FileObject]) -> some View {
-        List {
-            ForEach(files, id: \.key) { fileObject in
-                FileListItemView(
-                    fileObject: fileObject,
-                    isSelected: selectionManager.isSelected(fileObject),
-                    r2Service: r2Service,
-                    bucketName: r2Service.selectedBucket?.name,
-                    messageManager: messageManager,
-                    onDeleteFile: { fileToDelete in
-                        requestDeleteFile(fileToDelete)
-                    },
-                    onDownloadFile: { file in
-                        downloadFile(file)
-                    }
-                )
-                .contentShape(Rectangle())
-                .onTapGesture(count: 2) {
-                    handleFileItemDoubleTap(fileObject)
-                }
-                .onTapGesture(count: 1) {
-                    handleFileItemTap(fileObject, allFiles: files)
-                }
-            }
-        }
-        .listStyle(PlainListStyle())
-    }
     
     /// 是否可以加载文件
     private var canLoadFiles: Bool {

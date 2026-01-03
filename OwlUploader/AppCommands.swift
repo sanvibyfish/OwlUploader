@@ -99,7 +99,6 @@ extension FocusedValues {
 }
 
 struct ViewModeActions {
-    var setListMode: () -> Void
     var setTableMode: () -> Void
     var setIconsMode: () -> Void
     var currentMode: FileViewMode
@@ -110,11 +109,6 @@ struct ViewModeCommands: Commands {
 
     var body: some Commands {
         CommandMenu(L.Commands.view) {
-            Button(L.Commands.listView) {
-                viewModeActions?.setListMode()
-            }
-            .keyboardShortcut("1", modifiers: .command)
-
             Button(L.Commands.tableView) {
                 viewModeActions?.setTableMode()
             }

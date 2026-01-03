@@ -10,7 +10,6 @@ import SwiftUI
 
 /// 文件视图模式
 enum FileViewMode: String, CaseIterable, Identifiable {
-    case list       // 简洁列表视图
     case table      // 表格视图（带列头，详细信息）
     case icons      // 图标网格视图
 
@@ -19,8 +18,6 @@ enum FileViewMode: String, CaseIterable, Identifiable {
     /// 模式对应的SF Symbol图标
     var iconName: String {
         switch self {
-        case .list:
-            return "list.bullet"
         case .table:
             return "tablecells"
         case .icons:
@@ -31,8 +28,6 @@ enum FileViewMode: String, CaseIterable, Identifiable {
     /// 模式名称（用于辅助功能）
     var displayName: String {
         switch self {
-        case .list:
-            return L.Files.ViewMode.list
         case .table:
             return L.Files.ViewMode.table
         case .icons:
@@ -43,8 +38,6 @@ enum FileViewMode: String, CaseIterable, Identifiable {
     /// 快捷键提示
     var keyboardShortcutHint: String {
         switch self {
-        case .list:
-            return "Cmd+1"
         case .table:
             return "Cmd+2"
         case .icons:
@@ -163,7 +156,7 @@ class ViewModeManager: ObservableObject {
            let mode = FileViewMode(rawValue: modeString) {
             self.currentMode = mode
         } else {
-            self.currentMode = .list
+            self.currentMode = .table  // 默认使用表格视图
         }
 
         if let sizeString = defaults.string(forKey: Keys.iconSize),
@@ -184,7 +177,7 @@ class ViewModeManager: ObservableObject {
 
     /// 切换视图模式
     func toggleMode() {
-        currentMode = currentMode == .list ? .icons : .list
+        currentMode = currentMode == .table ? .icons : .table
     }
 
     /// 设置视图模式
