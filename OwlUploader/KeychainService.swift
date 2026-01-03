@@ -39,6 +39,13 @@ class KeychainService {
     
     /// 共享实例
     static let shared = KeychainService()
+
+    private static let keychainQueueKey = DispatchSpecificKey<Void>()
+    private static let keychainQueue: DispatchQueue = {
+        let queue = DispatchQueue(label: "com.owluploader.keychain", qos: .userInitiated)
+        queue.setSpecific(key: keychainQueueKey, value: ())
+        return queue
+    }()
     
     private init() {}
     
@@ -65,25 +72,27 @@ class KeychainService {
     ///   - account: 账户标识符
     /// - Throws: KeychainError
     func store(_ data: Data, service: String, account: String) throws {
-        // 先尝试删除已存在的项目
-        try? delete(service: service, account: account)
-        
-        // 创建新的查询字典
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked
-        ]
-        
-        let status = SecItemAdd(query as CFDictionary, nil)
-        
-        guard status == errSecSuccess else {
-            if status == errSecDuplicateItem {
-                throw KeychainError.duplicateItem
-            } else {
-                throw KeychainError.unexpectedError(status: status)
+        try performKeychainOperation {
+            // 先尝试删除已存在的项目
+            try? delete(service: service, account: account)
+
+            // 创建新的查询字典
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: service,
+                kSecAttrAccount as String: account,
+                kSecValueData as String: data,
+                kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked
+            ]
+
+            let status = SecItemAdd(query as CFDictionary, nil)
+
+            guard status == errSecSuccess else {
+                if status == errSecDuplicateItem {
+                    throw KeychainError.duplicateItem
+                } else {
+                    throw KeychainError.unexpectedError(status: status)
+                }
             }
         }
     }
@@ -111,30 +120,32 @@ class KeychainService {
     /// - Returns: 存储的数据
     /// - Throws: KeychainError
     func retrieveData(service: String, account: String) throws -> Data {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-        
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        
-        guard status == errSecSuccess else {
-            if status == errSecItemNotFound {
-                throw KeychainError.itemNotFound
-            } else {
-                throw KeychainError.unexpectedError(status: status)
+        try performKeychainOperation {
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: service,
+                kSecAttrAccount as String: account,
+                kSecReturnData as String: true,
+                kSecMatchLimit as String: kSecMatchLimitOne
+            ]
+
+            var result: AnyObject?
+            let status = SecItemCopyMatching(query as CFDictionary, &result)
+
+            guard status == errSecSuccess else {
+                if status == errSecItemNotFound {
+                    throw KeychainError.itemNotFound
+                } else {
+                    throw KeychainError.unexpectedError(status: status)
+                }
             }
+
+            guard let data = result as? Data else {
+                throw KeychainError.invalidData
+            }
+
+            return data
         }
-        
-        guard let data = result as? Data else {
-            throw KeychainError.invalidData
-        }
-        
-        return data
     }
     
     /// 更新 Keychain 中的字符串值
@@ -158,23 +169,25 @@ class KeychainService {
     ///   - account: 账户标识符
     /// - Throws: KeychainError
     func update(_ data: Data, service: String, account: String) throws {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account
-        ]
-        
-        let updateAttributes: [String: Any] = [
-            kSecValueData as String: data
-        ]
-        
-        let status = SecItemUpdate(query as CFDictionary, updateAttributes as CFDictionary)
-        
-        guard status == errSecSuccess else {
-            if status == errSecItemNotFound {
-                throw KeychainError.itemNotFound
-            } else {
-                throw KeychainError.unexpectedError(status: status)
+        try performKeychainOperation {
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: service,
+                kSecAttrAccount as String: account
+            ]
+
+            let updateAttributes: [String: Any] = [
+                kSecValueData as String: data
+            ]
+
+            let status = SecItemUpdate(query as CFDictionary, updateAttributes as CFDictionary)
+
+            guard status == errSecSuccess else {
+                if status == errSecItemNotFound {
+                    throw KeychainError.itemNotFound
+                } else {
+                    throw KeychainError.unexpectedError(status: status)
+                }
             }
         }
     }
@@ -185,16 +198,18 @@ class KeychainService {
     ///   - account: 账户标识符
     /// - Throws: KeychainError
     func delete(service: String, account: String) throws {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account
-        ]
-        
-        let status = SecItemDelete(query as CFDictionary)
-        
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw KeychainError.unexpectedError(status: status)
+        try performKeychainOperation {
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: service,
+                kSecAttrAccount as String: account
+            ]
+
+            let status = SecItemDelete(query as CFDictionary)
+
+            guard status == errSecSuccess || status == errSecItemNotFound else {
+                throw KeychainError.unexpectedError(status: status)
+            }
         }
     }
     
@@ -210,6 +225,18 @@ class KeychainService {
         } catch {
             return false
         }
+    }
+
+    private func performKeychainOperation<T>(_ work: () throws -> T) throws -> T {
+        if DispatchQueue.getSpecific(key: Self.keychainQueueKey) != nil {
+            return try work()
+        }
+        if Thread.isMainThread {
+            return try Self.keychainQueue.sync {
+                try work()
+            }
+        }
+        return try work()
     }
 }
 

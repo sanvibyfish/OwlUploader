@@ -123,6 +123,18 @@ struct FileObject: Identifiable, Hashable {
     }
 }
 
+// MARK: - Equatable & Hashable
+
+extension FileObject {
+    static func == (lhs: FileObject, rhs: FileObject) -> Bool {
+        lhs.key == rhs.key
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(key)
+    }
+}
+
 // MARK: - Computed Properties
 
 extension FileObject {

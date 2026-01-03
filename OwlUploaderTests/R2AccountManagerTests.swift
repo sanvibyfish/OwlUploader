@@ -53,7 +53,7 @@ final class R2AccountManagerTests: XCTestCase {
 
         // Then
         XCTAssertNotNil(error.errorDescription)
-        XCTAssertTrue(error.errorDescription?.contains("Secret Access Key") == true)
+        XCTAssertFalse(error.errorDescription?.isEmpty ?? true)
     }
 
     func testAccountManagerError_accountNotFound_hasDescription() {

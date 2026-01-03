@@ -808,7 +808,7 @@ struct FileListView: View {
             } catch {
                 await MainActor.run {
                     self.isInitialLoading = false
-                    // 出错时清空列表，显示错误状态
+                    // 出错时才清空列表，显示错误状态
                     self.fileObjects = []
                     if let r2Error = error as? R2ServiceError {
                         messageManager.showError(r2Error)

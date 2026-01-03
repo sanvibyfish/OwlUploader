@@ -70,8 +70,20 @@ struct ContentView: View {
         .environmentObject(messageManager)
         .focusedValue(\.settingsActions, SettingsActions(openSettings: { showSettings = true }))
         .sheet(isPresented: $showSettings) {
-            AccountSettingsView()
-                .frame(width: 600, height: 500)
+            NavigationStack {
+                AccountSettingsView()
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") {
+                                showSettings = false
+                            }
+                        }
+                    }
+            }
+            .frame(width: 600, height: 500)
+            .environmentObject(r2Service)
+            .environmentObject(accountManager)
+            .environmentObject(messageManager)
         }
         .overlay(alignment: .topTrailing) {
             MessageBannerContainer(messageManager: messageManager)
