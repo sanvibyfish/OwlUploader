@@ -35,6 +35,6 @@ final class MoveQueueTaskTests: XCTestCase {
         )
 
         // Then
-        XCTAssertEqual(task.displayDetail, "→ 根目录")
+        XCTAssertEqual(task.displayDetail, "→ \(L.Move.rootDirectory)")
     }
 }

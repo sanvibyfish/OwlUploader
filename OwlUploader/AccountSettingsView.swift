@@ -2,79 +2,52 @@
 //  AccountSettingsView.swift
 //  OwlUploader
 //
-//  设置页面 - 账户管理
+//  设置页面 - macOS 原生 TabView 风格
 //
 
 import SwiftUI
 
-/// 设置视图
+// MARK: - 设置视图
+
 struct AccountSettingsView: View {
-    /// 账户管理器
     @EnvironmentObject var accountManager: R2AccountManager
-
-    /// R2服务
     @EnvironmentObject var r2Service: R2Service
-
-    /// 消息管理器
     @EnvironmentObject var messageManager: MessageManager
 
-    /// 语言管理器
-    @StateObject private var languageManager = LanguageManager.shared
-
-    /// 删除确认
     @State private var accountToDelete: R2Account?
     @State private var showDeleteConfirmation: Bool = false
-
-    /// 添加账户
     @State private var showAddAccountSheet: Bool = false
-
-    /// 编辑账户
     @State private var accountToEdit: R2Account?
-
-    /// 语言重启提示
     @State private var showRestartAlert: Bool = false
-    @State private var previousLanguage: String = ""
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // 页面标题
-                VStack(spacing: 8) {
-                    Text(L.Account.Settings.title)
-                        .font(.title2)
-                        .fontWeight(.semibold)
-
-                    Text(L.Account.Settings.subtitle)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.top, 20)
-
-                // 账户管理
-                accountsSection
-
-                // 上传设置
-                uploadSettingsSection
-
-                // 移动设置
-                moveSettingsSection
-
-                // 主题设置
-                themeSection
-
-                // 语言设置
-                languageSection
-
-                // 关于
-                aboutSection
-
-                Spacer(minLength: 40)
+        TabView {
+            // 账户标签页
+            AccountsTabView(
+                accountManager: accountManager,
+                r2Service: r2Service,
+                showAddAccountSheet: $showAddAccountSheet,
+                accountToEdit: $accountToEdit,
+                accountToDelete: $accountToDelete,
+                showDeleteConfirmation: $showDeleteConfirmation
+            )
+            .tabItem {
+                Label(L.Account.Settings.sectionTitle, systemImage: "person.crop.circle")
             }
-            .padding(.horizontal, 40)
+
+            // 通用设置标签页
+            GeneralTabView(showRestartAlert: $showRestartAlert)
+                .tabItem {
+                    Label(L.Settings.General.title, systemImage: "gearshape")
+                }
+
+            // 关于标签页
+            AboutTabView()
+                .tabItem {
+                    Label(L.About.title, systemImage: "info.circle")
+                }
         }
-        .navigationTitle(L.Account.Settings.title)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(AppColors.windowBackground)
+        .frame(width: 500, height: 400)
         .sheet(isPresented: $showAddAccountSheet) {
             AddAccountSheet(
                 accountManager: accountManager,
@@ -89,19 +62,13 @@ struct AccountSettingsView: View {
                 accountManager: accountManager,
                 r2Service: r2Service,
                 messageManager: messageManager,
-                onDismiss: {
-                    accountToEdit = nil
-                }
+                onDismiss: { accountToEdit = nil }
             )
         }
         .alert(L.Account.Delete.title, isPresented: $showDeleteConfirmation) {
-            Button(L.Common.Button.cancel, role: .cancel) {
-                accountToDelete = nil
-            }
+            Button(L.Common.Button.cancel, role: .cancel) { accountToDelete = nil }
             Button(L.Common.Button.delete, role: .destructive) {
-                if let account = accountToDelete {
-                    deleteAccount(account)
-                }
+                if let account = accountToDelete { deleteAccount(account) }
             }
         } message: {
             if let account = accountToDelete {
@@ -109,249 +76,30 @@ struct AccountSettingsView: View {
             }
         }
         .alert(L.Settings.Restart.title, isPresented: $showRestartAlert) {
-            Button(L.Settings.Restart.restartNow) {
-                restartApp()
-            }
+            Button(L.Settings.Restart.restartNow) { restartApp() }
             Button(L.Settings.Restart.later, role: .cancel) { }
         } message: {
             Text(L.Settings.Restart.message)
         }
-        .onAppear {
-            previousLanguage = languageManager.selectedLanguage
-        }
-        .onChange(of: languageManager.selectedLanguage) { oldValue, newValue in
-            if oldValue != newValue && !oldValue.isEmpty {
-                showRestartAlert = true
-            }
-            previousLanguage = newValue
-        }
     }
-
-    // MARK: - 账户管理区域
-
-    private var accountsSection: some View {
-        SettingsCard(title: L.Account.Settings.sectionTitle, icon: "person.crop.circle") {
-            if accountManager.accounts.isEmpty {
-                // 无账户状态
-                VStack(spacing: 12) {
-                    Image(systemName: "person.crop.circle.badge.plus")
-                        .font(.system(size: 32))
-                        .foregroundColor(.secondary)
-
-                    Text(L.Account.Settings.noAccounts)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-
-                    Button {
-                        showAddAccountSheet = true
-                    } label: {
-                        Label(L.Sidebar.Action.addAccount, systemImage: "plus")
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-            } else {
-                // 账户列表
-                VStack(spacing: 0) {
-                    ForEach(accountManager.accounts) { account in
-                        AccountRowView(
-                            account: account,
-                            isConnected: accountManager.currentAccount?.id == account.id && r2Service.isConnected,
-                            onEdit: {
-                                accountToEdit = account
-                            },
-                            onDelete: {
-                                accountToDelete = account
-                                showDeleteConfirmation = true
-                            }
-                        )
-
-                        if account.id != accountManager.accounts.last?.id {
-                            Divider()
-                        }
-                    }
-                }
-
-                Divider()
-                    .padding(.top, 8)
-
-                // 添加账户按钮
-                Button {
-                    showAddAccountSheet = true
-                } label: {
-                    Label(L.Sidebar.Action.addAccount, systemImage: "plus.circle")
-                        .font(.subheadline)
-                }
-                .buttonStyle(.plain)
-                .foregroundColor(AppColors.primary)
-                .padding(.top, 12)
-            }
-        }
-    }
-
-    // MARK: - 上传设置区域
-
-    /// 并发上传数设置值
-    @State private var concurrentUploads: Double = Double(UploadQueueManager.getMaxConcurrentUploads())
-
-    private var uploadSettingsSection: some View {
-        SettingsCard(title: L.Settings.Upload.title, icon: "arrow.up.circle") {
-            VStack(alignment: .leading, spacing: 16) {
-                // 并发上传数设置
-                HStack {
-                    Text(L.Settings.Upload.concurrentUploads)
-                        .font(.body)
-
-                    Spacer()
-
-                    TextField("1-10", value: $concurrentUploads, format: .number)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 60)
-                        .multilineTextAlignment(.trailing)
-                        .onChange(of: concurrentUploads) { _, newValue in
-                            let clamped = min(max(1.0, newValue), 50.0)
-                            if clamped != newValue {
-                                concurrentUploads = clamped
-                            }
-                            UploadQueueManager.setMaxConcurrentUploads(Int(clamped))
-                        }
-                }
-
-                Text(L.Settings.Upload.concurrentHint)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .padding(.vertical, 8)
-        }
-        .onAppear {
-            concurrentUploads = Double(UploadQueueManager.getMaxConcurrentUploads())
-        }
-    }
-
-    // MARK: - 移动设置区域
-
-    /// 并发移动数设置值
-    @State private var concurrentMoves: Double = Double(MoveQueueManager.getMaxConcurrentMoves())
-
-    private var moveSettingsSection: some View {
-        SettingsCard(title: L.Settings.Move.title, icon: "arrow.right.circle") {
-            VStack(alignment: .leading, spacing: 16) {
-                // 并发移动数设置
-                HStack {
-                    Text(L.Settings.Move.concurrentMoves)
-                        .font(.body)
-
-                    Spacer()
-
-                    TextField("1-10", value: $concurrentMoves, format: .number)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 60)
-                        .multilineTextAlignment(.trailing)
-                        .onChange(of: concurrentMoves) { _, newValue in
-                            let clamped = min(max(1.0, newValue), 10.0)
-                            if clamped != newValue {
-                                concurrentMoves = clamped
-                            }
-                            MoveQueueManager.setMaxConcurrentMoves(Int(clamped))
-                        }
-                }
-
-                Text(L.Settings.Move.concurrentHint)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .padding(.vertical, 8)
-        }
-        .onAppear {
-            concurrentMoves = Double(MoveQueueManager.getMaxConcurrentMoves())
-        }
-    }
-
-    // MARK: - 主题设置区域
-
-    @StateObject private var themeManager = ThemeManager.shared
-
-    private var themeSection: some View {
-        SettingsCard(title: L.Settings.Theme.title, icon: "paintbrush") {
-            VStack(alignment: .leading, spacing: 12) {
-                Picker(L.Settings.Theme.selectTheme, selection: $themeManager.selectedTheme) {
-                    ForEach(AppTheme.allCases, id: \.rawValue) { theme in
-                        Label(theme.displayName, systemImage: theme.icon)
-                            .tag(theme.rawValue)
-                    }
-                }
-                .pickerStyle(.menu)
-            }
-            .padding(.vertical, 8)
-        }
-    }
-
-    // MARK: - 语言设置区域
-
-    private var languageSection: some View {
-        SettingsCard(title: L.Settings.language, icon: "globe") {
-            VStack(alignment: .leading, spacing: 12) {
-                Picker(L.Settings.selectLanguage, selection: $languageManager.selectedLanguage) {
-                    ForEach(languageManager.availableLanguages, id: \.code) { lang in
-                        Text(lang.nativeName).tag(lang.code)
-                    }
-                }
-                .pickerStyle(.menu)
-
-                Text(L.Settings.languageHint)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .padding(.vertical, 8)
-        }
-    }
-
-    // MARK: - 关于区域
-
-    private var aboutSection: some View {
-        SettingsCard(title: L.About.title, icon: "info.circle") {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(L.Welcome.title)
-                        .font(.headline)
-                    Text(L.About.version("1.0.0"))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-
-                Image(systemName: "icloud.and.arrow.up")
-                    .font(.system(size: 32))
-                    .foregroundColor(.blue)
-            }
-            .padding(.vertical, 8)
-        }
-    }
-
-    // MARK: - 私有方法
 
     private func deleteAccount(_ account: R2Account) {
-        // 如果是当前连接的账户，先断开
         if accountManager.currentAccount?.id == account.id {
             r2Service.disconnect()
         }
-
-        // 删除账户
         do {
             try accountManager.deleteAccount(account)
-            messageManager.showSuccess(L.Message.Success.accountDeleted, description: L.Message.Success.accountDeletedDescription(account.displayName))
+            messageManager.showSuccess(
+                L.Message.Success.accountDeleted,
+                description: L.Message.Success.accountDeletedDescription(account.displayName)
+            )
         } catch {
             messageManager.showError(L.Message.Error.deleteFailed, description: error.localizedDescription)
         }
-
         accountToDelete = nil
     }
 
-    /// 重启应用
     private func restartApp() {
-        // 使用 NSApp 重启应用
         let url = URL(fileURLWithPath: Bundle.main.resourcePath!)
         let path = url.deletingLastPathComponent().deletingLastPathComponent().absoluteString
         let task = Process()
@@ -362,130 +110,214 @@ struct AccountSettingsView: View {
     }
 }
 
-// MARK: - 账户行视图
+// MARK: - 账户标签页
 
-struct AccountRowView: View {
-    let account: R2Account
-    let isConnected: Bool
-    let onEdit: () -> Void
-    let onDelete: () -> Void
-
-    @State private var isHovering: Bool = false
+struct AccountsTabView: View {
+    @ObservedObject var accountManager: R2AccountManager
+    @ObservedObject var r2Service: R2Service
+    @Binding var showAddAccountSheet: Bool
+    @Binding var accountToEdit: R2Account?
+    @Binding var accountToDelete: R2Account?
+    @Binding var showDeleteConfirmation: Bool
 
     var body: some View {
-        HStack(spacing: 12) {
-            // 状态指示器
-            Circle()
-                .fill(isConnected ? Color.green : Color.gray.opacity(0.3))
-                .frame(width: 8, height: 8)
+        Form {
+            Section {
+                ForEach(accountManager.accounts) { account in
+                    HStack {
+                        // 账户信息
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(account.displayName)
+                            Text(account.accessKeyID)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
 
-            // 账户信息
-            VStack(alignment: .leading, spacing: 2) {
-                Text(account.displayName)
-                    .font(.body)
-                    .foregroundColor(AppColors.textPrimary)
+                        Spacer()
 
-                HStack(spacing: 8) {
-                    Text(account.accessKeyID)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        // 连接状态
+                        if accountManager.currentAccount?.id == account.id && r2Service.isConnected {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                        }
 
-                    if !account.bucketNames.isEmpty {
-                        Text("•")
-                            .foregroundColor(.secondary)
-                        Text(L.Account.Status.bucketsCount(account.bucketNames.count))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        // 编辑按钮
+                        Button {
+                            accountToEdit = account
+                        } label: {
+                            Image(systemName: "pencil")
+                        }
+                        .buttonStyle(.borderless)
+
+                        // 删除按钮
+                        Button {
+                            accountToDelete = account
+                            showDeleteConfirmation = true
+                        } label: {
+                            Image(systemName: "trash")
+                                .foregroundColor(.red)
+                        }
+                        .buttonStyle(.borderless)
                     }
+                    .padding(.vertical, 2)
+                }
 
-                    if !account.publicDomains.isEmpty {
-                        Text("•")
-                            .foregroundColor(.secondary)
-                        Text(L.Account.Status.domainsCount(account.publicDomains.count))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                // 添加账户按钮
+                Button {
+                    showAddAccountSheet = true
+                } label: {
+                    Label(L.Sidebar.Action.addAccount, systemImage: "plus")
                 }
             }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+// MARK: - 通用设置标签页
+
+struct GeneralTabView: View {
+    @Binding var showRestartAlert: Bool
+
+    @StateObject private var themeManager = ThemeManager.shared
+    @StateObject private var languageManager = LanguageManager.shared
+    @State private var concurrentUploads: Double = Double(UploadQueueManager.getMaxConcurrentUploads())
+    @State private var concurrentMoves: Double = Double(MoveQueueManager.getMaxConcurrentMoves())
+    @State private var previousLanguage: String = ""
+
+    var body: some View {
+        Form {
+            // 外观设置
+            Section {
+                Picker(L.Settings.Theme.selectTheme, selection: $themeManager.selectedTheme) {
+                    ForEach(AppTheme.allCases, id: \.rawValue) { theme in
+                        Label(theme.displayName, systemImage: theme.icon)
+                            .tag(theme.rawValue)
+                    }
+                }
+
+                Picker(L.Settings.selectLanguage, selection: $languageManager.selectedLanguage) {
+                    ForEach(languageManager.availableLanguages, id: \.code) { lang in
+                        Text(lang.nativeName).tag(lang.code)
+                    }
+                }
+            } header: {
+                Text(L.Settings.Theme.title)
+            } footer: {
+                Text(L.Settings.languageHint)
+            }
+
+            // 上传设置
+            Section {
+                Stepper(value: $concurrentUploads, in: 1...50, step: 1) {
+                    HStack {
+                        Text(L.Settings.Upload.concurrentUploads)
+                        Spacer()
+                        Text("\(Int(concurrentUploads))")
+                            .foregroundColor(.secondary)
+                            .monospacedDigit()
+                    }
+                }
+                .onChange(of: concurrentUploads) { _, newValue in
+                    UploadQueueManager.setMaxConcurrentUploads(Int(newValue))
+                }
+            } header: {
+                Text(L.Settings.Upload.title)
+            } footer: {
+                Text(L.Settings.Upload.concurrentHint)
+            }
+
+            // 移动设置
+            Section {
+                Stepper(value: $concurrentMoves, in: 1...10, step: 1) {
+                    HStack {
+                        Text(L.Settings.Move.concurrentMoves)
+                        Spacer()
+                        Text("\(Int(concurrentMoves))")
+                            .foregroundColor(.secondary)
+                            .monospacedDigit()
+                    }
+                }
+                .onChange(of: concurrentMoves) { _, newValue in
+                    MoveQueueManager.setMaxConcurrentMoves(Int(newValue))
+                }
+            } header: {
+                Text(L.Settings.Move.title)
+            } footer: {
+                Text(L.Settings.Move.concurrentHint)
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle(L.Settings.General.title)
+        .onAppear {
+            concurrentUploads = Double(UploadQueueManager.getMaxConcurrentUploads())
+            concurrentMoves = Double(MoveQueueManager.getMaxConcurrentMoves())
+            previousLanguage = languageManager.selectedLanguage
+        }
+        .onChange(of: languageManager.selectedLanguage) { oldValue, newValue in
+            if oldValue != newValue && !oldValue.isEmpty {
+                showRestartAlert = true
+            }
+            previousLanguage = newValue
+        }
+    }
+}
+
+// MARK: - 关于标签页
+
+struct AboutTabView: View {
+    var body: some View {
+        VStack(spacing: 0) {
+            Spacer()
+
+            // 应用图标
+            if let appIcon = NSApplication.shared.applicationIconImage {
+                Image(nsImage: appIcon)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 96, height: 96)
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+            }
+
+            Spacer().frame(height: 16)
+
+            Text(L.Welcome.title)
+                .font(.title2)
+                .fontWeight(.semibold)
+
+            Spacer().frame(height: 4)
+
+            Text(L.About.version(appVersion))
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+
+            Spacer().frame(height: 24)
+
+            Text(L.Welcome.subtitle)
+                .font(.body)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 300)
 
             Spacer()
 
-            // 连接状态标签
-            if isConnected {
-                Text(L.Common.Status.connected)
-                    .font(.caption)
-                    .foregroundColor(.green)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.green.opacity(0.1))
-                    .cornerRadius(4)
-            }
-
-            // 操作按钮（hover时显示）
-            if isHovering {
-                HStack(spacing: 8) {
-                    Button(action: onEdit) {
-                        Image(systemName: "pencil")
-                            .foregroundColor(AppColors.primary)
-                    }
-                    .buttonStyle(.plain)
-                    .help(L.Help.editAccount)
-
-                    Button(action: onDelete) {
-                        Image(systemName: "trash")
-                            .foregroundColor(AppColors.destructive)
-                    }
-                    .buttonStyle(.plain)
-                    .help(L.Help.deleteAccount)
-                }
-                .transition(AppTransitions.hoverActions)
-            }
+            Text(L.About.copyright)
+                .font(.caption)
+                .foregroundColor(AppColors.textTertiary)
+                .padding(.bottom, 20)
         }
-        .padding(.vertical, 10)
-        .contentShape(Rectangle())
-        .onHover { hovering in
-            withAnimation(AppAnimations.hover) {
-                isHovering = hovering
-            }
-        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .navigationTitle(L.About.title)
+    }
+
+    private var appVersion: String {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+        return "\(version) (\(build))"
     }
 }
 
-// MARK: - 设置卡片组件
-
-struct SettingsCard<Content: View>: View {
-    let title: String
-    let icon: String
-    @ViewBuilder let content: Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // 卡片标题
-            HStack(spacing: 8) {
-                Image(systemName: icon)
-                    .foregroundColor(AppColors.primary)
-                Text(title)
-                    .font(.headline)
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 16)
-            .padding(.bottom, 12)
-
-            // 卡片内容
-            VStack(spacing: 0) {
-                content
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 16)
-        }
-        .background(AppColors.contentBackground)
-        .cornerRadius(10)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(AppColors.border, lineWidth: 1)
-        )
-    }
-}
 
 // MARK: - 编辑账户表单
 
@@ -514,136 +346,112 @@ struct EditAccountSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack {
-                Button(L.Common.Button.cancel) { onDismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Spacer()
-                Text(L.Account.Edit.title)
-                    .font(.headline)
-                Spacer()
-                Button(L.Common.Button.save) { saveAccount() }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(isSaving || !isFormValid)
-            }
-            .padding()
-
-            Divider()
-
-            // Content
             Form {
-                Section(L.Account.Add.accountInfo) {
+                Section {
+                    TextField(L.Account.Field.displayName, text: $displayName)
                     TextField(L.Account.Field.accountID, text: $accountID)
                         .textContentType(.username)
-                        .textFieldStyle(.roundedBorder)
-
-                    TextField(L.Account.Field.accessKeyID, text: $accessKeyID)
-                        .textContentType(.username)
-                        .textFieldStyle(.roundedBorder)
-
-                    SecureField(L.Account.Field.secretAccessKeyHint, text: $secretAccessKey)
-                        .textContentType(.password)
-                        .textFieldStyle(.roundedBorder)
-
-                    TextField(L.Account.Field.displayName, text: $displayName)
-                        .textFieldStyle(.roundedBorder)
+                } header: {
+                    Text(L.Account.Add.accountInfo)
                 }
 
-                Section(L.Account.Add.endpoint) {
+                Section {
+                    TextField(L.Account.Field.accessKeyID, text: $accessKeyID)
+                    SecureField(L.Account.Field.secretAccessKey, text: $secretAccessKey)
+                } header: {
+                    Text(L.Account.Add.credentials)
+                }
+
+                Section {
                     TextField(L.Account.Field.endpointURL, text: $endpointURL)
                         .textContentType(.URL)
-                        .textFieldStyle(.roundedBorder)
+                } header: {
+                    Text(L.Account.Add.endpoint)
+                } footer: {
                     Text(L.Account.Field.endpointHint)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
                 }
 
-                Section(L.Account.Add.publicDomains) {
-                    // 重要提示：缩略图功能说明
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(L.Account.Domain.featureHint)
-                            .font(.caption)
-                            .foregroundColor(.orange)
-                            .fixedSize(horizontal: false, vertical: true)
-                        
-                        Text(L.Account.Domain.configGuide)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .padding(.vertical, 4)
-                    
-                    Divider()
-                    
-                    // 已添加的域名列表
-                    if publicDomains.isEmpty {
-                        Text(L.Account.Domain.empty)
-                            .foregroundColor(.secondary)
-                            .font(.subheadline)
-                    } else {
-                        ForEach(Array(publicDomains.enumerated()), id: \.offset) { index, domain in
-                            HStack(spacing: 12) {
-                                // 默认标记
-                                Button {
-                                    withAnimation { defaultDomainIndex = index }
-                                } label: {
-                                    Image(systemName: defaultDomainIndex == index ? "star.fill" : "star")
-                                        .foregroundColor(defaultDomainIndex == index ? .yellow : .gray)
-                                }
-                                .buttonStyle(.borderless)
-                                .help(defaultDomainIndex == index ? L.Account.Domain.isDefault : L.Account.Domain.setDefault)
-
-                                Text(domain)
-                                    .font(.system(.body, design: .monospaced))
-
-                                Spacer()
-
-                                // 删除按钮
-                                Button {
-                                    withAnimation { removeDomain(at: index) }
-                                } label: {
-                                    Image(systemName: "trash")
-                                        .foregroundColor(.red)
-                                }
-                                .buttonStyle(.borderless)
-                                .help(L.Account.Domain.remove)
+                Section {
+                    ForEach(Array(publicDomains.enumerated()), id: \.offset) { index, domain in
+                        HStack {
+                            Text(domain)
+                            Spacer()
+                            if defaultDomainIndex == index {
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(.accentColor)
                             }
+                            Button {
+                                publicDomains.remove(at: index)
+                                if defaultDomainIndex >= publicDomains.count {
+                                    defaultDomainIndex = max(0, publicDomains.count - 1)
+                                }
+                            } label: {
+                                Image(systemName: "minus.circle.fill")
+                                    .foregroundColor(.red)
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            defaultDomainIndex = index
                         }
                     }
 
-                    // 添加新域名
-                    HStack(spacing: 8) {
+                    HStack {
                         TextField(L.Account.Domain.placeholder, text: $newDomain)
-                            .textFieldStyle(.roundedBorder)
                             .onSubmit { addDomain() }
-
-                        Button(L.Common.Button.add) {
+                        Button {
                             addDomain()
+                        } label: {
+                            Image(systemName: "plus")
                         }
-                        .disabled(newDomain.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
+                        .disabled(newDomain.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
-
-                    Text(L.Account.Domain.defaultHint)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                } header: {
+                    Text(L.Account.Add.publicDomains)
+                } footer: {
+                    Text(L.Account.Domain.hint)
                 }
 
                 if let error = saveError {
                     Section {
-                        Text(error)
+                        Label(error, systemImage: "exclamationmark.triangle")
                             .foregroundColor(.red)
                     }
                 }
             }
             .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
             .disabled(isSaving)
 
-            if isSaving {
-                ProgressView(L.Account.Edit.saving)
-                    .padding()
+            Divider()
+
+            // 底部按钮栏 - macOS 标准布局
+            HStack {
+                if isSaving {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                    Text(L.Account.Edit.saving)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                Button(L.Common.Button.cancel) {
+                    onDismiss()
+                }
+                .keyboardShortcut(.cancelAction)
+
+                Button(L.Common.Button.save) {
+                    saveAccount()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(!isFormValid || isSaving)
             }
+            .padding()
         }
-        .frame(width: 500, height: 600)
+        .frame(width: 450, height: 480)
         .onAppear {
             accountID = account.accountID
             accessKeyID = account.accessKeyID
@@ -651,33 +459,26 @@ struct EditAccountSheet: View {
             endpointURL = account.endpointURL
             publicDomains = account.publicDomains
             defaultDomainIndex = account.defaultPublicDomainIndex
+
+            // 从 Keychain 加载 Secret Access Key
+            if let credentials = try? accountManager.getCompleteCredentials(for: account) {
+                secretAccessKey = credentials.secretAccessKey
+            }
         }
     }
 
     private func addDomain() {
         let trimmed = newDomain.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty, !publicDomains.contains(trimmed) else { return }
-        withAnimation {
-            publicDomains.append(trimmed)
-            if publicDomains.count == 1 {
-                defaultDomainIndex = 0
-            }
+        publicDomains.append(trimmed)
+        if publicDomains.count == 1 {
+            defaultDomainIndex = 0
         }
         newDomain = ""
     }
 
-    private func removeDomain(at index: Int) {
-        publicDomains.remove(at: index)
-        if defaultDomainIndex >= publicDomains.count {
-            defaultDomainIndex = max(0, publicDomains.count - 1)
-        }
-    }
-
     private func saveAccount() {
-        withAnimation(AppAnimations.standard) {
-            isSaving = true
-            saveError = nil
-        }
+        withAnimation { isSaving = true; saveError = nil }
 
         let trimmedAccountID = accountID.trimmingCharacters(in: .whitespaces)
         let trimmedAccessKeyID = accessKeyID.trimmingCharacters(in: .whitespaces)
@@ -694,36 +495,29 @@ struct EditAccountSheet: View {
             defaultPublicDomainIndex: defaultDomainIndex
         )
 
-        // 使用 Task 避免 Keychain 操作阻塞主线程
         Task {
             do {
-                // 如果提供了新的 Secret Key，则更新
                 if !trimmedSecretKey.isEmpty {
                     try accountManager.updateAccount(updatedAccount, secretAccessKey: trimmedSecretKey)
                 } else {
                     try accountManager.updateAccount(updatedAccount)
                 }
 
-                // 如果是当前连接的账户，需要重新初始化
-                if accountManager.currentAccount?.id == account.id {
-                    if !trimmedSecretKey.isEmpty {
-                        try? await r2Service.initialize(with: updatedAccount, secretAccessKey: trimmedSecretKey)
-                    }
+                if accountManager.currentAccount?.id == account.id && !trimmedSecretKey.isEmpty {
+                    try? await r2Service.initialize(with: updatedAccount, secretAccessKey: trimmedSecretKey)
                 }
 
                 await MainActor.run {
-                    withAnimation(AppAnimations.standard) {
-                        isSaving = false
-                    }
-                    messageManager.showSuccess(L.Message.Success.accountSaved, description: L.Message.Success.accountSavedDescription(updatedAccount.displayName))
+                    withAnimation { isSaving = false }
+                    messageManager.showSuccess(
+                        L.Message.Success.accountSaved,
+                        description: L.Message.Success.accountSavedDescription(updatedAccount.displayName)
+                    )
                     onDismiss()
                 }
             } catch {
                 await MainActor.run {
-                    withAnimation(AppAnimations.standard) {
-                        isSaving = false
-                        saveError = error.localizedDescription
-                    }
+                    withAnimation { isSaving = false; saveError = error.localizedDescription }
                 }
             }
         }
@@ -737,5 +531,4 @@ struct EditAccountSheet: View {
         .environmentObject(MessageManager())
         .environmentObject(R2Service.shared)
         .environmentObject(R2AccountManager.shared)
-        .frame(width: 600, height: 500)
 }

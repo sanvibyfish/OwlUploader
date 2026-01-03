@@ -317,118 +317,112 @@ struct AddAccountSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack {
-                Button(L.Common.Button.cancel) { onDismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Spacer()
-                Text(L.Account.Add.title)
-                    .font(.headline)
-                Spacer()
-                Button(L.Common.Button.add) { addAccount() }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(!isFormValid || isTesting)
+            Form {
+                Section {
+                    TextField(L.Account.Field.displayName, text: $displayName)
+                    TextField(L.Account.Field.accountID, text: $accountID)
+                        .textContentType(.username)
+                } header: {
+                    Text(L.Account.Add.accountInfo)
+                }
+
+                Section {
+                    TextField(L.Account.Field.accessKeyID, text: $accessKeyID)
+                    SecureField(L.Account.Field.secretAccessKey, text: $secretAccessKey)
+                } header: {
+                    Text(L.Account.Add.credentials)
+                }
+
+                Section {
+                    TextField(L.Account.Field.endpointURL, text: $endpointURL)
+                        .textContentType(.URL)
+                } header: {
+                    Text(L.Account.Add.endpoint)
+                } footer: {
+                    Text(L.Account.Field.endpointHint)
+                }
+
+                Section {
+                    ForEach(Array(publicDomains.enumerated()), id: \.offset) { index, domain in
+                        HStack {
+                            Text(domain)
+                            Spacer()
+                            if defaultDomainIndex == index {
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(.accentColor)
+                            }
+                            Button {
+                                publicDomains.remove(at: index)
+                                if defaultDomainIndex >= publicDomains.count {
+                                    defaultDomainIndex = max(0, publicDomains.count - 1)
+                                }
+                            } label: {
+                                Image(systemName: "minus.circle.fill")
+                                    .foregroundColor(.red)
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            defaultDomainIndex = index
+                        }
+                    }
+
+                    HStack {
+                        TextField(L.Account.Domain.placeholder, text: $newDomain)
+                            .onSubmit { addDomain() }
+                        Button {
+                            addDomain()
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                        .disabled(newDomain.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                } header: {
+                    Text(L.Account.Add.publicDomains)
+                } footer: {
+                    Text(L.Account.Domain.hint)
+                }
+
+                if let error = testError {
+                    Section {
+                        Label(error, systemImage: "exclamationmark.triangle")
+                            .foregroundColor(.red)
+                    }
+                }
             }
-            .padding()
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+            .disabled(isTesting)
 
             Divider()
 
-            // Form
-            ScrollView {
-                Form {
-                    Section(L.Account.Add.accountInfo) {
-                        TextField(L.Account.Field.displayName, text: $displayName)
-                        TextField(L.Account.Field.accountID, text: $accountID)
-                            .textContentType(.username)
-                    }
-
-                    Section(L.Account.Add.credentials) {
-                        TextField(L.Account.Field.accessKeyID, text: $accessKeyID)
-                            .textContentType(.username)
-                        SecureField(L.Account.Field.secretAccessKey, text: $secretAccessKey)
-                            .textContentType(.password)
-                    }
-
-                    Section(L.Account.Add.endpoint) {
-                        TextField(L.Account.Field.endpointURL, text: $endpointURL)
-                            .textContentType(.URL)
-                        Text(L.Account.Field.endpointHint)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-
-                    Section(L.Account.Add.publicDomains) {
-                        // 已添加的域名列表
-                        if publicDomains.isEmpty {
-                            Text(L.Account.Domain.empty)
-                                .foregroundColor(.secondary)
-                                .font(.subheadline)
-                        } else {
-                            ForEach(Array(publicDomains.enumerated()), id: \.offset) { index, domain in
-                                HStack(spacing: 12) {
-                                    // 默认标记
-                                    Button {
-                                        withAnimation { defaultDomainIndex = index }
-                                    } label: {
-                                        Image(systemName: defaultDomainIndex == index ? "star.fill" : "star")
-                                            .foregroundColor(defaultDomainIndex == index ? .yellow : .gray)
-                                    }
-                                    .buttonStyle(.borderless)
-                                    .help(defaultDomainIndex == index ? L.Account.Domain.isDefault : L.Account.Domain.setDefault)
-
-                                    Text(domain)
-                                        .font(.system(.body, design: .monospaced))
-
-                                    Spacer()
-
-                                    // 删除按钮
-                                    Button {
-                                        withAnimation { removeDomain(at: index) }
-                                    } label: {
-                                        Image(systemName: "trash")
-                                            .foregroundColor(.red)
-                                    }
-                                    .buttonStyle(.borderless)
-                                    .help(L.Account.Domain.remove)
-                                }
-                            }
-                        }
-
-                        // 添加新域名
-                        HStack(spacing: 8) {
-                            TextField(L.Account.Domain.placeholder, text: $newDomain)
-                                .textFieldStyle(.roundedBorder)
-                                .onSubmit { addDomain() }
-
-                            Button(L.Common.Button.add) {
-                                addDomain()
-                            }
-                            .disabled(newDomain.trimmingCharacters(in: .whitespaces).isEmpty)
-                        }
-
-                        Text(L.Account.Domain.defaultHint)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-
-                    if let error = testError {
-                        Section {
-                            Text(error)
-                                .foregroundColor(.red)
-                                .font(.caption)
-                        }
-                    }
+            // 底部按钮栏 - macOS 标准布局
+            HStack {
+                if isTesting {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                    Text(L.Account.Add.testingConnection)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
-                .formStyle(.grouped)
-                .disabled(isTesting)
-            }
 
-            if isTesting {
-                ProgressView(L.Account.Add.testingConnection)
-                    .padding()
+                Spacer()
+
+                Button(L.Common.Button.cancel) {
+                    onDismiss()
+                }
+                .keyboardShortcut(.cancelAction)
+
+                Button(L.Common.Button.add) {
+                    addAccount()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(!isFormValid || isTesting)
             }
+            .padding()
         }
-        .frame(width: 500, height: 600)
+        .frame(width: 450, height: 520)
     }
 
     private var isFormValid: Bool {
@@ -440,21 +434,11 @@ struct AddAccountSheet: View {
     private func addDomain() {
         let trimmed = newDomain.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty, !publicDomains.contains(trimmed) else { return }
-        withAnimation {
-            publicDomains.append(trimmed)
-            if publicDomains.count == 1 {
-                defaultDomainIndex = 0
-            }
+        publicDomains.append(trimmed)
+        if publicDomains.count == 1 {
+            defaultDomainIndex = 0
         }
         newDomain = ""
-    }
-
-    private func removeDomain(at index: Int) {
-        publicDomains.remove(at: index)
-        // 调整默认索引
-        if defaultDomainIndex >= publicDomains.count {
-            defaultDomainIndex = max(0, publicDomains.count - 1)
-        }
     }
 
     private func addAccount() {

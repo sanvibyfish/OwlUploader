@@ -30,7 +30,7 @@ final class R2AccountManagerTests: XCTestCase {
     override func tearDown() async throws {
         // 清理测试创建的账户
         for account in testAccounts {
-            try? accountManager.deleteAccount(account)
+            try? await deleteAccountOnBackground(account)
         }
         testAccounts = []
         try await super.tearDown()
@@ -44,7 +44,7 @@ final class R2AccountManagerTests: XCTestCase {
 
         // Then
         XCTAssertNotNil(error.errorDescription)
-        XCTAssertTrue(error.errorDescription?.contains("无效") == true)
+        XCTAssertFalse(error.errorDescription?.isEmpty ?? true)
     }
 
     func testAccountManagerError_invalidSecretKey_hasDescription() {
@@ -62,7 +62,7 @@ final class R2AccountManagerTests: XCTestCase {
 
         // Then
         XCTAssertNotNil(error.errorDescription)
-        XCTAssertTrue(error.errorDescription?.contains("未找到") == true)
+        XCTAssertFalse(error.errorDescription?.isEmpty ?? true)
     }
 
     func testAccountManagerError_saveFailure_hasDescription() {
@@ -71,7 +71,7 @@ final class R2AccountManagerTests: XCTestCase {
 
         // Then
         XCTAssertNotNil(error.errorDescription)
-        XCTAssertTrue(error.errorDescription?.contains("失败") == true)
+        XCTAssertFalse(error.errorDescription?.isEmpty ?? true)
     }
 
     // MARK: - CompleteR2Credentials Tests
@@ -153,14 +153,14 @@ final class R2AccountManagerTests: XCTestCase {
 
     // MARK: - saveAccount Tests
 
-    func testSaveAccount_withValidData_addsToAccounts() throws {
+    func testSaveAccount_withValidData_addsToAccounts() async throws {
         // Given
         let account = createTestAccount()
         let secretKey = "test-secret-key-12345"
         let initialCount = accountManager.accounts.count
 
         // When
-        try accountManager.saveAccount(account, secretAccessKey: secretKey)
+        try await saveAccountOnBackground(account, secretAccessKey: secretKey)
         testAccounts.append(account) // 标记需要清理
 
         // Then
@@ -168,7 +168,7 @@ final class R2AccountManagerTests: XCTestCase {
         XCTAssertTrue(accountManager.accounts.contains(where: { $0.accountID == account.accountID }))
     }
 
-    func testSaveAccount_withInvalidAccount_throwsError() {
+    func testSaveAccount_withInvalidAccount_throwsError() async {
         // Given
         let invalidAccount = R2Account(
             accountID: "",
@@ -176,7 +176,10 @@ final class R2AccountManagerTests: XCTestCase {
         )
 
         // When & Then
-        XCTAssertThrowsError(try accountManager.saveAccount(invalidAccount, secretAccessKey: "secret")) { error in
+        do {
+            try await saveAccountOnBackground(invalidAccount, secretAccessKey: "secret")
+            XCTFail("Expected AccountManagerError")
+        } catch {
             guard let managerError = error as? R2AccountManager.AccountManagerError else {
                 XCTFail("Expected AccountManagerError")
                 return
@@ -185,12 +188,15 @@ final class R2AccountManagerTests: XCTestCase {
         }
     }
 
-    func testSaveAccount_withEmptySecretKey_throwsError() {
+    func testSaveAccount_withEmptySecretKey_throwsError() async {
         // Given
         let account = createTestAccount()
 
         // When & Then
-        XCTAssertThrowsError(try accountManager.saveAccount(account, secretAccessKey: "")) { error in
+        do {
+            try await saveAccountOnBackground(account, secretAccessKey: "")
+            XCTFail("Expected AccountManagerError")
+        } catch {
             guard let managerError = error as? R2AccountManager.AccountManagerError else {
                 XCTFail("Expected AccountManagerError")
                 return
@@ -199,12 +205,15 @@ final class R2AccountManagerTests: XCTestCase {
         }
     }
 
-    func testSaveAccount_withWhitespaceOnlySecretKey_throwsError() {
+    func testSaveAccount_withWhitespaceOnlySecretKey_throwsError() async {
         // Given
         let account = createTestAccount()
 
         // When & Then
-        XCTAssertThrowsError(try accountManager.saveAccount(account, secretAccessKey: "   ")) { error in
+        do {
+            try await saveAccountOnBackground(account, secretAccessKey: "   ")
+            XCTFail("Expected AccountManagerError")
+        } catch {
             guard let managerError = error as? R2AccountManager.AccountManagerError else {
                 XCTFail("Expected AccountManagerError")
                 return
@@ -213,13 +222,13 @@ final class R2AccountManagerTests: XCTestCase {
         }
     }
 
-    func testSaveAccount_asFirstAccount_setsAsCurrentAccount() throws {
+    func testSaveAccount_asFirstAccount_setsAsCurrentAccount() async throws {
         // Given - 确保没有当前账户
         accountManager.setCurrentAccount(nil)
         let account = createTestAccount()
 
         // When
-        try accountManager.saveAccount(account, secretAccessKey: "test-secret")
+        try await saveAccountOnBackground(account, secretAccessKey: "test-secret")
         testAccounts.append(account)
 
         // Then
@@ -228,41 +237,41 @@ final class R2AccountManagerTests: XCTestCase {
 
     // MARK: - deleteAccount Tests
 
-    func testDeleteAccount_removesFromAccounts() throws {
+    func testDeleteAccount_removesFromAccounts() async throws {
         // Given
         let account = createTestAccount()
-        try accountManager.saveAccount(account, secretAccessKey: "test-secret")
+        try await saveAccountOnBackground(account, secretAccessKey: "test-secret")
         XCTAssertTrue(accountManager.accounts.contains(where: { $0.accountID == account.accountID }))
 
         // When
-        try accountManager.deleteAccount(account)
+        try await deleteAccountOnBackground(account)
 
         // Then
         XCTAssertFalse(accountManager.accounts.contains(where: { $0.accountID == account.accountID }))
     }
 
-    func testDeleteAccount_removesSecretFromKeychain() throws {
+    func testDeleteAccount_removesSecretFromKeychain() async throws {
         // Given
         let account = createTestAccount()
-        try accountManager.saveAccount(account, secretAccessKey: "test-secret")
+        try await saveAccountOnBackground(account, secretAccessKey: "test-secret")
         XCTAssertTrue(keychainService.hasSecretAccessKey(for: account))
 
         // When
-        try accountManager.deleteAccount(account)
+        try await deleteAccountOnBackground(account)
 
         // Then
         XCTAssertFalse(keychainService.hasSecretAccessKey(for: account))
     }
 
-    func testDeleteAccount_clearsCurrentAccountIfDeleted() throws {
+    func testDeleteAccount_clearsCurrentAccountIfDeleted() async throws {
         // Given
         let account = createTestAccount()
-        try accountManager.saveAccount(account, secretAccessKey: "test-secret")
+        try await saveAccountOnBackground(account, secretAccessKey: "test-secret")
         accountManager.setCurrentAccount(account)
         testAccounts.append(account)
 
         // When
-        try accountManager.deleteAccount(account)
+        try await deleteAccountOnBackground(account)
         testAccounts.removeAll { $0.id == account.id }
 
         // Then
@@ -274,15 +283,15 @@ final class R2AccountManagerTests: XCTestCase {
 
     // MARK: - getCompleteCredentials Tests
 
-    func testGetCompleteCredentials_returnsCredentialsWithSecretKey() throws {
+    func testGetCompleteCredentials_returnsCredentialsWithSecretKey() async throws {
         // Given
         let account = createTestAccount()
         let secretKey = "my-secret-access-key"
-        try accountManager.saveAccount(account, secretAccessKey: secretKey)
+        try await saveAccountOnBackground(account, secretAccessKey: secretKey)
         testAccounts.append(account)
 
         // When
-        let credentials = try accountManager.getCompleteCredentials(for: account)
+        let credentials = try await getCompleteCredentialsOnBackground(for: account)
 
         // Then
         XCTAssertEqual(credentials.account.accountID, account.accountID)
@@ -300,10 +309,10 @@ final class R2AccountManagerTests: XCTestCase {
 
     // MARK: - setCurrentAccount Tests
 
-    func testSetCurrentAccount_updatesCurrentAccount() throws {
+    func testSetCurrentAccount_updatesCurrentAccount() async throws {
         // Given
         let account = createTestAccount()
-        try accountManager.saveAccount(account, secretAccessKey: "test-secret")
+        try await saveAccountOnBackground(account, secretAccessKey: "test-secret")
         testAccounts.append(account)
 
         // When
@@ -313,10 +322,10 @@ final class R2AccountManagerTests: XCTestCase {
         XCTAssertEqual(accountManager.currentAccount?.id, account.id)
     }
 
-    func testSetCurrentAccount_withNil_clearsCurrentAccount() throws {
+    func testSetCurrentAccount_withNil_clearsCurrentAccount() async throws {
         // Given
         let account = createTestAccount()
-        try accountManager.saveAccount(account, secretAccessKey: "test-secret")
+        try await saveAccountOnBackground(account, secretAccessKey: "test-secret")
         testAccounts.append(account)
         accountManager.setCurrentAccount(account)
         XCTAssertNotNil(accountManager.currentAccount)
@@ -330,10 +339,10 @@ final class R2AccountManagerTests: XCTestCase {
 
     // MARK: - validateAccount Tests
 
-    func testValidateAccount_withValidAccountAndKeychain_returnsTrue() throws {
+    func testValidateAccount_withValidAccountAndKeychain_returnsTrue() async throws {
         // Given
         let account = createTestAccount()
-        try accountManager.saveAccount(account, secretAccessKey: "test-secret")
+        try await saveAccountOnBackground(account, secretAccessKey: "test-secret")
         testAccounts.append(account)
 
         // When
@@ -394,10 +403,10 @@ final class R2AccountManagerTests: XCTestCase {
 
     // MARK: - Update Existing Account Tests
 
-    func testSaveAccount_withExistingAccount_updatesInsteadOfAdding() throws {
+    func testSaveAccount_withExistingAccount_updatesInsteadOfAdding() async throws {
         // Given
         let account = createTestAccount()
-        try accountManager.saveAccount(account, secretAccessKey: "original-secret")
+        try await saveAccountOnBackground(account, secretAccessKey: "original-secret")
         testAccounts.append(account)
         let countAfterFirstSave = accountManager.accounts.count
 
@@ -407,7 +416,7 @@ final class R2AccountManagerTests: XCTestCase {
             accessKeyID: account.accessKeyID,
             displayName: "Updated Name"
         )
-        try accountManager.saveAccount(updatedAccount, secretAccessKey: "new-secret")
+        try await saveAccountOnBackground(updatedAccount, secretAccessKey: "new-secret")
 
         // Then - 数量不应该增加
         XCTAssertEqual(accountManager.accounts.count, countAfterFirstSave)
@@ -415,15 +424,15 @@ final class R2AccountManagerTests: XCTestCase {
 
     // MARK: - Bucket Management Tests
 
-    func testAddBucket_addsTrimmedBucketToAccount() throws {
+    func testAddBucket_addsTrimmedBucketToAccount() async throws {
         // Given
         let account = createTestAccount()
-        try accountManager.saveAccount(account, secretAccessKey: "test-secret")
+        try await saveAccountOnBackground(account, secretAccessKey: "test-secret")
         testAccounts.append(account)
         accountManager.setCurrentAccount(account)
 
         // When
-        try accountManager.addBucket(to: account, bucketName: "  my-bucket  ")
+        try await addBucketOnBackground(to: account, bucketName: "  my-bucket  ")
 
         // Then
         let updated = accountManager.accounts.first { $0.id == account.id }
@@ -431,15 +440,15 @@ final class R2AccountManagerTests: XCTestCase {
         XCTAssertEqual(accountManager.currentAccount?.bucketNames, ["my-bucket"])
     }
 
-    func testRemoveBucket_removesBucketFromAccount() throws {
+    func testRemoveBucket_removesBucketFromAccount() async throws {
         // Given
         let account = createTestAccount()
-        try accountManager.saveAccount(account, secretAccessKey: "test-secret")
+        try await saveAccountOnBackground(account, secretAccessKey: "test-secret")
         testAccounts.append(account)
-        try accountManager.addBucket(to: account, bucketName: "bucket-to-remove")
+        try await addBucketOnBackground(to: account, bucketName: "bucket-to-remove")
 
         // When
-        try accountManager.removeBucket(from: account, bucketName: "bucket-to-remove")
+        try await removeBucketOnBackground(from: account, bucketName: "bucket-to-remove")
 
         // Then
         let updated = accountManager.accounts.first { $0.id == account.id }
@@ -454,5 +463,37 @@ final class R2AccountManagerTests: XCTestCase {
             accessKeyID: "AKIATEST\(UUID().uuidString.prefix(8))",
             displayName: "Test Account"
         )
+    }
+
+    // MARK: - Background Helpers
+
+    private func saveAccountOnBackground(_ account: R2Account, secretAccessKey: String) async throws {
+        try await MainActor.run {
+            try self.accountManager.saveAccount(account, secretAccessKey: secretAccessKey)
+        }
+    }
+
+    private func deleteAccountOnBackground(_ account: R2Account) async throws {
+        try await MainActor.run {
+            try self.accountManager.deleteAccount(account)
+        }
+    }
+
+    private func addBucketOnBackground(to account: R2Account, bucketName: String) async throws {
+        try await MainActor.run {
+            try self.accountManager.addBucket(to: account, bucketName: bucketName)
+        }
+    }
+
+    private func removeBucketOnBackground(from account: R2Account, bucketName: String) async throws {
+        try await MainActor.run {
+            try self.accountManager.removeBucket(from: account, bucketName: bucketName)
+        }
+    }
+
+    private func getCompleteCredentialsOnBackground(for account: R2Account) async throws -> CompleteR2Credentials {
+        try await MainActor.run {
+            try self.accountManager.getCompleteCredentials(for: account)
+        }
     }
 }

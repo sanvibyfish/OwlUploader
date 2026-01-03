@@ -54,17 +54,8 @@ struct SettingsActions {
 
 struct AppCommands: Commands {
     @FocusedValue(\.fileActions) var fileActions
-    @FocusedValue(\.settingsActions) var settingsActions
 
     var body: some Commands {
-        // 设置菜单
-        CommandGroup(replacing: .appSettings) {
-            Button(L.Commands.settings) {
-                settingsActions?.openSettings()
-            }
-            .keyboardShortcut(",", modifiers: .command)
-        }
-        
         // 文件菜单
         CommandGroup(after: .newItem) {
             Button(L.Commands.newFolder) {

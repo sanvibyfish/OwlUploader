@@ -10,6 +10,9 @@
     "(%@)" : {
 
     },
+    "%lld" : {
+
+    },
     "%lld %@" : {
       "localizations" : {
         "en" : {
@@ -26,8 +29,16 @@
     "•" : {
 
     },
-    "1-10" : {
-
+    "about.copyright" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "© 2025 OwlUploader. All rights reserved."
+          }
+        }
+      }
     },
     "about.title" : {
       "extractionState" : "extracted_with_value",
@@ -199,19 +210,8 @@
         }
       }
     },
-    "account.domain.configGuide" : {
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Configure public domain in Cloudflare R2 Console → Bucket Settings → Public Access"
-          }
-        }
-      }
-    },
     "account.domain.defaultHint" : {
-      "extractionState" : "extracted_with_value",
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -227,8 +227,19 @@
         }
       }
     },
-    "account.domain.empty" : {
+    "account.domain.defaultLabel" : {
       "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Default"
+          }
+        }
+      }
+    },
+    "account.domain.empty" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -244,19 +255,19 @@
         }
       }
     },
-    "account.domain.featureHint" : {
+    "account.domain.hint" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "⚠️ Thumbnail preview requires public domain configuration. Without it, thumbnails in Table/Icons view will not display."
+            "value" : "Optional. Used for generating share links and thumbnail preview."
           }
         }
       }
     },
     "account.domain.isDefault" : {
-      "extractionState" : "extracted_with_value",
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -278,7 +289,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "cdn.example.com or pub-xxx.r2.dev"
+            "value" : "cdn.example.com"
           }
         },
         "zh-Hans" : {
@@ -290,7 +301,7 @@
       }
     },
     "account.domain.remove" : {
-      "extractionState" : "extracted_with_value",
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -312,7 +323,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Set as default"
+            "value" : "Set default"
           }
         },
         "zh-Hans" : {
@@ -5382,6 +5393,17 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "跟随系统"
+          }
+        }
+      }
+    },
+    "settings.general.title" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "General"
           }
         }
       }

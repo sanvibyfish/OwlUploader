@@ -304,14 +304,10 @@ enum L {
         }
 
         enum Domain {
-            static let empty = String(localized: "account.domain.empty", defaultValue: "No domains added yet")
-            static let placeholder = String(localized: "account.domain.placeholder", defaultValue: "cdn.example.com or pub-xxx.r2.dev")
-            static let defaultHint = String(localized: "account.domain.defaultHint", defaultValue: "Click star to set as default for share links")
-            static let featureHint = String(localized: "account.domain.featureHint", defaultValue: "⚠️ Thumbnail preview requires public domain configuration. Without it, thumbnails in Table/Icons view will not display.")
-            static let configGuide = String(localized: "account.domain.configGuide", defaultValue: "Configure public domain in Cloudflare R2 Console → Bucket Settings → Public Access")
-            static let setDefault = String(localized: "account.domain.setDefault", defaultValue: "Set as default")
-            static let isDefault = String(localized: "account.domain.isDefault", defaultValue: "Default domain")
-            static let remove = String(localized: "account.domain.remove", defaultValue: "Remove domain")
+            static let placeholder = String(localized: "account.domain.placeholder", defaultValue: "cdn.example.com")
+            static let hint = String(localized: "account.domain.hint", defaultValue: "Optional. Used for generating share links and thumbnail preview.")
+            static let setDefault = String(localized: "account.domain.setDefault", defaultValue: "Set default")
+            static let defaultLabel = String(localized: "account.domain.defaultLabel", defaultValue: "Default")
         }
 
         enum Delete {
@@ -434,6 +430,8 @@ enum L {
         static func version(_ version: String) -> String {
             String(format: NSLocalizedString("about.version", value: "Version %@", comment: ""), version)
         }
+
+        static let copyright = String(localized: "about.copyright", defaultValue: "© 2025 OwlUploader. All rights reserved.")
     }
 
     // MARK: - Settings
@@ -443,6 +441,10 @@ enum L {
         static let selectLanguage = String(localized: "settings.selectLanguage", defaultValue: "Select Language")
         static let languageHint = String(localized: "settings.languageHint", defaultValue: "App needs to restart for language change to take effect")
         static let followSystem = String(localized: "settings.followSystem", defaultValue: "Follow System")
+
+        enum General {
+            static let title = String(localized: "settings.general.title", defaultValue: "General")
+        }
 
         enum Restart {
             static let title = String(localized: "settings.restart.title", defaultValue: "Restart Required")
