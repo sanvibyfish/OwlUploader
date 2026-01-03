@@ -38,9 +38,9 @@ extension BucketItem {
     /// 格式化的创建日期字符串
     var formattedCreationDate: String {
         guard let creationDate = creationDate else {
-            return "未知"
+            return L.Common.Label.unknown
         }
-        
+
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
         formatter.timeStyle = .short

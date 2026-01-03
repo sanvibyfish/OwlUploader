@@ -84,7 +84,7 @@ class MessageManager: ObservableObject {
     }
     
     func showError(_ error: R2ServiceError) {
-        let actionTitle = error.isRetryable ? "Retry" : nil
+        let actionTitle = error.isRetryable ? L.Common.Button.retry : nil
         showError(error.localizedDescription, description: error.suggestedAction, actionTitle: actionTitle)
     }
     

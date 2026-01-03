@@ -74,7 +74,7 @@ struct ContentView: View {
                 AccountSettingsView()
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
-                            Button("Done") {
+                            Button(L.Common.Button.done) {
                                 showSettings = false
                             }
                         }

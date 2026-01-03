@@ -56,6 +56,12 @@ struct AccountSettingsView: View {
                 // 上传设置
                 uploadSettingsSection
 
+                // 移动设置
+                moveSettingsSection
+
+                // 主题设置
+                themeSection
+
                 // 语言设置
                 languageSection
 
@@ -220,6 +226,64 @@ struct AccountSettingsView: View {
         }
         .onAppear {
             concurrentUploads = Double(UploadQueueManager.getMaxConcurrentUploads())
+        }
+    }
+
+    // MARK: - 移动设置区域
+
+    /// 并发移动数设置值
+    @State private var concurrentMoves: Double = Double(MoveQueueManager.getMaxConcurrentMoves())
+
+    private var moveSettingsSection: some View {
+        SettingsCard(title: L.Settings.Move.title, icon: "arrow.right.circle") {
+            VStack(alignment: .leading, spacing: 16) {
+                // 并发移动数设置
+                HStack {
+                    Text(L.Settings.Move.concurrentMoves)
+                        .font(.body)
+
+                    Spacer()
+
+                    TextField("1-10", value: $concurrentMoves, format: .number)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 60)
+                        .multilineTextAlignment(.trailing)
+                        .onChange(of: concurrentMoves) { _, newValue in
+                            let clamped = min(max(1.0, newValue), 10.0)
+                            if clamped != newValue {
+                                concurrentMoves = clamped
+                            }
+                            MoveQueueManager.setMaxConcurrentMoves(Int(clamped))
+                        }
+                }
+
+                Text(L.Settings.Move.concurrentHint)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.vertical, 8)
+        }
+        .onAppear {
+            concurrentMoves = Double(MoveQueueManager.getMaxConcurrentMoves())
+        }
+    }
+
+    // MARK: - 主题设置区域
+
+    @StateObject private var themeManager = ThemeManager.shared
+
+    private var themeSection: some View {
+        SettingsCard(title: L.Settings.Theme.title, icon: "paintbrush") {
+            VStack(alignment: .leading, spacing: 12) {
+                Picker(L.Settings.Theme.selectTheme, selection: $themeManager.selectedTheme) {
+                    ForEach(AppTheme.allCases, id: \.rawValue) { theme in
+                        Label(theme.displayName, systemImage: theme.icon)
+                            .tag(theme.rawValue)
+                    }
+                }
+                .pickerStyle(.menu)
+            }
+            .padding(.vertical, 8)
         }
     }
 

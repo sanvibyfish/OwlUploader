@@ -74,7 +74,7 @@ class KeychainService {
     func store(_ data: Data, service: String, account: String) throws {
         try performKeychainOperation {
             // 先尝试删除已存在的项目
-            try? delete(service: service, account: account)
+            try? self.delete(service: service, account: account)
 
             // 创建新的查询字典
             let query: [String: Any] = [
@@ -227,16 +227,22 @@ class KeychainService {
         }
     }
 
-    private func performKeychainOperation<T>(_ work: () throws -> T) throws -> T {
+    private func performKeychainOperation<T>(_ work: @escaping () throws -> T) throws -> T {
         if DispatchQueue.getSpecific(key: Self.keychainQueueKey) != nil {
             return try work()
         }
-        if Thread.isMainThread {
-            return try Self.keychainQueue.sync {
-                try work()
-            }
+
+        let group = DispatchGroup()
+        var result: Result<T, Error>!
+
+        group.enter()
+        Self.keychainQueue.async {
+            result = Result { try work() }
+            group.leave()
         }
-        return try work()
+        group.wait()
+
+        return try result.get()
     }
 }
 

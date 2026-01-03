@@ -191,7 +191,7 @@ class FileDropNSView: NSView {
             let files = try getFiles(from: sender)
 
             guard !files.isEmpty else {
-                delegate?.onError(title: "拖拽失败", description: "未检测到有效文件")
+                delegate?.onError(title: L.Message.Error.dragFailed, description: L.Error.File.noFiles)
                 return false
             }
 
@@ -269,7 +269,7 @@ class FileDropNSView: NSView {
 
             // 检查是否有有效内容
             guard !regularFiles.isEmpty || !folderDrops.isEmpty else {
-                delegate?.onError(title: "没有有效文件", description: "所有拖拽的文件都不符合上传要求")
+                delegate?.onError(title: L.Message.Error.noValidFiles, description: L.Message.Error.allFilesInvalid)
                 return false
             }
 
@@ -289,7 +289,7 @@ class FileDropNSView: NSView {
 
         } catch {
             print("❌ FileDropView: 拖拽操作失败: \(error)")
-            delegate?.onError(title: "拖拽失败", description: "处理拖拽文件时发生错误: \(error.localizedDescription)")
+            delegate?.onError(title: L.Message.Error.dragFailed, description: L.Message.Error.dragProcessFailed(error.localizedDescription))
             return false
         }
     }
@@ -397,7 +397,7 @@ private enum FileDropError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .noFiles:
-            return "未检测到有效文件"
+            return L.Error.File.noFiles
         }
     }
 } 

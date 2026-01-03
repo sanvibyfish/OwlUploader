@@ -12,6 +12,7 @@ final class OwlUploaderUITestsLaunchTests: XCTestCase {
     private func makeApp() -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments.append("--ui-testing")
+        app.launchArguments += ["-AppleLanguages", "(zh)", "-AppleLocale", "zh_CN"]
         return app
     }
 

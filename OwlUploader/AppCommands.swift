@@ -59,7 +59,7 @@ struct AppCommands: Commands {
     var body: some Commands {
         // 设置菜单
         CommandGroup(replacing: .appSettings) {
-            Button("Settings...") {
+            Button(L.Commands.settings) {
                 settingsActions?.openSettings()
             }
             .keyboardShortcut(",", modifiers: .command)
@@ -133,7 +133,10 @@ struct ViewModeCommands: Commands {
     @FocusedValue(\.viewModeActions) var viewModeActions
 
     var body: some Commands {
-        CommandMenu(L.Commands.view) {
+        // 添加到现有的 View 菜单中，而不是创建新菜单
+        CommandGroup(after: .sidebar) {
+            Divider()
+
             Button(L.Commands.tableView) {
                 viewModeActions?.setTableMode()
             }

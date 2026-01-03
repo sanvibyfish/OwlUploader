@@ -31,6 +31,7 @@ enum L {
         enum Label {
             static let loading = String(localized: "common.label.loading", defaultValue: "Loading...")
             static let pleaseWait = String(localized: "common.label.pleaseWait", defaultValue: "Please wait")
+            static let unknown = String(localized: "common.label.unknown", defaultValue: "Unknown")
         }
 
         enum Status {
@@ -121,6 +122,11 @@ enum L {
             static let type = String(localized: "files.sort.type", defaultValue: "Type")
         }
 
+        enum Menu {
+            static let filterSection = String(localized: "files.menu.filterSection", defaultValue: "Filter")
+            static let sortSection = String(localized: "files.menu.sortSection", defaultValue: "Sort")
+        }
+
         enum FileType {
             static let folder = String(localized: "files.type.folder", defaultValue: "Folder")
             static let image = String(localized: "files.type.image", defaultValue: "Image")
@@ -129,12 +135,29 @@ enum L {
             static let pdf = String(localized: "files.type.pdf", defaultValue: "PDF Document")
             static let text = String(localized: "files.type.text", defaultValue: "Text File")
             static let unknown = String(localized: "files.type.unknown", defaultValue: "Unknown Type")
+            static let wordDocument = String(localized: "files.type.wordDocument", defaultValue: "Word Document")
+            static let excelSpreadsheet = String(localized: "files.type.excelSpreadsheet", defaultValue: "Excel Spreadsheet")
+            static let powerPoint = String(localized: "files.type.powerPoint", defaultValue: "PowerPoint")
+            static let archive = String(localized: "files.type.archive", defaultValue: "Archive")
+            static let htmlDocument = String(localized: "files.type.htmlDocument", defaultValue: "HTML Document")
+            static let cssStylesheet = String(localized: "files.type.cssStylesheet", defaultValue: "CSS Stylesheet")
+            static let javaScript = String(localized: "files.type.javaScript", defaultValue: "JavaScript")
+            static let jsonFile = String(localized: "files.type.jsonFile", defaultValue: "JSON File")
+            static let xmlFile = String(localized: "files.type.xmlFile", defaultValue: "XML File")
+            static let swiftSource = String(localized: "files.type.swiftSource", defaultValue: "Swift Source")
+            static let markdown = String(localized: "files.type.markdown", defaultValue: "Markdown")
+            static let document = String(localized: "files.type.document", defaultValue: "Document")
+
+            static func extensionFile(_ ext: String) -> String {
+                String(format: NSLocalizedString("files.type.extensionFile", value: "%@ File", comment: ""), ext)
+            }
         }
 
         enum TableColumn {
             static let name = String(localized: "files.tableColumn.name", defaultValue: "Name")
             static let size = String(localized: "files.tableColumn.size", defaultValue: "Size")
             static let modified = String(localized: "files.tableColumn.modified", defaultValue: "Modified")
+            static let kind = String(localized: "files.tableColumn.kind", defaultValue: "Kind")
         }
 
         static func itemsSelected(_ count: Int) -> String {
@@ -235,6 +258,14 @@ enum L {
                 String(format: NSLocalizedString("move.status.failed", value: "Move failed: %@", comment: ""), error)
             }
         }
+
+        enum Message {
+            static let moveFailed = String(localized: "move.message.moveFailed", defaultValue: "Move Failed")
+            static let noMoveNeeded = String(localized: "move.message.noMoveNeeded", defaultValue: "No Move Needed")
+            static let alreadyAtDestination = String(localized: "move.message.alreadyAtDestination", defaultValue: "File is already at the destination")
+        }
+
+        static let rootDirectory = String(localized: "move.rootDirectory", defaultValue: "Root")
     }
 
     // MARK: - Account
@@ -425,6 +456,20 @@ enum L {
             static let concurrentUploads = String(localized: "settings.upload.concurrentUploads", defaultValue: "Concurrent Uploads")
             static let concurrentHint = String(localized: "settings.upload.concurrentHint", defaultValue: "Higher values may speed up batch uploads, but might cause network congestion")
         }
+
+        enum Move {
+            static let title = String(localized: "settings.move.title", defaultValue: "Move Settings")
+            static let concurrentMoves = String(localized: "settings.move.concurrentMoves", defaultValue: "Concurrent Moves")
+            static let concurrentHint = String(localized: "settings.move.concurrentHint", defaultValue: "Number of files to move simultaneously")
+        }
+
+        enum Theme {
+            static let title = String(localized: "settings.theme.title", defaultValue: "Appearance")
+            static let selectTheme = String(localized: "settings.theme.selectTheme", defaultValue: "Theme")
+            static let followSystem = String(localized: "settings.theme.followSystem", defaultValue: "Follow System")
+            static let light = String(localized: "settings.theme.light", defaultValue: "Light")
+            static let dark = String(localized: "settings.theme.dark", defaultValue: "Dark")
+        }
     }
 
     // MARK: - Alerts
@@ -521,11 +566,18 @@ enum L {
         static let download = String(localized: "help.download", defaultValue: "Download")
         static let copyLink = String(localized: "help.copyLink", defaultValue: "Copy Link")
         static let delete = String(localized: "help.delete", defaultValue: "Delete")
+        static let previousFile = String(localized: "help.previousFile", defaultValue: "Previous (←)")
+        static let nextFile = String(localized: "help.nextFile", defaultValue: "Next (→)")
+        static let back = String(localized: "help.back", defaultValue: "Back")
+        static let forward = String(localized: "help.forward", defaultValue: "Forward")
+        static let moreOptions = String(localized: "help.moreOptions", defaultValue: "More Options")
+        static let closeEsc = String(localized: "help.closeEsc", defaultValue: "Close (ESC)")
     }
 
     // MARK: - Commands
 
     enum Commands {
+        static let settings = String(localized: "commands.settings", defaultValue: "Settings...")
         static let newFolder = String(localized: "commands.newFolder", defaultValue: "New Folder")
         static let selectAll = String(localized: "commands.selectAll", defaultValue: "Select All")
         static let deselectAll = String(localized: "commands.deselectAll", defaultValue: "Deselect All")
@@ -690,6 +742,13 @@ extension L {
             static func error(_ message: String) -> String {
                 String(format: NSLocalizedString("error.server.error", value: "Server error: %@", comment: ""), message)
             }
+        }
+
+        // MARK: - Service Errors
+
+        enum Service {
+            static let r2NotInitialized = String(localized: "error.service.r2NotInitialized",
+                defaultValue: "R2 service not initialized")
         }
 
         // MARK: - Unknown Errors

@@ -78,7 +78,7 @@ struct FileTableView: View {
             .width(90)
 
             // 类型列 (Kind)
-            TableColumn("Kind", value: \.sortableKind) { file in
+            TableColumn(L.Files.TableColumn.kind, value: \.sortableKind) { file in
                 Text(file.kindDescription)
                     .font(.system(size: 12))
                     .foregroundColor(AppColors.textSecondary)
@@ -356,7 +356,7 @@ extension FileObject {
     /// 可排序的类型值（用于 Table 排序）
     var sortableKind: String {
         if isDirectory {
-            return "Folder"
+            return L.Files.FileType.folder
         }
         return fileExtension.lowercased()
     }
@@ -364,45 +364,45 @@ extension FileObject {
     /// 类型描述（用于显示）
     var kindDescription: String {
         if isDirectory {
-            return "Folder"
+            return L.Files.FileType.folder
         }
-        
+
         let ext = fileExtension.lowercased()
         switch ext {
         case "jpg", "jpeg", "png", "gif", "webp", "heic", "bmp", "tiff":
-            return "Image"
+            return L.Files.FileType.image
         case "mp4", "mov", "avi", "mkv", "webm", "m4v":
-            return "Video"
+            return L.Files.FileType.video
         case "mp3", "wav", "m4a", "aac", "flac", "ogg":
-            return "Audio"
+            return L.Files.FileType.audio
         case "pdf":
-            return "PDF Document"
+            return L.Files.FileType.pdf
         case "doc", "docx":
-            return "Word Document"
+            return L.Files.FileType.wordDocument
         case "xls", "xlsx":
-            return "Excel Spreadsheet"
+            return L.Files.FileType.excelSpreadsheet
         case "ppt", "pptx":
-            return "PowerPoint"
+            return L.Files.FileType.powerPoint
         case "txt":
-            return "Text File"
+            return L.Files.FileType.text
         case "zip", "rar", "7z", "tar", "gz":
-            return "Archive"
+            return L.Files.FileType.archive
         case "html", "htm":
-            return "HTML Document"
+            return L.Files.FileType.htmlDocument
         case "css":
-            return "CSS Stylesheet"
+            return L.Files.FileType.cssStylesheet
         case "js":
-            return "JavaScript"
+            return L.Files.FileType.javaScript
         case "json":
-            return "JSON File"
+            return L.Files.FileType.jsonFile
         case "xml":
-            return "XML File"
+            return L.Files.FileType.xmlFile
         case "swift":
-            return "Swift Source"
+            return L.Files.FileType.swiftSource
         case "md":
-            return "Markdown"
+            return L.Files.FileType.markdown
         default:
-            return ext.isEmpty ? "Document" : "\(ext.uppercased()) File"
+            return ext.isEmpty ? L.Files.FileType.document : L.Files.FileType.extensionFile(ext.uppercased())
         }
     }
 }

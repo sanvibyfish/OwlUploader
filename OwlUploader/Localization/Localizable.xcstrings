@@ -731,9 +731,6 @@
         }
       }
     },
-    "Back" : {
-
-    },
     "bucket.action.attemptingConnection" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -1006,9 +1003,6 @@
         }
       }
     },
-    "Close (ESC)" : {
-
-    },
     "commands.deselectAll" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -1124,6 +1118,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "全选"
+          }
+        }
+      }
+    },
+    "commands.settings" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Settings..."
           }
         }
       }
@@ -1362,6 +1367,17 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "请稍候"
+          }
+        }
+      }
+    },
+    "common.label.unknown" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Unknown"
           }
         }
       }
@@ -1739,9 +1755,6 @@
           }
         }
       }
-    },
-    "Done" : {
-
     },
     "error.account.accountNotFound" : {
       "extractionState" : "extracted_with_value",
@@ -2423,6 +2436,17 @@
         }
       }
     },
+    "error.service.r2NotInitialized" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "R2 service not initialized"
+          }
+        }
+      }
+    },
     "error.storage.quotaExceeded" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -2870,6 +2894,28 @@
         }
       }
     },
+    "files.menu.filterSection" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Filter"
+          }
+        }
+      }
+    },
+    "files.menu.sortSection" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Sort"
+          }
+        }
+      }
+    },
     "files.selectDownloadFolder" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -3125,6 +3171,17 @@
         }
       }
     },
+    "files.tableColumn.kind" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Kind"
+          }
+        }
+      }
+    },
     "files.tableColumn.modified" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -3295,6 +3352,17 @@
         }
       }
     },
+    "files.type.archive" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Archive"
+          }
+        }
+      }
+    },
     "files.type.audio" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -3308,6 +3376,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "音频"
+          }
+        }
+      }
+    },
+    "files.type.cssStylesheet" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "CSS Stylesheet"
+          }
+        }
+      }
+    },
+    "files.type.document" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Document"
+          }
+        }
+      }
+    },
+    "files.type.excelSpreadsheet" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Excel Spreadsheet"
+          }
+        }
+      }
+    },
+    "files.type.extensionFile" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%@ File"
           }
         }
       }
@@ -3329,6 +3441,17 @@
         }
       }
     },
+    "files.type.htmlDocument" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "HTML Document"
+          }
+        }
+      }
+    },
     "files.type.image" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -3346,6 +3469,39 @@
         }
       }
     },
+    "files.type.javaScript" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "JavaScript"
+          }
+        }
+      }
+    },
+    "files.type.jsonFile" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "JSON File"
+          }
+        }
+      }
+    },
+    "files.type.markdown" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Markdown"
+          }
+        }
+      }
+    },
     "files.type.pdf" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -3359,6 +3515,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "PDF 文档"
+          }
+        }
+      }
+    },
+    "files.type.powerPoint" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "PowerPoint"
+          }
+        }
+      }
+    },
+    "files.type.swiftSource" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Swift Source"
           }
         }
       }
@@ -3410,6 +3588,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "视频"
+          }
+        }
+      }
+    },
+    "files.type.wordDocument" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Word Document"
+          }
+        }
+      }
+    },
+    "files.type.xmlFile" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "XML File"
           }
         }
       }
@@ -3584,8 +3784,16 @@
         }
       }
     },
-    "Forward" : {
-
+    "help.back" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Back"
+          }
+        }
+      }
     },
     "help.clearSelection" : {
       "extractionState" : "extracted_with_value",
@@ -3600,6 +3808,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "清除选择 (Esc)"
+          }
+        }
+      }
+    },
+    "help.closeEsc" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Close (ESC)"
           }
         }
       }
@@ -3706,6 +3925,17 @@
         }
       }
     },
+    "help.forward" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Forward"
+          }
+        }
+      }
+    },
     "help.goUp" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -3723,6 +3953,17 @@
         }
       }
     },
+    "help.moreOptions" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "More Options"
+          }
+        }
+      }
+    },
     "help.newFolder" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -3736,6 +3977,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新建文件夹"
+          }
+        }
+      }
+    },
+    "help.nextFile" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Next (→)"
+          }
+        }
+      }
+    },
+    "help.previousFile" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Previous (←)"
           }
         }
       }
@@ -3790,9 +4053,6 @@
           }
         }
       }
-    },
-    "Kind" : {
-
     },
     "message.error.allFilesInvalid" : {
       "extractionState" : "extracted_with_value",
@@ -4848,6 +5108,39 @@
         }
       }
     },
+    "move.message.alreadyAtDestination" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "File is already at the destination"
+          }
+        }
+      }
+    },
+    "move.message.moveFailed" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Move Failed"
+          }
+        }
+      }
+    },
+    "move.message.noMoveNeeded" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "No Move Needed"
+          }
+        }
+      }
+    },
     "move.queue.title" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -4855,6 +5148,17 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Move Queue"
+          }
+        }
+      }
+    },
+    "move.rootDirectory" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Root"
           }
         }
       }
@@ -4891,9 +5195,6 @@
           }
         }
       }
-    },
-    "Next (→)" : {
-
     },
     "preview.cannotLoadImage" : {
       "extractionState" : "extracted_with_value",
@@ -5031,9 +5332,6 @@
         }
       }
     },
-    "Previous (←)" : {
-
-    },
     "savePanel.saveFile" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -5069,9 +5367,6 @@
       }
     },
     "Search" : {
-
-    },
-    "Settings..." : {
 
     },
     "settings.followSystem" : {
@@ -5121,6 +5416,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "需要重启应用程序才能使语言更改生效"
+          }
+        }
+      }
+    },
+    "settings.move.concurrentHint" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Number of files to move simultaneously"
+          }
+        }
+      }
+    },
+    "settings.move.concurrentMoves" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Concurrent Moves"
+          }
+        }
+      }
+    },
+    "settings.move.title" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Move Settings"
           }
         }
       }
@@ -5206,6 +5534,61 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "选择语言"
+          }
+        }
+      }
+    },
+    "settings.theme.dark" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Dark"
+          }
+        }
+      }
+    },
+    "settings.theme.followSystem" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Follow System"
+          }
+        }
+      }
+    },
+    "settings.theme.light" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Light"
+          }
+        }
+      }
+    },
+    "settings.theme.selectTheme" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Theme"
+          }
+        }
+      }
+    },
+    "settings.theme.title" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Appearance"
           }
         }
       }
@@ -5974,15 +6357,6 @@
           }
         }
       }
-    },
-    "排序" : {
-
-    },
-    "更多选项" : {
-
-    },
-    "筛选" : {
-
     }
   },
   "version" : "1.0"

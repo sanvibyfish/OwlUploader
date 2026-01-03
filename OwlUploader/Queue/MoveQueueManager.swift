@@ -34,9 +34,9 @@ struct MoveQueueTask: QueueTaskProtocol {
         let destPath = destinationKey.hasSuffix("/") ? String(destinationKey.dropLast()) : destinationKey
         if let lastSlash = destPath.lastIndex(of: "/") {
             let folder = String(destPath[destPath.index(after: lastSlash)...])
-            return "→ \(folder.isEmpty ? "根目录" : folder)/"
+            return "→ \(folder.isEmpty ? L.Move.rootDirectory : folder)/"
         }
-        return "→ 根目录"
+        return "→ \(L.Move.rootDirectory)"
     }
 
     static func == (lhs: MoveQueueTask, rhs: MoveQueueTask) -> Bool {
@@ -74,8 +74,32 @@ class MoveQueueManager: ObservableObject, TaskQueueManagerProtocol {
 
     // MARK: - Configuration
 
-    /// 最大并发移动数
-    private let maxConcurrentMoves: Int = 3
+    /// 并发移动数 UserDefaults 键
+    private static let concurrentMovesKey = "maxConcurrentMoves"
+
+    /// 最大并发移动数（从设置读取，默认 3，范围 1-10）
+    var maxConcurrentMoves: Int {
+        let stored = UserDefaults.standard.integer(forKey: Self.concurrentMovesKey)
+        if stored == 0 {
+            return 3 // 默认值
+        }
+        return min(max(stored, 1), 10)
+    }
+
+    /// 设置最大并发移动数
+    static func setMaxConcurrentMoves(_ value: Int) {
+        let clamped = min(max(value, 1), 10)
+        UserDefaults.standard.set(clamped, forKey: concurrentMovesKey)
+    }
+
+    /// 获取当前设置的最大并发移动数（用于 UI 显示）
+    static func getMaxConcurrentMoves() -> Int {
+        let stored = UserDefaults.standard.integer(forKey: concurrentMovesKey)
+        if stored == 0 {
+            return 3 // 默认值
+        }
+        return min(max(stored, 1), 10)
+    }
 
     // MARK: - Callbacks
 
@@ -232,7 +256,7 @@ class MoveQueueManager: ObservableObject, TaskQueueManagerProtocol {
             await MainActor.run {
                 activeMoveCount -= 1
                 if let idx = tasks.firstIndex(where: { $0.id == taskId }) {
-                    tasks[idx].status = .failed("R2 服务未初始化")
+                    tasks[idx].status = .failed(L.Error.Service.r2NotInitialized)
                 }
             }
             return

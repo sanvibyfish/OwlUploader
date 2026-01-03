@@ -442,7 +442,7 @@ class UploadQueueManager: ObservableObject, TaskQueueManagerProtocol {
             await MainActor.run {
                 activeUploadCount -= 1
                 if let idx = tasks.firstIndex(where: { $0.id == taskId }) {
-                    tasks[idx].status = .failed("R2 服务未初始化")
+                    tasks[idx].status = .failed(L.Error.Service.r2NotInitialized)
                 }
             }
             return

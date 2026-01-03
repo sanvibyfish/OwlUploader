@@ -186,7 +186,7 @@ struct FilePreviewView: View {
             .buttonStyle(.plain)
             .disabled(!hasPrevious)
             .opacity(hasPrevious ? 1.0 : 0.3)
-            .help("Previous (←)")
+            .help(L.Help.previousFile)
             
             Button(action: navigateToNext) {
                 Image(systemName: "chevron.right")
@@ -199,7 +199,7 @@ struct FilePreviewView: View {
             .buttonStyle(.plain)
             .disabled(!hasNext)
             .opacity(hasNext ? 1.0 : 0.3)
-            .help("Next (→)")
+            .help(L.Help.nextFile)
         }
     }
     
@@ -249,7 +249,7 @@ struct FilePreviewView: View {
                     .foregroundColor(Color(nsColor: .secondaryLabelColor))
             }
             .buttonStyle(.plain)
-            .help("Close (ESC)")
+            .help(L.Help.closeEsc)
         }
     }
     

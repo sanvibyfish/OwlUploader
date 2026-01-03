@@ -83,6 +83,9 @@ struct FileListView: View {
     
     /// 拖拽目标状态
     @State private var isTargeted: Bool = false
+    
+    /// 上次成功加载的路径（用于空状态显示，防止导航时闪烁）
+    @State private var lastLoadedPrefix: String = ""
 
     /// 文件来源枚举
     private enum FileSource {
@@ -250,13 +253,13 @@ struct FileListView: View {
                 Image(systemName: "chevron.left")
             }
             .disabled(!navigationHistory.canGoBack || !canLoadFiles || r2Service.isLoading)
-            .help("Back")
+            .help(L.Help.back)
             
             Button(action: navigateForward) {
                 Image(systemName: "chevron.right")
             }
             .disabled(!navigationHistory.canGoForward || !canLoadFiles || r2Service.isLoading)
-            .help("Forward")
+            .help(L.Help.forward)
             
             Button {
                 loadFileList()
@@ -334,7 +337,7 @@ struct FileListView: View {
     /// 更多选项菜单
     private var moreOptionsMenu: some View {
         Menu {
-            Section("筛选") {
+            Section(L.Files.Menu.filterSection) {
                 ForEach(FileFilterType.allCases, id: \.self) { type in
                     Button {
                         filterType = type
@@ -350,7 +353,7 @@ struct FileListView: View {
                 }
             }
             
-            Section("排序") {
+            Section(L.Files.Menu.sortSection) {
                 ForEach(FileSortOrder.allCases, id: \.self) { order in
                     Button {
                         sortOrder = order
@@ -368,7 +371,7 @@ struct FileListView: View {
         } label: {
             Image(systemName: "ellipsis.circle")
         }
-        .help("更多选项")
+        .help(L.Help.moreOptions)
     }
     
     // MARK: - Subviews & Builders
@@ -618,10 +621,11 @@ struct FileListView: View {
             )
             
             // 前景内容 - 使用 EmptyStateView
+            // 注意：使用 lastLoadedPrefix 而不是 currentPrefix，防止导航时显示错误的空状态
             EmptyStateView(
-                icon: currentPrefix.isEmpty ? "externaldrive" : "folder",
+                icon: lastLoadedPrefix.isEmpty ? "externaldrive" : "folder",
                 title: L.Files.Empty.title,
-                description: currentPrefix.isEmpty ? L.Files.Empty.bucketDescription : L.Files.Empty.folderDescription,
+                description: lastLoadedPrefix.isEmpty ? L.Files.Empty.bucketDescription : L.Files.Empty.folderDescription,
                 hints: [
                     (icon: "plus.circle.fill", color: .blue, text: L.Files.Empty.clickUpload),
                     (icon: "folder.badge.plus", color: .green, text: L.Files.Empty.clickNewFolder),
@@ -803,6 +807,7 @@ struct FileListView: View {
                 await MainActor.run {
                     // 过滤掉空名称的文件夹（可能是根目录标记）
                     self.fileObjects = objects.filter { !$0.name.isEmpty }
+                    self.lastLoadedPrefix = self.currentPrefix  // 记录已加载的路径
                     self.isInitialLoading = false
                 }
             } catch {
@@ -1293,7 +1298,7 @@ struct FileListView: View {
     ///   - destinationPath: 目标路径前缀
     private func handleMoveFilesToPath(items: [FileObject], toPath destinationPath: String) {
         guard let bucket = r2Service.selectedBucket else {
-            messageManager.showError("移动失败", description: "未选择存储桶")
+            messageManager.showError(L.Move.Message.moveFailed, description: L.Message.Error.noBucketSelected)
             return
         }
 
@@ -1304,7 +1309,7 @@ struct FileListView: View {
         }
 
         guard !validItems.isEmpty else {
-            messageManager.showInfo("无需移动", description: "文件已在目标位置")
+            messageManager.showInfo(L.Move.Message.noMoveNeeded, description: L.Move.Message.alreadyAtDestination)
             return
         }
 
