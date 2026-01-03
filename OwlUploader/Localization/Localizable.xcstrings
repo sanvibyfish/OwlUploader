@@ -196,6 +196,17 @@
         }
       }
     },
+    "account.domain.configGuide" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Configure public domain in Cloudflare R2 Console → Bucket Settings → Public Access"
+          }
+        }
+      }
+    },
     "account.domain.defaultHint" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -226,6 +237,17 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "暂无域名"
+          }
+        }
+      }
+    },
+    "account.domain.featureHint" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "⚠️ Thumbnail preview requires public domain configuration. Without it, thumbnails in Table/Icons view will not display."
           }
         }
       }
@@ -977,6 +999,9 @@
           }
         }
       }
+    },
+    "Close (ESC)" : {
+
     },
     "commands.deselectAll" : {
       "extractionState" : "extracted_with_value",
@@ -4786,6 +4811,9 @@
         }
       }
     },
+    "Next (→)" : {
+
+    },
     "preview.cannotLoadImage" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -4921,6 +4949,9 @@
           }
         }
       }
+    },
+    "Previous (←)" : {
+
     },
     "savePanel.saveFile" : {
       "extractionState" : "extracted_with_value",

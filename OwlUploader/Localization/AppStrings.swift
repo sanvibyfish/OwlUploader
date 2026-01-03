@@ -257,6 +257,8 @@ enum L {
             static let empty = String(localized: "account.domain.empty", defaultValue: "No domains added yet")
             static let placeholder = String(localized: "account.domain.placeholder", defaultValue: "cdn.example.com or pub-xxx.r2.dev")
             static let defaultHint = String(localized: "account.domain.defaultHint", defaultValue: "Click star to set as default for share links")
+            static let featureHint = String(localized: "account.domain.featureHint", defaultValue: "⚠️ Thumbnail preview requires public domain configuration. Without it, thumbnails in Table/Icons view will not display.")
+            static let configGuide = String(localized: "account.domain.configGuide", defaultValue: "Configure public domain in Cloudflare R2 Console → Bucket Settings → Public Access")
             static let setDefault = String(localized: "account.domain.setDefault", defaultValue: "Set as default")
             static let isDefault = String(localized: "account.domain.isDefault", defaultValue: "Default domain")
             static let remove = String(localized: "account.domain.remove", defaultValue: "Remove domain")

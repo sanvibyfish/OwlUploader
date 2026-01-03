@@ -495,6 +495,22 @@ struct EditAccountSheet: View {
                 }
 
                 Section(L.Account.Add.publicDomains) {
+                    // 重要提示：缩略图功能说明
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(L.Account.Domain.featureHint)
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                        
+                        Text(L.Account.Domain.configGuide)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.vertical, 4)
+                    
+                    Divider()
+                    
                     // 已添加的域名列表
                     if publicDomains.isEmpty {
                         Text(L.Account.Domain.empty)

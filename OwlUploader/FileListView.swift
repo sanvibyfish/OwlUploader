@@ -601,56 +601,73 @@ struct FileListView: View {
                 }
             )
 
-            // 根据视图模式显示不同的文件列表
-            Group {
-                switch viewModeManager.currentMode {
-                case .table:
-                    // 表格视图（带列头）
-                    FileTableView(
-                        files: filteredFiles,
-                        selectionManager: selectionManager,
-                        sortOrder: $sortOrder,
-                        r2Service: r2Service,
-                        bucketName: r2Service.selectedBucket?.name,
-                        messageManager: messageManager,
-                        onNavigate: { file in
-                            handleFileItemDoubleTap(file)
-                        },
-                        onDeleteFile: { file in
-                            requestDeleteFile(file)
-                        },
-                        onDownloadFile: { file in
-                            downloadFile(file)
-                        }
-                    )
-                case .icons:
-                    // 图标网格视图
-                    FileGridView(
-                        files: filteredFiles,
-                        selectionManager: selectionManager,
-                        iconSize: viewModeManager.iconSizeValue,
-                        r2Service: r2Service,
-                        bucketName: r2Service.selectedBucket?.name,
-                        messageManager: messageManager,
-                        onNavigate: { file in
-                            handleFileItemDoubleTap(file)
-                        },
-                        onDeleteFile: { file in
-                            requestDeleteFile(file)
-                        },
-                        onDownloadFile: { file in
-                            downloadFile(file)
-                        }
-                    )
-                }
+            // 双视图保持：两个视图都在内存中，用 zIndex 控制显示层级
+            // 保持两个视图都完全渲染（opacity > 0），避免 Table 懒加载问题
+            ZStack {
+                // 表格视图
+                FileTableView(
+                    files: filteredFiles,
+                    selectionManager: selectionManager,
+                    sortOrder: $sortOrder,
+                    r2Service: r2Service,
+                    bucketName: r2Service.selectedBucket?.name,
+                    messageManager: messageManager,
+                    onNavigate: { file in
+                        handleFileItemDoubleTap(file)
+                    },
+                    onDeleteFile: { file in
+                        requestDeleteFile(file)
+                    },
+                    onDownloadFile: { file in
+                        downloadFile(file)
+                    }
+                )
+                .zIndex(viewModeManager.currentMode == .table ? 1 : 0)
+                .allowsHitTesting(viewModeManager.currentMode == .table)
+                
+                // 图标网格视图
+                FileGridView(
+                    files: filteredFiles,
+                    selectionManager: selectionManager,
+                    iconSize: viewModeManager.iconSizeValue,
+                    r2Service: r2Service,
+                    bucketName: r2Service.selectedBucket?.name,
+                    messageManager: messageManager,
+                    onNavigate: { file in
+                        handleFileItemDoubleTap(file)
+                    },
+                    onDeleteFile: { file in
+                        requestDeleteFile(file)
+                    },
+                    onDownloadFile: { file in
+                        downloadFile(file)
+                    }
+                )
+                .zIndex(viewModeManager.currentMode == .icons ? 1 : 0)
+                .allowsHitTesting(viewModeManager.currentMode == .icons)
             }
             // 移除阻塞式 loading 覆盖层，改为在工具栏显示加载状态
             // 用户可以在加载过程中继续交互
             .sheet(item: $fileToPreview) { file in
+                let filteredFiles = SearchFilterBar.filterAndSort(files: fileObjects, searchText: searchText, filterType: filterType, sortOrder: sortOrder)
+                
                 FilePreviewView(
                     r2Service: r2Service,
                     fileObject: file,
+                    allFiles: filteredFiles.filter { !$0.isDirectory },  // 只传入非目录文件用于导航
                     bucketName: r2Service.selectedBucket?.name ?? "",
+                    messageManager: messageManager,
+                    onNavigate: { newFile in
+                        // 导航时更新预览文件
+                        fileToPreview = newFile
+                    },
+                    onDownload: { file in
+                        downloadFile(file)
+                    },
+                    onDelete: { file in
+                        deleteFile(file)
+                        fileToPreview = nil  // 删除后关闭预览
+                    },
                     onDismiss: { fileToPreview = nil }
                 )
             }
@@ -669,9 +686,13 @@ struct FileListView: View {
         
         guard let bucket = r2Service.selectedBucket else { return }
         
-        // 立即设置加载状态并清空列表，显示加载视图
-        isInitialLoading = true
-        fileObjects = []
+        // 只在首次加载（列表为空）时显示全屏加载界面
+        // 后续导航保持当前列表显示，后台加载完成后再切换
+        let isFirstLoad = fileObjects.isEmpty
+        if isFirstLoad {
+            isInitialLoading = true
+        }
+        
         selectionManager.clearSelection()
         r2Service.lastError = nil  // 清除旧的错误状态
         
@@ -688,7 +709,7 @@ struct FileListView: View {
             } catch {
                 await MainActor.run {
                     self.isInitialLoading = false
-                    // 清空列表，显示错误状态
+                    // 出错时清空列表，显示错误状态
                     self.fileObjects = []
                     if let r2Error = error as? R2ServiceError {
                         messageManager.showError(r2Error)

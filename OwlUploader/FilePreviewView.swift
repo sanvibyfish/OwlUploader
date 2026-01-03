@@ -2,7 +2,7 @@
 //  FilePreviewView.swift
 //  OwlUploader
 //
-//  文件预览组件
+//  文件预览组件 - 现代macOS风格（类似Finder快速查看）
 //  支持图片、视频、音频、PDF、文本预览
 //
 
@@ -17,10 +17,25 @@ struct FilePreviewView: View {
     @ObservedObject var r2Service: R2Service
     
     /// 要预览的文件对象
-    let fileObject: FileObject
+    @State var fileObject: FileObject
+    
+    /// 所有文件列表（用于导航）
+    let allFiles: [FileObject]
     
     /// 存储桶名称
     let bucketName: String
+    
+    /// 消息管理器
+    var messageManager: MessageManager?
+    
+    /// 导航回调
+    var onNavigate: ((FileObject) -> Void)?
+    
+    /// 下载回调
+    var onDownload: ((FileObject) -> Void)?
+    
+    /// 删除回调
+    var onDelete: ((FileObject) -> Void)?
     
     /// 关闭回调
     let onDismiss: () -> Void
@@ -37,108 +52,238 @@ struct FilePreviewView: View {
     /// 本地临时文件 URL
     @State private var localFileURL: URL?
     
+    /// 当前文件索引
+    private var currentIndex: Int? {
+        allFiles.firstIndex(where: { $0.id == fileObject.id })
+    }
+    
+    /// 是否有上一个文件
+    private var hasPrevious: Bool {
+        guard let index = currentIndex else { return false }
+        return index > 0
+    }
+    
+    /// 是否有下一个文件
+    private var hasNext: Bool {
+        guard let index = currentIndex else { return false }
+        return index < allFiles.count - 1
+    }
+    
     var body: some View {
-        VStack(spacing: 0) {
-            // 标题栏（始终可见，包含关闭按钮）
-            headerView
+        ZStack {
+            // 系统背景（自适应亮暗模式）
+            Color(nsColor: .controlBackgroundColor)
+                .ignoresSafeArea()
             
-            Divider()
-            
-            // 内联加载指示器（不阻塞）
-            if isLoading {
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                    Text(L.Preview.loading)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity)
-                .background(Color(nsColor: .controlBackgroundColor))
+            VStack(spacing: 0) {
+                // 工具栏
+                modernToolbar
+                
+                // 预览内容
+                contentView
             }
-            
-            // 预览内容
-            contentView
         }
-        .frame(minWidth: 600, minHeight: 500)
+        .frame(minWidth: 800, minHeight: 600)
         .onAppear {
             loadPreviewData()
         }
         .onDisappear {
             // 清理临时文件
-            if let url = localFileURL {
-                try? FileManager.default.removeItem(at: url)
-            }
+            cleanupTempFile()
+        }
+        .onChange(of: fileObject.id) { _, _ in
+            // 文件变化时重新加载
+            cleanupTempFile()
+            resetState()
+            loadPreviewData()
+        }
+        // 键盘快捷键
+        .onKeyPress(.leftArrow) {
+            navigateToPrevious()
+            return .handled
+        }
+        .onKeyPress(.rightArrow) {
+            navigateToNext()
+            return .handled
+        }
+        .onKeyPress(.escape) {
+            onDismiss()
+            return .handled
         }
     }
     
     // MARK: - 子视图
     
-    /// 标题栏
-    private var headerView: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(fileObject.name)
-                    .font(.headline)
-                    .lineLimit(1)
+    /// 现代化工具栏（类似Quick Look）
+    private var modernToolbar: some View {
+        HStack(spacing: 16) {
+            // 左侧：文件信息
+            HStack(spacing: 12) {
+                // 文件类型图标
+                Image(systemName: fileIcon)
+                    .font(.system(size: 20))
+                    .foregroundColor(iconColor)
                 
-                HStack(spacing: 8) {
-                    Text(fileObject.formattedSize)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(fileObject.name)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(Color(nsColor: .labelColor))
+                        .lineLimit(1)
                     
-                    Text("·")
-                        .foregroundColor(.secondary)
-                    
-                    Text(fileType.displayName)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    HStack(spacing: 6) {
+                        Text(fileObject.formattedSize)
+                            .font(.system(size: 11))
+                            .foregroundColor(Color(nsColor: .secondaryLabelColor))
+                        
+                        Text("·")
+                            .foregroundColor(Color(nsColor: .tertiaryLabelColor))
+                        
+                        Text(fileType.displayName)
+                            .font(.system(size: 11))
+                            .foregroundColor(Color(nsColor: .secondaryLabelColor))
+                    }
                 }
             }
             
             Spacer()
-
-            Button(L.Common.Button.close) {
-                onDismiss()
+            
+            // 中间：导航按钮
+            HStack(spacing: 8) {
+                Button(action: navigateToPrevious) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(Color(nsColor: .labelColor))
+                        .frame(width: 32, height: 32)
+                        .background(hasPrevious ? Color(nsColor: .controlAccentColor).opacity(0.2) : Color.clear)
+                        .cornerRadius(6)
+                }
+                .buttonStyle(.plain)
+                .disabled(!hasPrevious)
+                .opacity(hasPrevious ? 1.0 : 0.3)
+                .help("Previous (←)")
+                
+                Button(action: navigateToNext) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(Color(nsColor: .labelColor))
+                        .frame(width: 32, height: 32)
+                        .background(hasNext ? Color(nsColor: .controlAccentColor).opacity(0.2) : Color.clear)
+                        .cornerRadius(6)
+                }
+                .buttonStyle(.plain)
+                .disabled(!hasNext)
+                .opacity(hasNext ? 1.0 : 0.3)
+                .help("Next (→)")
             }
-            .buttonStyle(.bordered)
+            
+            Spacer()
+            
+            // 右侧：快速操作按钮
+            HStack(spacing: 12) {
+                // 下载按钮
+                if !fileObject.isDirectory {
+                    Button(action: { onDownload?(fileObject) }) {
+                        Image(systemName: "arrow.down.circle")
+                            .font(.system(size: 18))
+                            .foregroundColor(Color(nsColor: .controlAccentColor))
+                    }
+                    .buttonStyle(.plain)
+                    .help(L.Help.download)
+                }
+                
+                // 复制链接按钮
+                if !fileObject.isDirectory {
+                    Button(action: copyFileURL) {
+                        Image(systemName: "link")
+                            .font(.system(size: 18))
+                            .foregroundColor(Color(nsColor: .controlAccentColor))
+                    }
+                    .buttonStyle(.plain)
+                    .help(L.Help.copyLink)
+                }
+                
+                // 删除按钮
+                Button(action: { onDelete?(fileObject) }) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 18))
+                        .foregroundColor(Color(nsColor: .systemRed))
+                }
+                .buttonStyle(.plain)
+                .help(L.Help.delete)
+                
+                // 分隔线
+                Rectangle()
+                    .fill(Color(nsColor: .separatorColor))
+                    .frame(width: 1, height: 20)
+                
+                // 关闭按钮
+                Button(action: onDismiss) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(Color(nsColor: .secondaryLabelColor))
+                }
+                .buttonStyle(.plain)
+                .help("Close (ESC)")
+            }
         }
-        .padding()
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .background(
+            Color(nsColor: .windowBackgroundColor)
+                .opacity(0.95)
+        )
     }
     
     /// 内容视图
     @ViewBuilder
     private var contentView: some View {
-        if let error = errorMessage {
-            errorView(error)
-        } else if !isLoading {
-            // 只在加载完成后显示预览内容
-            previewContent
-        } else {
-            // 加载中时显示空白（顶部有内联指示器）
-            Color.clear
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        ZStack {
+            // 系统背景色（自适应亮暗模式）
+            Color(nsColor: .controlBackgroundColor)
+            
+            if let error = errorMessage {
+                errorView(error)
+            } else if isLoading {
+                loadingView
+            } else {
+                // 预览内容居中显示
+                previewContent
+            }
         }
+    }
+    
+    /// 加载视图
+    private var loadingView: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .scaleEffect(1.2)
+                .progressViewStyle(.circular)
+            
+            Text(L.Preview.loading)
+                .font(.system(size: 14))
+                .foregroundColor(Color(nsColor: .secondaryLabelColor))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     /// 错误视图
     private func errorView(_ message: String) -> some View {
-        VStack(spacing: 16) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 48))
-                .foregroundColor(.orange)
+        VStack(spacing: 20) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 56))
+                .foregroundColor(Color(nsColor: .systemOrange))
 
             Text(L.Preview.cannotPreview)
-                .font(.headline)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(Color(nsColor: .labelColor))
 
             Text(message)
-                .font(.body)
-                .foregroundColor(.secondary)
+                .font(.system(size: 14))
+                .foregroundColor(Color(nsColor: .secondaryLabelColor))
                 .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
     }
     
     /// 预览内容
@@ -160,14 +305,18 @@ struct FilePreviewView: View {
         }
     }
     
-    /// 图片预览
+    /// 图片预览（居中显示，类似Quick Look）
     private var imagePreview: some View {
         Group {
             if let data = previewData, let nsImage = NSImage(data: data) {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .padding()
+                GeometryReader { geometry in
+                    Image(nsImage: nsImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .clipped()
+                }
+                .padding(40)
             } else {
                 errorView(L.Preview.cannotLoadImage)
             }
@@ -180,6 +329,7 @@ struct FilePreviewView: View {
             if let url = localFileURL {
                 VideoPlayer(player: AVPlayer(url: url))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(40)
             } else {
                 errorView(L.Preview.cannotLoadVideo)
             }
@@ -188,17 +338,22 @@ struct FilePreviewView: View {
     
     /// 音频预览
     private var audioPreview: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "music.note")
-                .font(.system(size: 64))
-                .foregroundColor(.blue)
+        VStack(spacing: 24) {
+            Image(systemName: "music.note.list")
+                .font(.system(size: 72))
+                .foregroundColor(Color(nsColor: .secondaryLabelColor))
             
             Text(fileObject.name)
-                .font(.headline)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(Color(nsColor: .labelColor))
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
             
             if let url = localFileURL {
                 VideoPlayer(player: AVPlayer(url: url))
-                    .frame(height: 50)
+                    .frame(height: 60)
+                    .frame(maxWidth: 400)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -209,6 +364,7 @@ struct FilePreviewView: View {
         Group {
             if let data = previewData, let pdfDocument = PDFDocument(data: data) {
                 PDFKitView(document: pdfDocument)
+                    .padding(20)
             } else {
                 errorView(L.Preview.cannotLoadPDF)
             }
@@ -221,11 +377,13 @@ struct FilePreviewView: View {
             if let data = previewData, let text = String(data: data, encoding: .utf8) {
                 ScrollView {
                     Text(text)
-                        .font(.system(.body, design: .monospaced))
+                        .font(.system(size: 13, design: .monospaced))
+                        .foregroundColor(Color(nsColor: .labelColor))
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding()
+                        .padding(40)
                         .textSelection(.enabled)
                 }
+                .background(Color(nsColor: .textBackgroundColor))
             } else {
                 errorView(L.Preview.cannotLoadText)
             }
@@ -234,17 +392,18 @@ struct FilePreviewView: View {
     
     /// 未知类型视图
     private var unknownTypeView: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "doc.questionmark")
-                .font(.system(size: 48))
-                .foregroundColor(.secondary)
+        VStack(spacing: 20) {
+            Image(systemName: "doc.questionmark.fill")
+                .font(.system(size: 56))
+                .foregroundColor(Color(nsColor: .tertiaryLabelColor))
 
             Text(L.Preview.unsupportedType)
-                .font(.headline)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(Color(nsColor: .labelColor))
 
             Text(L.Preview.fileType(fileObject.name.components(separatedBy: ".").last ?? L.Files.FileType.unknown))
-                .font(.caption)
-                .foregroundColor(.secondary)
+                .font(.system(size: 14))
+                .foregroundColor(Color(nsColor: .secondaryLabelColor))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -271,7 +430,102 @@ struct FilePreviewView: View {
         }
     }
     
+    /// 文件图标
+    private var fileIcon: String {
+        if fileObject.isDirectory {
+            return "folder.fill"
+        }
+        
+        switch fileType {
+        case .image:
+            return "photo.fill"
+        case .video:
+            return "film.fill"
+        case .audio:
+            return "music.note"
+        case .pdf:
+            return "doc.fill"
+        case .text:
+            return "doc.text.fill"
+        case .unknown:
+            return "doc.fill"
+        }
+    }
+    
+    /// 图标颜色
+    private var iconColor: Color {
+        if fileObject.isDirectory {
+            return .blue
+        }
+        
+        switch fileType {
+        case .image:
+            return .purple
+        case .video:
+            return .orange
+        case .audio:
+            return .pink
+        case .pdf:
+            return .red
+        case .text:
+            return .cyan
+        case .unknown:
+            return .gray
+        }
+    }
+    
     // MARK: - 方法
+    
+    /// 导航到上一个文件
+    private func navigateToPrevious() {
+        guard let index = currentIndex, index > 0 else { return }
+        let previousFile = allFiles[index - 1]
+        
+        // 只导航非目录文件
+        if !previousFile.isDirectory {
+            fileObject = previousFile
+            onNavigate?(previousFile)
+        }
+    }
+    
+    /// 导航到下一个文件
+    private func navigateToNext() {
+        guard let index = currentIndex, index < allFiles.count - 1 else { return }
+        let nextFile = allFiles[index + 1]
+        
+        // 只导航非目录文件
+        if !nextFile.isDirectory {
+            fileObject = nextFile
+            onNavigate?(nextFile)
+        }
+    }
+    
+    /// 复制文件URL
+    private func copyFileURL() {
+        guard let fileURL = r2Service.generateFileURL(for: fileObject, in: bucketName) else {
+            return
+        }
+        
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(fileURL, forType: .string)
+        messageManager?.showSuccess(L.Message.Success.linkCopied, description: L.Message.Success.linkCopiedDescription)
+    }
+    
+    /// 重置状态
+    private func resetState() {
+        previewData = nil
+        localFileURL = nil
+        isLoading = true
+        errorMessage = nil
+    }
+    
+    /// 清理临时文件
+    private func cleanupTempFile() {
+        if let url = localFileURL {
+            try? FileManager.default.removeItem(at: url)
+            localFileURL = nil
+        }
+    }
     
     /// 加载预览数据
     private func loadPreviewData() {
