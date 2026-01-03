@@ -307,6 +307,7 @@ class UploadQueueManager: ObservableObject, TaskQueueManagerProtocol {
     /// 清除已完成的任务
     func clearCompleted() {
         tasks.removeAll { $0.status.isCompleted }
+        objectWillChange.send()
     }
 
     /// 清除所有任务
