@@ -695,6 +695,15 @@ struct FileListView: View {
                     onDownloadFile: { file in
                         downloadFile(file)
                     },
+                    onPreview: { file in
+                        fileToPreview = file
+                    },
+                    onCreateFolder: {
+                        showingCreateFolderSheet = true
+                    },
+                    onUpload: {
+                        showingFileImporter = true
+                    },
                     onMoveToPath: { file, destinationPath in
                         handleMoveToPath(file: file, destinationPath: destinationPath)
                     },
@@ -720,6 +729,15 @@ struct FileListView: View {
                     },
                     onDownloadFile: { file in
                         downloadFile(file)
+                    },
+                    onPreview: { file in
+                        fileToPreview = file
+                    },
+                    onCreateFolder: {
+                        showingCreateFolderSheet = true
+                    },
+                    onUpload: {
+                        showingFileImporter = true
                     },
                     onMoveToPath: { file, destinationPath in
                         handleMoveToPath(file: file, destinationPath: destinationPath)

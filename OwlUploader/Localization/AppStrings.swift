@@ -180,6 +180,9 @@ enum L {
         }
 
         enum ContextMenu {
+            static let preview = String(localized: "files.contextMenu.preview", defaultValue: "Preview")
+            static let newFolder = String(localized: "files.contextMenu.newFolder", defaultValue: "New Folder")
+            static let upload = String(localized: "files.contextMenu.upload", defaultValue: "Upload")
             static let download = String(localized: "files.contextMenu.download", defaultValue: "Download")
             static let copyLink = String(localized: "files.contextMenu.copyLink", defaultValue: "Copy Link")
             static let delete = String(localized: "files.contextMenu.delete", defaultValue: "Delete")

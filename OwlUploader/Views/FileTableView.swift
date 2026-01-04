@@ -32,6 +32,15 @@ struct FileTableView: View {
     var onDeleteFile: ((FileObject) -> Void)?
     var onDownloadFile: ((FileObject) -> Void)?
 
+    /// 预览文件回调
+    var onPreview: ((FileObject) -> Void)?
+
+    /// 新建文件夹回调
+    var onCreateFolder: (() -> Void)?
+
+    /// 上传文件回调
+    var onUpload: (() -> Void)?
+
     /// 移动到指定路径回调：(文件, 目标路径)
     var onMoveToPath: ((FileObject, String) -> Void)?
 
@@ -91,6 +100,25 @@ struct FileTableView: View {
             // 右键菜单
             if let firstID = selectedIDs.first,
                let file = files.first(where: { $0.id == firstID }) {
+                // 有选中文件时的完整菜单
+                // 预览（仅文件显示）
+                if !file.isDirectory {
+                    Button(action: { onPreview?(file) }) {
+                        Label(L.Files.ContextMenu.preview, systemImage: "eye")
+                    }
+                    Divider()
+                }
+
+                // 新建文件夹和上传（始终显示）
+                Button(action: { onCreateFolder?() }) {
+                    Label(L.Files.ContextMenu.newFolder, systemImage: "folder.badge.plus")
+                }
+                Button(action: { onUpload?() }) {
+                    Label(L.Files.ContextMenu.upload, systemImage: "arrow.up.circle")
+                }
+                Divider()
+
+                // 下载和复制链接（仅文件显示）
                 if !file.isDirectory {
                     Button(action: { onDownloadFile?(file) }) {
                         Label(L.Files.ContextMenu.download, systemImage: "arrow.down.circle")
@@ -108,6 +136,14 @@ struct FileTableView: View {
 
                 Button(role: .destructive, action: { onDeleteFile?(file) }) {
                     Label(L.Files.ContextMenu.delete, systemImage: "trash")
+                }
+            } else {
+                // 未选中文件时的简化菜单（空白区域右键）
+                Button(action: { onCreateFolder?() }) {
+                    Label(L.Files.ContextMenu.newFolder, systemImage: "folder.badge.plus")
+                }
+                Button(action: { onUpload?() }) {
+                    Label(L.Files.ContextMenu.upload, systemImage: "arrow.up.circle")
                 }
             }
         } primaryAction: { selectedIDs in

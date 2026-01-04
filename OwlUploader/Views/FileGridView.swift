@@ -29,6 +29,15 @@ struct FileGridView: View {
     var onDeleteFile: ((FileObject) -> Void)?
     var onDownloadFile: ((FileObject) -> Void)?
 
+    /// 预览文件回调
+    var onPreview: ((FileObject) -> Void)?
+
+    /// 新建文件夹回调
+    var onCreateFolder: (() -> Void)?
+
+    /// 上传文件回调
+    var onUpload: (() -> Void)?
+
     /// 移动到指定路径回调：(文件, 目标路径)
     var onMoveToPath: ((FileObject, String) -> Void)?
 
@@ -62,6 +71,9 @@ struct FileGridView: View {
                         onDoubleTap: {
                             handleDoubleTap(file)
                         },
+                        onPreview: onPreview,
+                        onCreateFolder: onCreateFolder,
+                        onUpload: onUpload,
                         onMoveToPath: onMoveToPath,
                         currentFolders: currentFolders,
                         currentPrefix: currentPrefix
@@ -72,9 +84,19 @@ struct FileGridView: View {
             .padding(.vertical, 12)
         }
         .background(AppColors.contentBackground)
+        .contentShape(Rectangle())
         .onTapGesture {
             // 点击空白区域清除选择
             selectionManager.clearSelection()
+        }
+        .contextMenu {
+            // 空白区域右键菜单
+            Button(action: { onCreateFolder?() }) {
+                Label(L.Files.ContextMenu.newFolder, systemImage: "folder.badge.plus")
+            }
+            Button(action: { onUpload?() }) {
+                Label(L.Files.ContextMenu.upload, systemImage: "arrow.up.circle")
+            }
         }
     }
 

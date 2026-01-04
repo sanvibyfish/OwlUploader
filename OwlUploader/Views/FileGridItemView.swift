@@ -29,6 +29,15 @@ struct FileGridItemView: View {
     var onTap: (() -> Void)?
     var onDoubleTap: (() -> Void)?
 
+    /// 预览文件回调
+    var onPreview: ((FileObject) -> Void)?
+
+    /// 新建文件夹回调
+    var onCreateFolder: (() -> Void)?
+
+    /// 上传文件回调
+    var onUpload: (() -> Void)?
+
     /// 移动到指定路径回调：(文件, 目标路径)
     var onMoveToPath: ((FileObject, String) -> Void)?
 
@@ -82,6 +91,24 @@ struct FileGridItemView: View {
 
     @ViewBuilder
     private var contextMenuContent: some View {
+        // 预览（仅文件显示）
+        if !fileObject.isDirectory {
+            Button(action: { onPreview?(fileObject) }) {
+                Label(L.Files.ContextMenu.preview, systemImage: "eye")
+            }
+            Divider()
+        }
+
+        // 新建文件夹和上传（始终显示）
+        Button(action: { onCreateFolder?() }) {
+            Label(L.Files.ContextMenu.newFolder, systemImage: "folder.badge.plus")
+        }
+        Button(action: { onUpload?() }) {
+            Label(L.Files.ContextMenu.upload, systemImage: "arrow.up.circle")
+        }
+        Divider()
+
+        // 下载和复制链接（仅文件显示）
         if !fileObject.isDirectory {
             Button(action: { onDownloadFile?(fileObject) }) {
                 Label(L.Files.ContextMenu.download, systemImage: "arrow.down.circle")

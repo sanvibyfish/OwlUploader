@@ -2560,6 +2560,23 @@
         }
       }
     },
+    "files.contextMenu.newFolder" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "New Folder"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建文件夹"
+          }
+        }
+      }
+    },
     "files.contextMenu.moveTo" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -2578,6 +2595,40 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Parent Folder (..)"
+          }
+        }
+      }
+    },
+    "files.contextMenu.preview" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Preview"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "预览"
+          }
+        }
+      }
+    },
+    "files.contextMenu.upload" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Upload"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上传"
           }
         }
       }
