@@ -10,22 +10,37 @@ A clean and efficient **Cloudflare R2 Object Storage Management Tool** designed 
 - Support for multiple Cloudflare R2 account configuration and management
 - Secure credential storage (using macOS Keychain)
 - Real-time connection status monitoring and error handling
+- Quick account switching
 
 ### 📦 Bucket Operations
 - Browse and manage all accessible R2 buckets
 - Intuitive bucket information display
 - Quick bucket switching
+- Custom public domain configuration
 
 ### 📁 File Management
-- **File Upload**: Support for drag-and-drop upload and file picker
-- **File Download**: One-click download to local storage
-- **File Deletion**: Batch deletion operations
-- **Folder Management**: Create and organize folder structures
-- **File Preview**: Support for common file type previews(Not Finish)
+- **File Upload**: Drag-and-drop upload, folder upload, batch upload
+- **File Download**: Single file download, batch download
+- **File Deletion**: Single file deletion, batch deletion (optimized batch API)
+- **File Rename**: Support file and folder renaming with real-time name validation
+- **File Move**: Right-click menu to move to other directories, batch move support
+- **Folder Management**: Create, delete, rename folders
+- **File Preview**: Support image, video, audio, PDF, text format preview
+- **Copy Link**: One-click copy file public access link
+
+### 🎯 Advanced Features
+- **Navigation History**: Forward/backward navigation, similar to Finder
+- **Multi-selection**: Cmd+Click to add selection, Shift+Click for range selection
+- **Search & Filter**: File name search, type filtering, sorting
+- **Queue Management**: Upload/download/move queues with cancel and retry support
+- **Task Deduplication**: Automatically skip duplicate tasks
 
 ### 🎨 User Experience
-- Native macOS design language
-- Responsive interface layout
+- Native macOS design language (SwiftUI)
+- Finder-style interface (Table View / Icon View)
+- Breadcrumb navigation and path bar
+- Perfect dark mode support
+- Simplified Chinese and English localization
 - Intelligent error prompts and operation suggestions
 - Real-time operation status feedback
 
@@ -125,7 +140,7 @@ Detailed development records can be found in the [`docs/dev/`](docs/dev/) direct
 
 ## 📄 License
 
-This project is open sourced under the [MIT License](LICENSE).
+This project is open sourced under the [GNU GPL v3](LICENSE).
 
 ## 🙏 Acknowledgments
 

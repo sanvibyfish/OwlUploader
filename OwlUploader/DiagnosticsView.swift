@@ -29,12 +29,12 @@ struct DiagnosticsView: View {
                 Image(systemName: "checkmark.shield.fill")
                     .font(.system(size: 48))
                     .foregroundColor(.purple)
-                
-                Text("上传功能诊断")
+
+                Text(L.Diagnostics.title)
                     .font(.title2)
                     .fontWeight(.semibold)
-                
-                Text("检查上传功能的各项配置和状态")
+
+                Text(L.Diagnostics.subtitle)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }
@@ -47,7 +47,7 @@ struct DiagnosticsView: View {
                 VStack(spacing: 16) {
                     ProgressView()
                         .scaleEffect(1.2)
-                    Text("正在检查各项配置...")
+                    Text(L.Diagnostics.checking)
                         .font(.body)
                         .foregroundColor(.secondary)
                 }
@@ -64,14 +64,14 @@ struct DiagnosticsView: View {
             
             // 底部按钮
             HStack {
-                Button("关闭") {
+                Button(L.Common.Button.close) {
                     dismiss()
                 }
                 .buttonStyle(.bordered)
-                
+
                 Spacer()
-                
-                Button("开始诊断") {
+
+                Button(L.Diagnostics.startDiagnostics) {
                     runDiagnostics()
                 }
                 .buttonStyle(.borderedProminent)
@@ -80,7 +80,7 @@ struct DiagnosticsView: View {
         }
         .padding(20)
         .frame(minWidth: 800, idealWidth: 900, maxWidth: 1200, minHeight: 650, idealHeight: 750, maxHeight: 1000)
-        .navigationTitle("系统诊断")
+        .navigationTitle(L.Diagnostics.systemDiagnostics)
     }
     
     /// 初始状态视图
@@ -89,22 +89,22 @@ struct DiagnosticsView: View {
             Image(systemName: "doc.text.magnifyingglass")
                 .font(.system(size: 40))
                 .foregroundColor(.secondary)
-            
-            Text("点击\"开始诊断\"检查上传功能状态")
+
+            Text(L.Diagnostics.clickToStart)
                 .font(.body)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
-            
-            Text("诊断将检查以下项目：")
+
+            Text(L.Diagnostics.itemsToCheck)
                 .font(.headline)
                 .padding(.top, 20)
-            
+
             VStack(alignment: .leading, spacing: 8) {
-                DiagnosticCheckItem(title: "账户连接状态", icon: "wifi")
-                DiagnosticCheckItem(title: "存储桶选择状态", icon: "externaldrive")
-                DiagnosticCheckItem(title: "账户配置信息", icon: "person.badge.key")
-                DiagnosticCheckItem(title: "端点 URL 格式", icon: "link")
-                DiagnosticCheckItem(title: "客户端初始化", icon: "gear")
+                DiagnosticCheckItem(title: L.Diagnostics.CheckItem.accountConnection, icon: "wifi")
+                DiagnosticCheckItem(title: L.Diagnostics.CheckItem.bucketSelection, icon: "externaldrive")
+                DiagnosticCheckItem(title: L.Diagnostics.CheckItem.accountConfig, icon: "person.badge.key")
+                DiagnosticCheckItem(title: L.Diagnostics.CheckItem.endpointURL, icon: "link")
+                DiagnosticCheckItem(title: L.Diagnostics.CheckItem.clientInit, icon: "gear")
             }
             .padding(.horizontal, 20)
         }
@@ -121,18 +121,18 @@ struct DiagnosticsView: View {
                     Image(systemName: result.isReady ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                         .font(.system(size: 24))
                         .foregroundColor(result.isReady ? .green : .orange)
-                    
-                    Text(result.isReady ? "上传功能就绪" : "发现问题需要解决")
+
+                    Text(result.isReady ? L.Diagnostics.uploadReady : L.Diagnostics.issuesNeedResolving)
                         .font(.headline)
                         .foregroundColor(result.isReady ? .green : .orange)
                 }
-                
+
                 if !result.isReady {
                     Divider()
-                    
+
                     // 发现的问题
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("发现的问题：")
+                        Text(L.Diagnostics.issuesFound)
                             .font(.headline)
                             .foregroundColor(.primary)
                         
@@ -157,10 +157,10 @@ struct DiagnosticsView: View {
                     }
                     
                     Divider()
-                    
+
                     // 解决建议
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("解决建议：")
+                        Text(L.Diagnostics.suggestions)
                             .font(.headline)
                             .foregroundColor(.primary)
                         
@@ -186,11 +186,11 @@ struct DiagnosticsView: View {
                 } else {
                     // 成功状态的详细信息
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("✅ 所有检查项目均通过")
+                        Text("✅ " + L.Diagnostics.allChecksPassed)
                             .font(.body)
                             .foregroundColor(.green)
-                        
-                        Text("您可以正常使用文件上传功能")
+
+                        Text(L.Diagnostics.canUseUpload)
                             .font(.body)
                             .foregroundColor(.secondary)
                     }

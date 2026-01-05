@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import os
 import AWSClientRuntime
 import AWSS3
 import Smithy
@@ -48,86 +49,87 @@ enum R2ServiceError: Error, LocalizedError {
     case sslCertificateError
     case endpointNotReachable(String)
     
+    // 新增：操作逻辑错误
+    case invalidOperation(String)
+
     var errorDescription: String? {
         switch self {
         case .accountNotConfigured:
-            return "R2 账户未配置。请先配置您的 R2 账户信息。"
+            return L.Error.Account.notConfigured
         case .invalidCredentials:
-            return "R2 账户凭证无效。请检查您的 Access Key ID 和 Secret Access Key。"
+            return L.Error.Account.invalidCredentials
         case .networkError(let error):
-            return "网络连接错误：\(error.localizedDescription)"
+            return L.Error.Network.error(error.localizedDescription)
         case .authenticationError:
-            return "身份验证失败。请检查您的账户凭证。"
+            return L.Error.Account.authenticationFailed
         case .serverError(let message):
-            return "服务器错误：\(message)"
+            return L.Error.Server.error(message)
         case .unknownError(let error):
-            return "未知错误：\(error.localizedDescription)"
-            
-        // 新增错误类型的描述
+            return L.Error.Unknown.error(error.localizedDescription)
         case .bucketNotFound(let bucketName):
-            return "存储桶 '\(bucketName)' 不存在或无访问权限。"
+            return L.Error.Bucket.notFound(bucketName)
         case .fileNotFound(let fileName):
-            return "文件 '\(fileName)' 不存在。"
+            return L.Error.File.notFound(fileName)
         case .invalidFileName(let fileName):
-            return "文件名 '\(fileName)' 包含非法字符，请使用有效的文件名。"
+            return L.Error.File.invalidName(fileName)
         case .uploadFailed(let fileName, let error):
-            return "上传文件 '\(fileName)' 失败：\(error.localizedDescription)"
+            return L.Error.File.uploadFailed(fileName, error.localizedDescription)
         case .downloadFailed(let fileName, let error):
-            return "下载文件 '\(fileName)' 失败：\(error.localizedDescription)"
+            return L.Error.File.downloadFailed(fileName, error.localizedDescription)
         case .createFolderFailed(let folderName, let error):
-            return "创建文件夹 '\(folderName)' 失败：\(error.localizedDescription)"
+            return L.Error.Folder.createFailed(folderName, error.localizedDescription)
         case .deleteFileFailed(let fileName, let error):
-            return "删除文件 '\(fileName)' 失败：\(error.localizedDescription)"
+            return L.Error.File.deleteFailed(fileName, error.localizedDescription)
         case .permissionDenied(let operation):
-            return "权限不足，无法执行 '\(operation)' 操作。请检查您的账户权限。"
+            return L.Error.Permission.denied(operation)
         case .storageQuotaExceeded:
-            return "存储配额已满，无法上传更多文件。请清理空间或升级账户。"
+            return L.Error.Storage.quotaExceeded
         case .invalidFileSize(let fileName):
-            return "文件 '\(fileName)' 大小超出限制。单个文件最大支持 5GB。"
+            return L.Error.File.sizeExceeded(fileName)
         case .fileAccessDenied(let fileName):
-            return "无法访问文件 '\(fileName)'。应用没有读取此文件的权限。"
-            
-        // 新增错误类型的描述
+            return L.Error.File.accessDenied(fileName)
         case .connectionTimeout:
-            return "连接超时。请检查网络连接并重试。"
+            return L.Error.Network.timeout
         case .dnsResolutionFailed:
-            return "DNS 解析失败。请检查端点 URL 是否正确，或者网络连接是否正常。"
+            return L.Error.Network.dnsResolutionFailed
         case .sslCertificateError:
-            return "SSL 证书验证失败。请检查端点 URL 是否支持 HTTPS。"
+            return L.Error.Network.sslCertificateError
         case .endpointNotReachable(let endpoint):
-            return "无法连接到端点 '\(endpoint)'。请检查 URL 是否正确且服务可用。"
+            return L.Error.Network.endpointNotReachable(endpoint)
+        case .invalidOperation(let message):
+            return message
         }
     }
-    
+
     /// 获取错误的建议操作
     var suggestedAction: String? {
         switch self {
         case .accountNotConfigured:
-            return "请前往账户设置页面配置您的 R2 账户信息。"
+            return L.Error.Account.notConfiguredSuggestion
         case .invalidCredentials:
-            return "请检查并重新输入正确的 Access Key ID 和 Secret Access Key。"
+            return L.Error.Account.invalidCredentialsSuggestion
         case .networkError:
-            return "请检查网络连接并重试。"
+            return L.Error.Network.errorSuggestion
         case .authenticationError:
-            return "请重新配置您的账户凭证。"
+            return L.Error.Account.authenticationFailedSuggestion
         case .bucketNotFound:
-            return "请选择一个存在的存储桶或在 Cloudflare 控制台中创建新的存储桶。"
+            return L.Error.Bucket.notFoundSuggestion
         case .permissionDenied:
-            return "请联系管理员检查您的账户权限设置。"
+            return L.Error.Permission.deniedSuggestion
         case .storageQuotaExceeded:
-            return "请删除不需要的文件或联系管理员扩容。"
+            return L.Error.Storage.quotaExceededSuggestion
         case .invalidFileSize:
-            return "请选择小于 5GB 的文件进行上传。"
+            return L.Error.File.sizeExceededSuggestion
         case .fileAccessDenied:
-            return "请尝试以下解决方案：1) 将文件移动到文档文件夹或桌面；2) 检查文件权限设置；3) 重新选择文件进行上传。"
+            return L.Error.File.accessDeniedSuggestion
         case .connectionTimeout:
-            return "请检查网络连接稳定性，然后重试操作。"
+            return L.Error.Network.timeoutSuggestion
         case .dnsResolutionFailed:
-            return "请验证端点 URL 是否正确，检查网络 DNS 设置。"
+            return L.Error.Network.dnsResolutionFailedSuggestion
         case .sslCertificateError:
-            return "请确认端点 URL 使用 HTTPS 协议且证书有效。"
+            return L.Error.Network.sslCertificateErrorSuggestion
         case .endpointNotReachable:
-            return "请检查以下几点：1) 端点 URL 格式是否正确（应为 https://账户ID.r2.cloudflarestorage.com）；2) 网络连接是否正常；3) 防火墙是否允许 HTTPS 连接；4) Cloudflare R2 服务是否可用。"
+            return L.Error.Network.endpointNotReachableSuggestion
         default:
             return nil
         }
@@ -148,6 +150,8 @@ enum R2ServiceError: Error, LocalizedError {
             return true
         case .sslCertificateError:
             return false
+        case .invalidOperation(_):
+            return false
         }
     }
 }
@@ -157,6 +161,10 @@ enum R2ServiceError: Error, LocalizedError {
 @MainActor
 class R2Service: ObservableObject {
     // MARK: - Properties
+
+    private static var isUITesting: Bool {
+        ProcessInfo.processInfo.arguments.contains("--ui-testing")
+    }
     
     /// S3 客户端实例
     private var s3Client: S3Client?
@@ -186,8 +194,10 @@ class R2Service: ObservableObject {
         self.accountManager = accountManager
         
         // 尝试加载现有账户配置
-        Task {
-            await loadAccountAndInitialize()
+        if !Self.isUITesting {
+            Task {
+                await loadAccountAndInitialize()
+            }
         }
     }
     
@@ -510,6 +520,12 @@ class R2Service: ObservableObject {
     /// 适用于 API Token 没有 listBuckets 权限但有特定存储桶访问权限的情况
     /// - Parameter bucketName: 存储桶名称
     func selectBucketDirectly(_ bucketName: String) async throws -> BucketItem {
+        // 如果已断开但仍有当前账户配置，尝试自动重新初始化
+        if s3Client == nil, let account = accountManager.currentAccount {
+            let credentials = try accountManager.getCompleteCredentials(for: account)
+            try await initialize(with: credentials.account, secretAccessKey: credentials.secretAccessKey)
+        }
+
         guard let s3Client = s3Client else {
             throw R2ServiceError.accountNotConfigured
         }
@@ -660,27 +676,36 @@ class R2Service: ObservableObject {
         guard let s3Client = s3Client else {
             throw R2ServiceError.accountNotConfigured
         }
-        
+
         isLoading = true
         lastError = nil
-        
+
         do {
-            // 构造 ListObjectsV2 请求
-            let input = ListObjectsV2Input(
-                bucket: bucket,
-                delimiter: "/",  // 使用 `/` 作为分隔符来模拟文件夹结构
-                maxKeys: 1000,   // 单次最多返回 1000 个对象
-                prefix: prefix   // 路径前缀，用于指定"文件夹"
-            )
-            
-            let response = try await s3Client.listObjectsV2(input: input)
             var fileObjects: [FileObject] = []
             var processedKeys = Set<String>() // 用于去重的 key 集合
-            
-            // 添加调试信息：开始处理返回结果
-            print("🐛 DEBUG listObjects: Processing response for prefix '\(prefix ?? "ROOT")'")
-            print("🐛 DEBUG listObjects: Raw CommonPrefixes count: \(response.commonPrefixes?.count ?? 0)")
-            print("🐛 DEBUG listObjects: Raw Contents count: \(response.contents?.count ?? 0)")
+            var continuationToken: String? = nil
+            var pageCount = 0
+
+            // 分页循环获取所有对象
+            repeat {
+                pageCount += 1
+
+                // 构造 ListObjectsV2 请求
+                let input = ListObjectsV2Input(
+                    bucket: bucket,
+                    continuationToken: continuationToken,  // 分页令牌
+                    delimiter: "/",  // 使用 `/` 作为分隔符来模拟文件夹结构
+                    maxKeys: 1000,   // 单次最多返回 1000 个对象
+                    prefix: prefix   // 路径前缀，用于指定"文件夹"
+                )
+
+                let response = try await s3Client.listObjectsV2(input: input)
+
+                // 添加调试信息：开始处理返回结果
+                print("🐛 DEBUG listObjects: Page \(pageCount) for prefix '\(prefix ?? "ROOT")'")
+                print("🐛 DEBUG listObjects: Raw CommonPrefixes count: \(response.commonPrefixes?.count ?? 0)")
+                print("🐛 DEBUG listObjects: Raw Contents count: \(response.contents?.count ?? 0)")
+                print("🐛 DEBUG listObjects: IsTruncated: \(response.isTruncated ?? false)")
 
             // 处理文件夹（CommonPrefixes）- 优先处理，避免重复
             if let commonPrefixes = response.commonPrefixes {
@@ -722,8 +747,9 @@ class R2Service: ObservableObject {
                         }
 
                         // Cloudflare R2 特殊处理：检查是否为文件夹对象
-                        // R2 可能会在 listObjects 时去掉文件夹对象的末尾斜杠，但保持 size=0
-                        let isLikelyFolderObject = (size == 0) && !key.contains(".")
+                        // 1. 如果 key 以 / 结尾，绝对是文件夹
+                        // 2. 如果大小为 0 且不包含点（兼容旧逻辑）
+                        let isLikelyFolderObject = key.hasSuffix("/") || ((size == 0) && !key.contains("."))
                         
                         if !isLikelyFolderObject {
                             // 这是一个真正的文件对象
@@ -752,9 +778,15 @@ class R2Service: ObservableObject {
                     }
                 }
             }
-            
+
+                // 更新分页令牌
+                continuationToken = response.nextContinuationToken
+
+                // 如果没有更多数据，退出循环
+            } while continuationToken != nil
+
             // 添加调试信息：完成处理
-            print("🐛 DEBUG listObjects: Finished processing. Total FileObjects created: \(fileObjects.count)")
+            print("🐛 DEBUG listObjects: Finished processing \(pageCount) page(s). Total FileObjects created: \(fileObjects.count)")
             fileObjects.forEach { fo in
                 if fo.key == "stricker-ai-blog/" || fo.name == "stricker-ai-blog" {
                     print("    📄 Final FileObject: Name='\(fo.name)', Key='\(fo.key)', IsDirectory=\(fo.isDirectory), Icon='\(fo.iconName)'")
@@ -763,7 +795,7 @@ class R2Service: ObservableObject {
 
             isLoading = false
             return fileObjects
-            
+
         } catch {
             isLoading = false
             let serviceError = mapError(error)
@@ -808,9 +840,12 @@ class R2Service: ObservableObject {
             print("   最终路径: '\(finalFolderPath)'")
             
             // 创建 PutObject 请求，上传一个空对象来表示文件夹
+            // 使用 application/x-directory 作为 Content-Type 确保 R2 识别为文件夹
             let input = PutObjectInput(
                 body: .data(Data()), // 空内容
                 bucket: bucket,
+                contentLength: 0,
+                contentType: "application/x-directory",
                 key: finalFolderPath
             )
             
@@ -997,7 +1032,612 @@ class R2Service: ObservableObject {
             throw serviceError
         }
     }
-    
+
+    // MARK: - Multipart Upload 分片上传
+
+    /// 分片上传阈值：超过此大小使用分片上传（100MB）
+    /// 简单上传对于较小文件更快（无额外 API 开销）
+    private let multipartThreshold: Int64 = 100 * 1024 * 1024
+
+    /// 分片上传并发数
+    private let uploadConcurrency: Int = 12
+
+    /// 根据文件大小计算最佳分片大小
+    /// - Parameter fileSize: 文件大小（字节）
+    /// - Returns: 分片大小（字节）
+    private func calculatePartSize(for fileSize: Int64) -> Int {
+        // 自适应分片策略：
+        // - 100MB-500MB: 20MB 分片（5-25 个分片）
+        // - 500MB-2GB:   50MB 分片（10-40 个分片）
+        // - >2GB:        100MB 分片（减少 API 调用）
+        let mb = 1024 * 1024
+
+        if fileSize <= 500 * Int64(mb) {
+            return 20 * mb  // 20MB
+        } else if fileSize <= 2 * 1024 * Int64(mb) {
+            return 50 * mb  // 50MB
+        } else {
+            return 100 * mb // 100MB
+        }
+    }
+
+    /// 流式上传文件（低内存占用）
+    /// 小文件使用普通上传，大文件使用分片上传
+    /// - Parameters:
+    ///   - bucket: 存储桶名称
+    ///   - key: 目标对象键（完整路径）
+    ///   - fileURL: 本地文件 URL
+    ///   - contentType: MIME类型
+    ///   - progress: 进度回调 (0.0 - 1.0)
+    func uploadFileStream(
+        bucket: String,
+        key: String,
+        fileURL: URL,
+        contentType: String,
+        progress: @escaping (Double) -> Void
+    ) async throws {
+        guard let s3Client = s3Client else {
+            print("❌ S3客户端未初始化")
+            throw R2ServiceError.accountNotConfigured
+        }
+
+        let fileName = fileURL.lastPathComponent
+
+        // 获取文件大小
+        let fileAttributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+        guard let fileSize = fileAttributes[.size] as? Int64 else {
+            throw R2ServiceError.uploadFailed(fileName, NSError(
+                domain: "R2Service",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "无法获取文件大小"]
+            ))
+        }
+
+        // 检查文件大小限制（5GB）
+        let maxFileSize: Int64 = 5 * 1024 * 1024 * 1024
+        if fileSize > maxFileSize {
+            print("❌ 文件大小超限: \(fileSize) > 5GB")
+            throw R2ServiceError.invalidFileSize(fileName)
+        }
+
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useGB, .useMB, .useKB, .useBytes]
+        formatter.countStyle = .file
+        print("📏 文件大小: \(formatter.string(fromByteCount: fileSize))")
+
+        // 根据文件大小选择上传方式
+        if fileSize > multipartThreshold {
+            print("📦 使用分片上传（文件 > \(formatter.string(fromByteCount: multipartThreshold))）")
+            try await uploadMultipart(
+                bucket: bucket,
+                key: key,
+                fileURL: fileURL,
+                fileSize: fileSize,
+                contentType: contentType,
+                progress: progress
+            )
+        } else {
+            print("📤 使用普通上传")
+            try await uploadSimple(
+                bucket: bucket,
+                key: key,
+                fileURL: fileURL,
+                fileSize: fileSize,
+                contentType: contentType,
+                progress: progress
+            )
+        }
+    }
+
+    /// 普通上传（小文件）
+    private func uploadSimple(
+        bucket: String,
+        key: String,
+        fileURL: URL,
+        fileSize: Int64,
+        contentType: String,
+        progress: @escaping (Double) -> Void
+    ) async throws {
+        guard let s3Client = s3Client else {
+            throw R2ServiceError.accountNotConfigured
+        }
+
+        let fileName = fileURL.lastPathComponent
+        isLoading = true
+        lastError = nil
+
+        do {
+            // 读取文件数据
+            let data = try Data(contentsOf: fileURL)
+
+            await MainActor.run {
+                progress(0.5)
+            }
+
+            // 创建 PutObject 请求
+            let input = PutObjectInput(
+                body: .data(data),
+                bucket: bucket,
+                contentLength: Int(fileSize),
+                contentType: contentType,
+                key: key
+            )
+
+            print("🚀 开始执行上传...")
+            let _ = try await s3Client.putObject(input: input)
+
+            await MainActor.run {
+                progress(1.0)
+            }
+
+            isLoading = false
+            print("✅ 上传成功完成")
+
+        } catch {
+            isLoading = false
+            let serviceError = mapUploadError(error, fileName: fileName)
+            lastError = serviceError
+            throw serviceError
+        }
+    }
+
+    /// 分片上传（大文件，并发上传多个分片）
+    /// 自适应分片大小，根据文件大小动态调整
+    private func uploadMultipart(
+        bucket: String,
+        key: String,
+        fileURL: URL,
+        fileSize: Int64,
+        contentType: String,
+        progress: @escaping (Double) -> Void
+    ) async throws {
+        guard let s3Client = s3Client else {
+            throw R2ServiceError.accountNotConfigured
+        }
+
+        let fileName = fileURL.lastPathComponent
+        isLoading = true
+        lastError = nil
+
+        // 根据文件大小计算最佳分片大小
+        let partSize = calculatePartSize(for: fileSize)
+
+        // 计算分片数量
+        let totalParts = Int((fileSize + Int64(partSize) - 1) / Int64(partSize))
+        print("📦 并发分片上传: \(totalParts) 个分片，每个 \(partSize / 1024 / 1024)MB，并发数: \(uploadConcurrency)")
+
+        var uploadId: String?
+
+        do {
+            // 1. 初始化分片上传
+            print("🔧 初始化分片上传...")
+            let createInput = CreateMultipartUploadInput(
+                bucket: bucket,
+                contentType: contentType,
+                key: key
+            )
+            let createResponse = try await s3Client.createMultipartUpload(input: createInput)
+
+            guard let id = createResponse.uploadId else {
+                throw R2ServiceError.uploadFailed(fileName, NSError(
+                    domain: "R2Service",
+                    code: -1,
+                    userInfo: [NSLocalizedDescriptionKey: "无法获取上传ID"]
+                ))
+            }
+            uploadId = id
+            print("✅ 获取上传ID: \(id.prefix(16))...")
+
+            // 2. 用于追踪进度和收集已完成分片
+            let bytesUploaded = OSAllocatedUnfairLock(initialState: Int64(0))
+            let completedPartsLock = OSAllocatedUnfairLock(initialState: [S3ClientTypes.CompletedPart]())
+
+            // 3. 并发上传分片
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                let semaphore = AsyncSemaphore(count: uploadConcurrency)
+
+                for partNumber in 1...totalParts {
+                    group.addTask {
+                        await semaphore.wait()
+
+                        do {
+                            // 检查任务是否被取消
+                            try Task.checkCancellation()
+
+                            // 计算分片的偏移量和大小
+                            let offset = Int64(partNumber - 1) * Int64(partSize)
+                            let remainingBytes = fileSize - offset
+                            let currentPartSize = min(Int64(partSize), remainingBytes)
+
+                            // 读取分片数据（每个任务独立打开文件句柄）
+                            let fileHandle = try FileHandle(forReadingFrom: fileURL)
+                            defer { try? fileHandle.close() }
+                            try fileHandle.seek(toOffset: UInt64(offset))
+                            let partData = fileHandle.readData(ofLength: Int(currentPartSize))
+
+                            if partData.isEmpty {
+                                await semaphore.signal()
+                                return
+                            }
+
+                            print("📤 上传分片 \(partNumber)/\(totalParts)...")
+
+                            // 上传分片
+                            let uploadPartInput = UploadPartInput(
+                                body: .data(partData),
+                                bucket: bucket,
+                                contentLength: partData.count,
+                                key: key,
+                                partNumber: partNumber,
+                                uploadId: id
+                            )
+
+                            let partResponse = try await s3Client.uploadPart(input: uploadPartInput)
+
+                            // 记录已完成的分片（线程安全）
+                            let completedPart = S3ClientTypes.CompletedPart(
+                                eTag: partResponse.eTag,
+                                partNumber: partNumber
+                            )
+                            completedPartsLock.withLock { parts in
+                                parts.append(completedPart)
+                            }
+
+                            // 更新进度（线程安全）
+                            let newTotal = bytesUploaded.withLock { total -> Int64 in
+                                total += Int64(partData.count)
+                                return total
+                            }
+                            let currentProgress = Double(newTotal) / Double(fileSize)
+                            await MainActor.run {
+                                progress(currentProgress * 0.95) // 留5%给完成操作
+                            }
+
+                            print("✅ 分片 \(partNumber) 完成")
+                            await semaphore.signal()
+                        } catch {
+                            await semaphore.signal()
+                            throw error
+                        }
+                    }
+                }
+
+                // 等待所有分片完成
+                try await group.waitForAll()
+            }
+
+            // 4. 获取并排序已完成的分片（分片必须按编号顺序）
+            let completedParts = completedPartsLock.withLock { parts in
+                parts.sorted { ($0.partNumber ?? 0) < ($1.partNumber ?? 0) }
+            }
+
+            // 5. 完成分片上传
+            print("🔧 完成分片上传...")
+            let completedUpload = S3ClientTypes.CompletedMultipartUpload(parts: completedParts)
+            let completeInput = CompleteMultipartUploadInput(
+                bucket: bucket,
+                key: key,
+                multipartUpload: completedUpload,
+                uploadId: id
+            )
+
+            let _ = try await s3Client.completeMultipartUpload(input: completeInput)
+
+            await MainActor.run {
+                progress(1.0)
+            }
+
+            isLoading = false
+            print("✅ 并发分片上传成功完成")
+
+        } catch {
+            isLoading = false
+
+            // 如果上传失败且有上传ID，尝试中止上传
+            if let id = uploadId {
+                print("⚠️ 上传失败，尝试中止分片上传...")
+                let abortInput = AbortMultipartUploadInput(
+                    bucket: bucket,
+                    key: key,
+                    uploadId: id
+                )
+                try? await s3Client.abortMultipartUpload(input: abortInput)
+                print("✅ 已中止分片上传")
+            }
+
+            // 如果是取消操作，直接重新抛出
+            if error is CancellationError {
+                print("🛑 分片上传被取消")
+                throw error
+            }
+
+            print("❌ 分片上传失败: \(error.localizedDescription)")
+            let serviceError = mapUploadError(error, fileName: fileName)
+            lastError = serviceError
+            throw serviceError
+        }
+    }
+
+    /// 下载文件到本地临时路径
+    /// - Parameters:
+    ///   - bucket: 存储桶名称
+    ///   - key: 对象键
+    ///   - to: 本地保存路径
+    func downloadObject(bucket: String, key: String, to localURL: URL) async throws {
+        guard let s3Client = s3Client else {
+            print("❌ S3客户端未初始化")
+            throw R2ServiceError.accountNotConfigured
+        }
+
+        let fileName = (key as NSString).lastPathComponent
+        print("📥 开始下载文件: \(key)")
+        print("   存储桶: \(bucket)")
+        print("   目标路径: \(localURL.path)")
+
+        isLoading = true
+        lastError = nil
+
+        do {
+            // 创建 GetObject 请求
+            let input = GetObjectInput(bucket: bucket, key: key)
+
+            print("🔧 正在创建下载请求...")
+            let response = try await s3Client.getObject(input: input)
+
+            // 读取响应 body
+            guard let body = response.body else {
+                print("❌ 响应体为空")
+                throw R2ServiceError.downloadFailed(fileName, NSError(
+                    domain: "R2Service",
+                    code: -1,
+                    userInfo: [NSLocalizedDescriptionKey: "响应体为空"]
+                ))
+            }
+
+            // 创建文件并获取 FileHandle
+            FileManager.default.createFile(atPath: localURL.path, contents: nil, attributes: nil)
+            let fileHandle = try FileHandle(forWritingTo: localURL)
+            defer { try? fileHandle.close() }
+
+            // 读取数据（AWS SDK 当前不支持真正的 AsyncSequence 遍历）
+            print("📖 正在读取文件数据...")
+            guard let fileData = try await body.readData() else {
+                print("❌ 文件数据为空")
+                throw R2ServiceError.downloadFailed(fileName, NSError(
+                    domain: "R2Service",
+                    code: -2,
+                    userInfo: [NSLocalizedDescriptionKey: "文件数据为空"]
+                ))
+            }
+
+            // 分块写入以减少内存峰值
+            print("💾 正在写入文件...")
+            var totalBytesWritten: Int64 = 0
+            let chunkSize = 1024 * 1024 // 1MB per chunk
+            var offset = 0
+            while offset < fileData.count {
+                autoreleasepool {
+                    let endIndex = min(offset + chunkSize, fileData.count)
+                    let chunk = fileData.subdata(in: offset..<endIndex)
+                    fileHandle.write(chunk)
+                    totalBytesWritten += Int64(chunk.count)
+                    offset = endIndex
+                }
+            }
+
+            // 格式化文件大小用于显示
+            let formatter = ByteCountFormatter()
+            formatter.allowedUnits = [.useGB, .useMB, .useKB, .useBytes]
+            formatter.countStyle = .file
+            let fileSizeString = formatter.string(fromByteCount: totalBytesWritten)
+            print("📏 文件大小: \(fileSizeString)")
+
+            isLoading = false
+            print("✅ 文件下载完成: \(localURL.path)")
+
+        } catch {
+            isLoading = false
+            print("❌ 下载过程中发生错误:")
+            print("   错误类型: \(type(of: error))")
+            print("   错误描述: \(error.localizedDescription)")
+
+            // 清理失败的下载文件
+            try? FileManager.default.removeItem(at: localURL)
+
+            // 如果已经是 R2ServiceError，直接抛出
+            if let r2Error = error as? R2ServiceError {
+                lastError = r2Error
+                throw r2Error
+            }
+
+            // 映射其他错误
+            let serviceError = R2ServiceError.downloadFailed(fileName, error)
+            lastError = serviceError
+            throw serviceError
+        }
+    }
+
+    /// 分段下载阈值：超过此大小使用分段下载（10MB）
+    private let downloadChunkThreshold: Int64 = 10 * 1024 * 1024
+
+    /// 分段下载块大小（10MB，更适合高速网络）
+    private let downloadChunkSize: Int64 = 10 * 1024 * 1024
+
+    /// 分段下载并发数
+    private let downloadConcurrency: Int = 12
+
+    /// 分段下载文件（低内存占用，并发下载）
+    /// 使用 HTTP Range 请求分段下载，多个分段并发下载
+    /// - Parameters:
+    ///   - bucket: 存储桶名称
+    ///   - key: 对象键
+    ///   - to: 本地保存路径
+    ///   - fileSize: 文件大小（必须预先知道）
+    ///   - progress: 进度回调 (bytesDownloaded, totalBytes)
+    func downloadObjectChunked(
+        bucket: String,
+        key: String,
+        to localURL: URL,
+        fileSize: Int64,
+        progress: @escaping (Int64, Int64) -> Void
+    ) async throws {
+        guard let s3Client = s3Client else {
+            print("❌ S3客户端未初始化")
+            throw R2ServiceError.accountNotConfigured
+        }
+
+        let fileName = (key as NSString).lastPathComponent
+
+        // 小文件直接下载
+        if fileSize <= downloadChunkThreshold {
+            print("📥 文件较小，使用普通下载: \(fileName)")
+            try await downloadObject(bucket: bucket, key: key, to: localURL)
+            progress(fileSize, fileSize)
+            return
+        }
+
+        print("📥 开始并发分段下载: \(key)")
+        print("   存储桶: \(bucket)")
+        print("   目标路径: \(localURL.path)")
+        print("   文件大小: \(fileSize) bytes")
+
+        let totalChunks = Int((fileSize + downloadChunkSize - 1) / downloadChunkSize)
+        print("📦 分段下载: \(totalChunks) 个分段，每个 \(downloadChunkSize / 1024 / 1024)MB，并发数: \(downloadConcurrency)")
+
+        do {
+            // 创建本地文件并预分配大小
+            FileManager.default.createFile(atPath: localURL.path, contents: nil, attributes: nil)
+            let fileHandle = try FileHandle(forWritingTo: localURL)
+
+            // 预分配文件大小（避免并发写入时的竞争）
+            try fileHandle.truncate(atOffset: UInt64(fileSize))
+            try fileHandle.close()
+
+            // 用于追踪进度的原子计数器
+            let bytesDownloaded = OSAllocatedUnfairLock(initialState: Int64(0))
+
+            // 并发下载分段
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                // 使用信号量限制并发数
+                let semaphore = AsyncSemaphore(count: downloadConcurrency)
+
+                for chunkIndex in 0..<totalChunks {
+                    group.addTask {
+                        await semaphore.wait()
+
+                        do {
+                            // 检查任务是否被取消
+                            try Task.checkCancellation()
+
+                            // 计算 Range
+                            let startByte = Int64(chunkIndex) * self.downloadChunkSize
+                            let endByte = min(startByte + self.downloadChunkSize - 1, fileSize - 1)
+                            let rangeString = "bytes=\(startByte)-\(endByte)"
+
+                            print("📥 下载分段 \(chunkIndex + 1)/\(totalChunks): \(rangeString)")
+
+                            // 创建带 Range 的请求
+                            let input = GetObjectInput(
+                                bucket: bucket,
+                                key: key,
+                                range: rangeString
+                            )
+
+                            let response = try await s3Client.getObject(input: input)
+
+                            guard let body = response.body else {
+                                throw R2ServiceError.downloadFailed(fileName, NSError(
+                                    domain: "R2Service",
+                                    code: -1,
+                                    userInfo: [NSLocalizedDescriptionKey: "分段 \(chunkIndex + 1) 响应体为空"]
+                                ))
+                            }
+
+                            // 读取分段数据
+                            guard let chunkData = try await body.readData() else {
+                                throw R2ServiceError.downloadFailed(fileName, NSError(
+                                    domain: "R2Service",
+                                    code: -2,
+                                    userInfo: [NSLocalizedDescriptionKey: "分段 \(chunkIndex + 1) 数据为空"]
+                                ))
+                            }
+
+                            // 写入文件（每个分段独立打开文件句柄，定位到正确位置）
+                            let chunkHandle = try FileHandle(forWritingTo: localURL)
+                            defer { try? chunkHandle.close() }
+                            try chunkHandle.seek(toOffset: UInt64(startByte))
+                            chunkHandle.write(chunkData)
+
+                            // 更新进度（线程安全）
+                            let newTotal = bytesDownloaded.withLock { total -> Int64 in
+                                total += Int64(chunkData.count)
+                                return total
+                            }
+                            progress(newTotal, fileSize)
+
+                            print("✅ 分段 \(chunkIndex + 1) 完成，已下载: \(newTotal)/\(fileSize)")
+                            await semaphore.signal()
+                        } catch {
+                            await semaphore.signal()
+                            throw error
+                        }
+                    }
+                }
+
+                // 等待所有分段完成
+                try await group.waitForAll()
+            }
+
+            print("✅ 并发分段下载完成: \(localURL.path)")
+
+        } catch {
+            print("❌ 分段下载失败: \(error.localizedDescription)")
+
+            // 清理失败的下载文件
+            try? FileManager.default.removeItem(at: localURL)
+
+            // 如果是取消操作，直接重新抛出
+            if error is CancellationError {
+                print("🛑 分段下载被取消")
+                throw error
+            }
+
+            if let r2Error = error as? R2ServiceError {
+                throw r2Error
+            }
+            throw R2ServiceError.downloadFailed(fileName, error)
+        }
+    }
+
+    /// 异步信号量（用于限制并发数）
+    private actor AsyncSemaphore {
+        private var count: Int
+        private var waiters: [CheckedContinuation<Void, Never>] = []
+
+        init(count: Int) {
+            self.count = count
+        }
+
+        func wait() async {
+            if count > 0 {
+                count -= 1
+            } else {
+                await withCheckedContinuation { continuation in
+                    waiters.append(continuation)
+                }
+            }
+        }
+
+        func signal() {
+            if let waiter = waiters.first {
+                waiters.removeFirst()
+                waiter.resume()
+            } else {
+                count += 1
+            }
+        }
+    }
+
     /// 删除指定的文件对象
     /// - Parameters:
     ///   - bucket: 存储桶名称
@@ -1049,6 +1689,400 @@ class R2Service: ObservableObject {
         }
     }
     
+    /// 批量删除文件
+    /// - Parameters:
+    ///   - bucket: 存储桶名称
+    ///   - keys: 要删除的对象键列表
+    /// - Returns: 删除失败的文件列表
+    func deleteObjects(bucket: String, keys: [String]) async throws -> [String] {
+        guard let s3Client = s3Client else {
+            throw R2ServiceError.accountNotConfigured
+        }
+        
+        guard !keys.isEmpty else { return [] }
+        
+        print("🗑️ 开始批量删除 \(keys.count) 个文件...")
+        
+        isLoading = true
+        lastError = nil
+        
+        var failedKeys: [String] = []
+        
+        // S3 DeleteObjects API 每次最多删除 1000 个对象
+        // 这里分批处理
+        let batchSize = 1000
+        for batch in stride(from: 0, to: keys.count, by: batchSize) {
+            let endIndex = min(batch + batchSize, keys.count)
+            let batchKeys = Array(keys[batch..<endIndex])
+            
+            do {
+                // 构建删除请求
+                let objectIdentifiers = batchKeys.map { key in
+                    S3ClientTypes.ObjectIdentifier(key: key)
+                }
+                
+                let deleteInput = S3ClientTypes.Delete(
+                    objects: objectIdentifiers,
+                    quiet: false
+                )
+                
+                let input = DeleteObjectsInput(
+                    bucket: bucket,
+                    delete: deleteInput
+                )
+                
+                let result = try await s3Client.deleteObjects(input: input)
+                
+                // 检查删除错误
+                if let errors = result.errors {
+                    for error in errors {
+                        if let key = error.key {
+                            failedKeys.append(key)
+                            print("❌ 删除失败: \(key) - \(error.message ?? "未知错误")")
+                        }
+                    }
+                }
+                
+                print("✅ 批量删除完成，成功: \(batchKeys.count - (result.errors?.count ?? 0))，失败: \(result.errors?.count ?? 0)")
+                
+            } catch {
+                // 如果整批失败，将所有键添加到失败列表
+                failedKeys.append(contentsOf: batchKeys)
+                print("❌ 批量删除请求失败: \(error.localizedDescription)")
+            }
+        }
+        
+        isLoading = false
+        return failedKeys
+    }
+
+    /// 删除文件夹及其所有内容
+    /// - Parameters:
+    ///   - bucket: 存储桶名称
+    ///   - folderKey: 文件夹路径（以 / 结尾）
+    /// - Returns: 删除的文件数量和失败的文件列表
+    func deleteFolder(bucket: String, folderKey: String) async throws -> (deletedCount: Int, failedKeys: [String]) {
+        guard let s3Client = s3Client else {
+            throw R2ServiceError.accountNotConfigured
+        }
+
+        // 确保 folderKey 以 / 结尾
+        let prefix = folderKey.hasSuffix("/") ? folderKey : folderKey + "/"
+
+        print("📁 开始删除文件夹: \(prefix)")
+        print("   存储桶: \(bucket)")
+
+        isLoading = true
+        lastError = nil
+
+        var allKeys: [String] = []
+        var continuationToken: String? = nil
+
+        // 1. 列出文件夹内所有对象
+        do {
+            repeat {
+                let input = ListObjectsV2Input(
+                    bucket: bucket,
+                    continuationToken: continuationToken,
+                    prefix: prefix
+                )
+
+                let response = try await s3Client.listObjectsV2(input: input)
+
+                if let contents = response.contents {
+                    let keys = contents.compactMap { $0.key }
+                    allKeys.append(contentsOf: keys)
+                }
+
+                continuationToken = response.nextContinuationToken
+            } while continuationToken != nil
+
+            print("📋 找到 \(allKeys.count) 个对象需要删除")
+
+            // 重要：始终添加文件夹标记对象本身（包括带斜杠和不带斜杠的版本）
+            // R2/S3 中文件夹通常由以 / 结尾的对象表示，但为了兼容性，我们也尝试删除不带斜杠的键
+            let slashedKey = prefix.hasSuffix("/") ? prefix : prefix + "/"
+            let noSlashKey = prefix.hasSuffix("/") ? String(prefix.dropLast()) : prefix
+            
+            if !allKeys.contains(slashedKey) {
+                allKeys.append(slashedKey)
+                print("📁 添加文件夹标记对象(标准): \(slashedKey)")
+            }
+            
+            if !allKeys.contains(noSlashKey) {
+                allKeys.append(noSlashKey)
+                print("📁 添加文件夹标记对象(兼容): \(noSlashKey)")
+            }
+
+            // 2. 批量删除所有对象（包括文件夹标记）
+            let failedKeys = try await deleteObjects(bucket: bucket, keys: allKeys)
+
+            isLoading = false
+
+            let deletedCount = allKeys.count - failedKeys.count
+            print("✅ 文件夹删除完成，删除 \(deletedCount) 个对象，失败 \(failedKeys.count) 个")
+
+            return (deletedCount, failedKeys)
+
+        } catch {
+            isLoading = false
+            print("❌ 删除文件夹失败: \(error.localizedDescription)")
+            let serviceError = mapError(error)
+            lastError = serviceError
+            throw serviceError
+        }
+    }
+
+    /// 重命名文件（通过复制后删除实现）
+    /// - Parameters:
+    ///   - bucket: 存储桶名称
+    ///   - oldKey: 原对象键
+    ///   - newKey: 新对象键
+    func renameObject(bucket: String, oldKey: String, newKey: String) async throws {
+        guard let s3Client = s3Client else {
+            throw R2ServiceError.accountNotConfigured
+        }
+        
+        print("✏️ 重命名文件: \(oldKey) -> \(newKey)")
+        
+        isLoading = true
+        lastError = nil
+        
+        do {
+            // 1. 复制对象到新位置
+            let copySource = "\(bucket)/\(oldKey)"
+            let copyInput = CopyObjectInput(
+                bucket: bucket,
+                copySource: copySource,
+                key: newKey
+            )
+            
+            print("📋 步骤 1/2: 复制对象...")
+            let _ = try await s3Client.copyObject(input: copyInput)
+            
+            // 2. 删除原对象
+            print("🗑️ 步骤 2/2: 删除原对象...")
+            let deleteInput = DeleteObjectInput(
+                bucket: bucket,
+                key: oldKey
+            )
+            let _ = try await s3Client.deleteObject(input: deleteInput)
+            
+            isLoading = false
+            print("✅ 重命名完成")
+
+        } catch {
+            isLoading = false
+            print("❌ 重命名失败: \(error.localizedDescription)")
+            let fileName = (oldKey as NSString).lastPathComponent
+            let serviceError = mapError(error)
+            lastError = serviceError
+            throw serviceError
+        }
+    }
+    
+    // MARK: - 移动操作
+    
+    /// 检查对象是否存在
+    /// - Parameters:
+    ///   - bucket: 存储桶名称
+    ///   - key: 对象键
+    /// - Returns: 是否存在
+    func objectExists(bucket: String, key: String) async throws -> Bool {
+        guard let s3Client = s3Client else {
+            throw R2ServiceError.accountNotConfigured
+        }
+        
+        do {
+            let input = HeadObjectInput(bucket: bucket, key: key)
+            let _ = try await s3Client.headObject(input: input)
+            return true
+        } catch {
+            // 如果是 404 类型错误，表示对象不存在
+            let errorDescription = String(describing: error).lowercased()
+            if errorDescription.contains("notfound") || errorDescription.contains("404") || errorDescription.contains("nosuchkey") {
+                return false
+            }
+            // 其他错误抛出
+            throw mapError(error)
+        }
+    }
+    
+    /// 移动单个对象（通过复制后删除实现）
+    /// - Parameters:
+    ///   - bucket: 存储桶名称
+    ///   - sourceKey: 源对象键
+    ///   - destinationKey: 目标对象键
+    func moveObject(bucket: String, sourceKey: String, destinationKey: String) async throws {
+        guard let s3Client = s3Client else {
+            throw R2ServiceError.accountNotConfigured
+        }
+        
+        // 如果源和目标相同，不需要移动
+        if sourceKey == destinationKey {
+            print("⚠️ 源和目标相同，跳过移动: \(sourceKey)")
+            return
+        }
+        
+        print("📦 移动文件: \(sourceKey) -> \(destinationKey)")
+
+        do {
+            // 1. 复制对象到新位置
+            // copySource 需要 URL 编码以支持特殊字符（包括泰语、中文等）
+            guard let encodedSourceKey = sourceKey.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else {
+                throw R2ServiceError.invalidOperation("无法编码源文件名")
+            }
+            let copySource = "\(bucket)/\(encodedSourceKey)"
+            let copyInput = CopyObjectInput(
+                bucket: bucket,
+                copySource: copySource,
+                key: destinationKey
+            )
+            
+            print("📋 步骤 1/2: 复制对象...")
+            let _ = try await s3Client.copyObject(input: copyInput)
+            
+            // 2. 删除原对象
+            print("🗑️ 步骤 2/2: 删除原对象...")
+            let deleteInput = DeleteObjectInput(
+                bucket: bucket,
+                key: sourceKey
+            )
+            let _ = try await s3Client.deleteObject(input: deleteInput)
+            
+            print("✅ 移动完成")
+            
+        } catch {
+            print("❌ 移动失败: \(error.localizedDescription)")
+            throw mapError(error)
+        }
+    }
+    
+    /// 移动文件夹及其所有内容
+    /// - Parameters:
+    ///   - bucket: 存储桶名称
+    ///   - sourceFolderKey: 源文件夹路径（以 / 结尾）
+    ///   - destinationFolderKey: 目标文件夹路径（以 / 结尾）
+    /// - Returns: 移动的文件数量和失败的文件列表
+    func moveFolder(bucket: String, sourceFolderKey: String, destinationFolderKey: String) async throws -> (movedCount: Int, failedKeys: [String]) {
+        guard let s3Client = s3Client else {
+            throw R2ServiceError.accountNotConfigured
+        }
+        
+        // 确保路径以 / 结尾
+        let sourcePrefix = sourceFolderKey.hasSuffix("/") ? sourceFolderKey : sourceFolderKey + "/"
+        let destPrefix = destinationFolderKey.hasSuffix("/") ? destinationFolderKey : destinationFolderKey + "/"
+        
+        // 检查是否试图移动到自身的子目录
+        if destPrefix.hasPrefix(sourcePrefix) {
+            print("❌ 不能移动文件夹到自身的子目录")
+            throw R2ServiceError.invalidOperation("不能移动文件夹到自身的子目录")
+        }
+        
+        // 如果源和目标相同，不需要移动
+        if sourcePrefix == destPrefix {
+            print("⚠️ 源和目标相同，跳过移动")
+            return (0, [])
+        }
+        
+        print("📁 开始移动文件夹: \(sourcePrefix) -> \(destPrefix)")
+        print("   存储桶: \(bucket)")
+        
+        isLoading = true
+        lastError = nil
+        
+        var allKeys: [String] = []
+        var continuationToken: String? = nil
+        var failedKeys: [String] = []
+        var movedCount = 0
+        
+        do {
+            // 1. 列出源文件夹内所有对象
+            repeat {
+                let input = ListObjectsV2Input(
+                    bucket: bucket,
+                    continuationToken: continuationToken,
+                    prefix: sourcePrefix
+                )
+                
+                let response = try await s3Client.listObjectsV2(input: input)
+                
+                if let contents = response.contents {
+                    let keys = contents.compactMap { $0.key }
+                    allKeys.append(contentsOf: keys)
+                }
+                
+                continuationToken = response.nextContinuationToken
+            } while continuationToken != nil
+            
+            // 添加文件夹标记对象本身
+            if !allKeys.contains(sourcePrefix) {
+                allKeys.append(sourcePrefix)
+            }
+            
+            print("📋 找到 \(allKeys.count) 个对象需要移动")
+            
+            // 2. 逐个移动对象
+            for sourceKey in allKeys {
+                // 检查任务是否被取消
+                try Task.checkCancellation()
+
+                // 计算目标路径：将源前缀替换为目标前缀
+                let relativePath = String(sourceKey.dropFirst(sourcePrefix.count))
+                let destKey = destPrefix + relativePath
+                
+                do {
+                    // 复制对象（copySource 需要 URL 编码）
+                    guard let encodedSourceKey = sourceKey.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else {
+                        print("⚠️ 无法编码文件名，跳过: \(sourceKey)")
+                        failedKeys.append(sourceKey)
+                        continue
+                    }
+                    let copySource = "\(bucket)/\(encodedSourceKey)"
+                    let copyInput = CopyObjectInput(
+                        bucket: bucket,
+                        copySource: copySource,
+                        key: destKey
+                    )
+                    let _ = try await s3Client.copyObject(input: copyInput)
+                    
+                    // 删除原对象
+                    let deleteInput = DeleteObjectInput(
+                        bucket: bucket,
+                        key: sourceKey
+                    )
+                    let _ = try await s3Client.deleteObject(input: deleteInput)
+                    
+                    movedCount += 1
+                    print("✅ 移动: \(sourceKey) -> \(destKey)")
+                    
+                } catch {
+                    failedKeys.append(sourceKey)
+                    print("❌ 移动失败: \(sourceKey) - \(error.localizedDescription)")
+                }
+            }
+            
+            isLoading = false
+            print("✅ 文件夹移动完成，成功 \(movedCount) 个，失败 \(failedKeys.count) 个")
+            
+            return (movedCount, failedKeys)
+            
+        } catch {
+            isLoading = false
+
+            // 如果是取消操作，直接重新抛出（已移动的文件保留）
+            if error is CancellationError {
+                print("🛑 文件夹移动被取消，已移动 \(movedCount) 个文件")
+                throw error
+            }
+
+            print("❌ 移动文件夹失败: \(error.localizedDescription)")
+            let serviceError = mapError(error)
+            lastError = serviceError
+            throw serviceError
+        }
+    }
+
     /// 断开连接
     func disconnect() {
         // 清理 S3 客户端和账户信息
@@ -1144,8 +2178,8 @@ class R2Service: ObservableObject {
         // 构建文件路径
         let filePath = fileObject.key
         
-        // 如果配置了公共域名，使用公共域名
-        if let publicDomain = account.publicDomain, !publicDomain.isEmpty {
+        // 如果配置了公共域名，使用默认公共域名
+        if let publicDomain = account.defaultPublicDomain, !publicDomain.isEmpty {
             // 确保域名格式正确
             let domain = publicDomain.hasPrefix("http") ? publicDomain : "https://\(publicDomain)"
             return "\(domain)/\(filePath)"
@@ -1768,5 +2802,16 @@ extension R2Service {
         
         // 返回根目录的示例数据
         return FileObject.sampleData
+    }
+}
+
+// MARK: - 测试支持
+
+extension R2Service {
+    /// 测试辅助方法：暴露 calculatePartSize 供单元测试使用
+    /// - Parameter fileSize: 文件大小（字节）
+    /// - Returns: 分片大小（字节）
+    func testCalculatePartSize(for fileSize: Int64) -> Int {
+        return calculatePartSize(for: fileSize)
     }
 } 

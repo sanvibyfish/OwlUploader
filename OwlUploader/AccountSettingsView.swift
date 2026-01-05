@@ -2,700 +2,585 @@
 //  AccountSettingsView.swift
 //  OwlUploader
 //
-//  Created by Sanvi Lu on 2025/5/25.
+//  设置页面 - macOS 原生 TabView 风格
 //
 
 import SwiftUI
 
-/// 账户配置设置视图
-/// 提供 R2 账户凭证的输入、验证和测试功能
+// MARK: - 设置视图
+
 struct AccountSettingsView: View {
-    // MARK: - State Properties
-    
-    /// 表单输入状态
+    @EnvironmentObject var accountManager: R2AccountManager
+    @EnvironmentObject var r2Service: R2Service
+    @EnvironmentObject var messageManager: MessageManager
+
+    @State private var accountToDelete: R2Account?
+    @State private var showDeleteConfirmation: Bool = false
+    @State private var showAddAccountSheet: Bool = false
+    @State private var accountToEdit: R2Account?
+    @State private var showRestartAlert: Bool = false
+
+    var body: some View {
+        TabView {
+            // 账户标签页
+            AccountsTabView(
+                accountManager: accountManager,
+                r2Service: r2Service,
+                showAddAccountSheet: $showAddAccountSheet,
+                accountToEdit: $accountToEdit,
+                accountToDelete: $accountToDelete,
+                showDeleteConfirmation: $showDeleteConfirmation
+            )
+            .tabItem {
+                Label(L.Account.Settings.sectionTitle, systemImage: "person.crop.circle")
+            }
+
+            // 通用设置标签页
+            GeneralTabView(showRestartAlert: $showRestartAlert)
+                .tabItem {
+                    Label(L.Settings.General.title, systemImage: "gearshape")
+                }
+
+            // 关于标签页
+            AboutTabView()
+                .tabItem {
+                    Label(L.About.title, systemImage: "info.circle")
+                }
+        }
+        .frame(width: 500, height: 400)
+        .sheet(isPresented: $showAddAccountSheet) {
+            AddAccountSheet(
+                accountManager: accountManager,
+                r2Service: r2Service,
+                messageManager: messageManager,
+                onDismiss: { showAddAccountSheet = false }
+            )
+        }
+        .sheet(item: $accountToEdit) { account in
+            EditAccountSheet(
+                account: account,
+                accountManager: accountManager,
+                r2Service: r2Service,
+                messageManager: messageManager,
+                onDismiss: { accountToEdit = nil }
+            )
+        }
+        .alert(L.Account.Delete.title, isPresented: $showDeleteConfirmation) {
+            Button(L.Common.Button.cancel, role: .cancel) { accountToDelete = nil }
+            Button(L.Common.Button.delete, role: .destructive) {
+                if let account = accountToDelete { deleteAccount(account) }
+            }
+        } message: {
+            if let account = accountToDelete {
+                Text(L.Account.Delete.confirmation(account.displayName))
+            }
+        }
+        .alert(L.Settings.Restart.title, isPresented: $showRestartAlert) {
+            Button(L.Settings.Restart.restartNow) { restartApp() }
+            Button(L.Settings.Restart.later, role: .cancel) { }
+        } message: {
+            Text(L.Settings.Restart.message)
+        }
+    }
+
+    private func deleteAccount(_ account: R2Account) {
+        if accountManager.currentAccount?.id == account.id {
+            r2Service.disconnect()
+        }
+        do {
+            try accountManager.deleteAccount(account)
+            messageManager.showSuccess(
+                L.Message.Success.accountDeleted,
+                description: L.Message.Success.accountDeletedDescription(account.displayName)
+            )
+        } catch {
+            messageManager.showError(L.Message.Error.deleteFailed, description: error.localizedDescription)
+        }
+        accountToDelete = nil
+    }
+
+    private func restartApp() {
+        let url = URL(fileURLWithPath: Bundle.main.resourcePath!)
+        let path = url.deletingLastPathComponent().deletingLastPathComponent().absoluteString
+        let task = Process()
+        task.launchPath = "/usr/bin/open"
+        task.arguments = [path]
+        task.launch()
+        NSApp.terminate(nil)
+    }
+}
+
+// MARK: - 账户标签页
+
+struct AccountsTabView: View {
+    @ObservedObject var accountManager: R2AccountManager
+    @ObservedObject var r2Service: R2Service
+    @Binding var showAddAccountSheet: Bool
+    @Binding var accountToEdit: R2Account?
+    @Binding var accountToDelete: R2Account?
+    @Binding var showDeleteConfirmation: Bool
+
+    var body: some View {
+        Form {
+            Section {
+                ForEach(accountManager.accounts) { account in
+                    HStack {
+                        // 账户信息
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(account.displayName)
+                            Text(account.accessKeyID)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+
+                        Spacer()
+
+                        // 连接状态
+                        if accountManager.currentAccount?.id == account.id && r2Service.isConnected {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                        }
+
+                        // 编辑按钮
+                        Button {
+                            accountToEdit = account
+                        } label: {
+                            Image(systemName: "pencil")
+                        }
+                        .buttonStyle(.borderless)
+
+                        // 删除按钮
+                        Button {
+                            accountToDelete = account
+                            showDeleteConfirmation = true
+                        } label: {
+                            Image(systemName: "trash")
+                                .foregroundColor(.red)
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                    .padding(.vertical, 2)
+                }
+
+                // 添加账户按钮
+                Button {
+                    showAddAccountSheet = true
+                } label: {
+                    Label(L.Sidebar.Action.addAccount, systemImage: "plus")
+                }
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+// MARK: - 通用设置标签页
+
+struct GeneralTabView: View {
+    @Binding var showRestartAlert: Bool
+
+    @StateObject private var themeManager = ThemeManager.shared
+    @StateObject private var languageManager = LanguageManager.shared
+    @State private var concurrentUploads: Double = Double(UploadQueueManager.getMaxConcurrentUploads())
+    @State private var concurrentMoves: Double = Double(MoveQueueManager.getMaxConcurrentMoves())
+    @State private var conflictResolution: ConflictResolution = MoveQueueManager.getConflictResolution()
+    @State private var renamePattern: RenamePattern = MoveQueueManager.getRenamePattern()
+    @State private var customPatternString: String = MoveQueueManager.getCustomPatternString()
+    @State private var previousLanguage: String = ""
+
+    var body: some View {
+        Form {
+            // 外观设置
+            Section {
+                Picker(L.Settings.Theme.selectTheme, selection: $themeManager.selectedTheme) {
+                    ForEach(AppTheme.allCases, id: \.rawValue) { theme in
+                        Label(theme.displayName, systemImage: theme.icon)
+                            .tag(theme.rawValue)
+                    }
+                }
+
+                Picker(L.Settings.selectLanguage, selection: $languageManager.selectedLanguage) {
+                    ForEach(languageManager.availableLanguages, id: \.code) { lang in
+                        Text(lang.nativeName).tag(lang.code)
+                    }
+                }
+            } header: {
+                Text(L.Settings.Theme.title)
+            } footer: {
+                Text(L.Settings.languageHint)
+            }
+
+            // 上传设置
+            Section {
+                Stepper(value: $concurrentUploads, in: 1...50, step: 1) {
+                    HStack {
+                        Text(L.Settings.Upload.concurrentUploads)
+                        Spacer()
+                        Text("\(Int(concurrentUploads))")
+                            .foregroundColor(.secondary)
+                            .monospacedDigit()
+                    }
+                }
+                .onChange(of: concurrentUploads) { _, newValue in
+                    UploadQueueManager.setMaxConcurrentUploads(Int(newValue))
+                }
+            } header: {
+                Text(L.Settings.Upload.title)
+            } footer: {
+                Text(L.Settings.Upload.concurrentHint)
+            }
+
+            // 移动设置
+            Section {
+                Stepper(value: $concurrentMoves, in: 1...10, step: 1) {
+                    HStack {
+                        Text(L.Settings.Move.concurrentMoves)
+                        Spacer()
+                        Text("\(Int(concurrentMoves))")
+                            .foregroundColor(.secondary)
+                            .monospacedDigit()
+                    }
+                }
+                .onChange(of: concurrentMoves) { _, newValue in
+                    MoveQueueManager.setMaxConcurrentMoves(Int(newValue))
+                }
+
+                // 冲突解决策略
+                Picker(L.Move.ConflictResolution.title, selection: $conflictResolution) {
+                    Text(L.Move.ConflictResolution.skip).tag(ConflictResolution.skip)
+                    Text(L.Move.ConflictResolution.rename).tag(ConflictResolution.rename)
+                    Text(L.Move.ConflictResolution.replace).tag(ConflictResolution.replace)
+                }
+                .onChange(of: conflictResolution) { _, newValue in
+                    UserDefaults.standard.set(newValue.rawValue, forKey: "moveConflictResolution")
+                }
+
+                // 重命名模式（仅在选择 rename 时显示）
+                if conflictResolution == .rename {
+                    Picker(L.Move.ConflictResolution.patternTitle, selection: $renamePattern) {
+                        ForEach(RenamePattern.allCases) { pattern in
+                            if pattern == .custom {
+                                Text(pattern.displayName).tag(pattern)
+                            } else {
+                                Text(pattern.displayName).tag(pattern)
+                            }
+                        }
+                    }
+                    .onChange(of: renamePattern) { _, newValue in
+                        UserDefaults.standard.set(newValue.rawValue, forKey: "moveRenamePattern")
+                    }
+
+                    // 自定义模式输入（仅在选择 custom 时显示）
+                    if renamePattern == .custom {
+                        HStack {
+                            TextField(L.Move.ConflictResolution.customPlaceholder, text: $customPatternString)
+                                .textFieldStyle(.roundedBorder)
+                                .onChange(of: customPatternString) { _, newValue in
+                                    UserDefaults.standard.set(newValue, forKey: "moveCustomPattern")
+                                }
+
+                            // 预览
+                            Text(renamePattern.preview(customPattern: customPatternString))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+            } header: {
+                Text(L.Settings.Move.title)
+            } footer: {
+                if conflictResolution == .rename && renamePattern == .custom {
+                    Text(L.Move.ConflictResolution.patternHint)
+                } else {
+                    Text(L.Settings.Move.concurrentHint)
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle(L.Settings.General.title)
+        .onAppear {
+            concurrentUploads = Double(UploadQueueManager.getMaxConcurrentUploads())
+            concurrentMoves = Double(MoveQueueManager.getMaxConcurrentMoves())
+            conflictResolution = MoveQueueManager.getConflictResolution()
+            renamePattern = MoveQueueManager.getRenamePattern()
+            customPatternString = MoveQueueManager.getCustomPatternString()
+            previousLanguage = languageManager.selectedLanguage
+        }
+        .onChange(of: languageManager.selectedLanguage) { oldValue, newValue in
+            if oldValue != newValue && !oldValue.isEmpty {
+                showRestartAlert = true
+            }
+            previousLanguage = newValue
+        }
+    }
+}
+
+// MARK: - 关于标签页
+
+struct AboutTabView: View {
+    var body: some View {
+        VStack(spacing: 0) {
+            Spacer()
+
+            // 应用图标
+            if let appIcon = NSApplication.shared.applicationIconImage {
+                Image(nsImage: appIcon)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 96, height: 96)
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+            }
+
+            Spacer().frame(height: 16)
+
+            Text(L.Welcome.title)
+                .font(.title2)
+                .fontWeight(.semibold)
+
+            Spacer().frame(height: 4)
+
+            Text(L.About.version(appVersion))
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+
+            Spacer().frame(height: 24)
+
+            Text(L.Welcome.subtitle)
+                .font(.body)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 300)
+
+            Spacer()
+
+            Text(L.About.copyright)
+                .font(.caption)
+                .foregroundColor(AppColors.textTertiary)
+                .padding(.bottom, 20)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .navigationTitle(L.About.title)
+    }
+
+    private var appVersion: String {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+        return "\(version) (\(build))"
+    }
+}
+
+
+// MARK: - 编辑账户表单
+
+struct EditAccountSheet: View {
+    let account: R2Account
+    @ObservedObject var accountManager: R2AccountManager
+    @ObservedObject var r2Service: R2Service
+    var messageManager: MessageManager
+    let onDismiss: () -> Void
+
+    @State private var displayName: String = ""
     @State private var accountID: String = ""
     @State private var accessKeyID: String = ""
     @State private var secretAccessKey: String = ""
     @State private var endpointURL: String = ""
-    @State private var defaultBucketName: String = ""
-    @State private var publicDomain: String = ""
-    
-    /// UI 状态管理
+    @State private var publicDomains: [String] = []
+    @State private var newDomain: String = ""
+    @State private var defaultDomainIndex: Int = 0
     @State private var isSaving: Bool = false
-    @State private var isTesting: Bool = false
-    @State private var testResult: ConnectionTestResult = .none
-    
-    /// 账户管理器
-    @StateObject private var accountManager = R2AccountManager.shared
-    
-    /// 消息管理器
-    @EnvironmentObject var messageManager: MessageManager
-    
-    /// R2 服务实例
-    @EnvironmentObject var r2Service: R2Service
-    
-    /// 断开连接确认对话框
-    @State private var showDisconnectConfirmation: Bool = false
-    
-    // MARK: - 连接测试结果枚举
-    
-    enum ConnectionTestResult {
-        case none
-        case success
-        case failure(String)
-        
-        var color: Color {
-            switch self {
-            case .none:
-                return .secondary
-            case .success:
-                return .green
-            case .failure:
-                return .red
-            }
-        }
-        
-        var icon: String {
-            switch self {
-            case .none:
-                return "circle"
-            case .success:
-                return "checkmark.circle.fill"
-            case .failure:
-                return "xmark.circle.fill"
-            }
-        }
-        
-        var message: String {
-            switch self {
-            case .none:
-                return "未测试"
-            case .success:
-                return "连接成功"
-            case .failure(let error):
-                return "连接失败: \(error)"
-            }
-        }
-    }
-    
-    // MARK: - Body
-    
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // 页面标题和描述
-                VStack(spacing: 8) {
-                    Text("R2 账户配置")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.primary)
-                    
-                    Text("配置您的 Cloudflare R2 账户信息以开始使用")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(.top, 20)
-                
-                // 账户信息卡片
-                VStack(spacing: 0) {
-                    // 卡片标题
-                    HStack {
-                        Label("账户信息", systemImage: "person.crop.circle")
-                            .font(.headline)
-                            .foregroundColor(.primary)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 20)
-                    .padding(.bottom, 16)
-                    
-                    VStack(spacing: 16) {
-                        // Account ID
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text("Account ID")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                Text("*")
-                                    .foregroundColor(.red)
-                                    .font(.caption)
-                            }
-                            
-                            TextField("请输入 Cloudflare Account ID", text: $accountID)
-                                .textFieldStyle(.roundedBorder)
-                                .font(.body)
-                                .onChange(of: accountID) { _ in
-                                    resetTestResult()
-                                }
-                        }
-                        
-                        // Access Key ID
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text("Access Key ID")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                Text("*")
-                                    .foregroundColor(.red)
-                                    .font(.caption)
-                            }
-                            
-                            TextField("请输入 Access Key ID", text: $accessKeyID)
-                                .textFieldStyle(.roundedBorder)
-                                .font(.body)
-                                .onChange(of: accessKeyID) { _ in
-                                    resetTestResult()
-                                }
-                        }
-                        
-                        // Secret Access Key
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text("Secret Access Key")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                Text("*")
-                                    .foregroundColor(.red)
-                                    .font(.caption)
-                            }
-                            
-                            SecureField("请输入 Secret Access Key", text: $secretAccessKey)
-                                .textFieldStyle(.roundedBorder)
-                                .font(.body)
-                                .onChange(of: secretAccessKey) { _ in
-                                    resetTestResult()
-                                }
-                        }
-                        
-                        // Endpoint URL
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text("Endpoint URL")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                Text("*")
-                                    .foregroundColor(.red)
-                                    .font(.caption)
-                            }
-                            
-                            TextField("例如: https://your-account.r2.cloudflarestorage.com", text: $endpointURL)
-                                .textFieldStyle(.roundedBorder)
-                                .font(.body)
-                                .onChange(of: endpointURL) { _ in
-                                    resetTestResult()
-                                }
-                        }
-                        
-                        // 默认存储桶名称
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("默认存储桶名称")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundColor(.primary)
-                            
-                            TextField("请输入存储桶名称（可选）", text: $defaultBucketName)
-                                .textFieldStyle(.roundedBorder)
-                                .font(.body)
-                                .onChange(of: defaultBucketName) { _ in
-                                    resetTestResult()
-                                }
-                            
-                            Text("如果您的 API Token 没有 listBuckets 权限，请在此输入要访问的存储桶名称")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .padding(.top, 2)
-                        }
-                        
-                        // 公共域名
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("公共域名")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundColor(.primary)
-                            
-                            TextField("例如: cdn.example.com", text: $publicDomain)
-                                .textFieldStyle(.roundedBorder)
-                                .font(.body)
-                                .onChange(of: publicDomain) { _ in
-                                    resetTestResult()
-                                }
-                            
-                            Text("配置自定义域名后，文件链接将使用此域名而非默认的 Cloudflare 域名")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .padding(.top, 2)
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 20)
-                }
-                .background(Color(NSColor.controlBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
-                
-                // 连接状态卡片
-                VStack(spacing: 0) {
-                    // 卡片标题
-                    HStack {
-                        Label("连接状态", systemImage: "network")
-                            .font(.headline)
-                            .foregroundColor(.primary)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 20)
-                    .padding(.bottom, 16)
-                    
-                    VStack(spacing: 16) {
-                        // 当前连接状态
-                        HStack(spacing: 12) {
-                            Image(systemName: r2Service.isConnected ? "checkmark.circle.fill" : "circle.dashed")
-                                .foregroundColor(r2Service.isConnected ? .green : .secondary)
-                                .font(.title3)
-                            
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(r2Service.isConnected ? "已连接到 R2 服务" : "未连接")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(r2Service.isConnected ? .green : .secondary)
-                                
-                                if r2Service.isConnected {
-                                    Text("连接正常，可以进行文件操作")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                            
-                            Spacer()
-                        }
-                        
-                        // 断开连接操作区域（优化布局，更美观）
-                        if r2Service.isConnected {
-                            Divider()
-                                .padding(.top, 12)
-                            
-                            VStack(spacing: 12) {
-                                // 操作说明
-                                Text("如需重新配置账户或切换服务，可以断开当前连接")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .multilineTextAlignment(.center)
-                                
-                                // 断开连接按钮
-                                Button(action: {
-                                    showDisconnectConfirmation = true
-                                }) {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "power")
-                                            .font(.caption)
-                                        Text("断开连接")
-                                            .font(.subheadline)
-                                            .fontWeight(.medium)
-                                    }
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 8)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .fill(Color.red)
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                                .frame(maxWidth: .infinity, alignment: .center)
-                            }
-                            .padding(.top, 8)
-                        }
-                        
-                        if !r2Service.isConnected {
-                            Divider()
-                            
-                            // 连接测试区域
-                            VStack(spacing: 12) {
-                                HStack(spacing: 12) {
-                                    Image(systemName: testResult.icon)
-                                        .foregroundColor(testResult.color)
-                                        .font(.title3)
-                                    
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("连接测试")
-                                            .font(.subheadline)
-                                            .fontWeight(.medium)
-                                        
-                                        Text(testResult.message)
-                                            .font(.caption)
-                                            .foregroundColor(testResult.color)
-                                    }
-                                    
-                                    Spacer()
-                                    
-                                    Button("测试连接") {
-                                        testConnection()
-                                    }
-                                    .disabled(!isFormValid || isTesting)
-                                    .buttonStyle(.borderedProminent)
-                                    .controlSize(.small)
-                                }
-                                
-                                if isTesting {
-                                    HStack(spacing: 8) {
-                                        ProgressView()
-                                            .controlSize(.small)
-                                        Text("正在测试连接...")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                }
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 20)
-                }
-                .background(Color(NSColor.controlBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
-                
-                // 帮助信息卡片
-                VStack(spacing: 0) {
-                    HStack {
-                        Label("配置指南", systemImage: "questionmark.circle")
-                            .font(.headline)
-                            .foregroundColor(.primary)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 20)
-                    .padding(.bottom, 16)
-                    
-                    VStack(alignment: .leading, spacing: 12) {
-                        HelpItem(
-                            icon: "person.badge.key",
-                            title: "Account ID",
-                            description: "在 Cloudflare 控制台的右侧边栏可以找到"
-                        )
-                        
-                        HelpItem(
-                            icon: "key",
-                            title: "Access Key",
-                            description: "在 R2 管理页面创建 API 令牌"
-                        )
-                        
-                        HelpItem(
-                            icon: "link",
-                            title: "Endpoint URL",
-                            description: "通常格式为 https://<account-id>.r2.cloudflarestorage.com"
-                        )
-                        
-                        HelpItem(
-                            icon: "folder",
-                            title: "默认存储桶",
-                            description: "如果 API Token 权限受限，请指定要访问的存储桶名称"
-                        )
-                        
-                        HelpItem(
-                            icon: "globe",
-                            title: "公共域名",
-                            description: "配置自定义域名用于生成文件的公共访问链接"
-                        )
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 20)
-                }
-                .background(Color(NSColor.controlBackgroundColor))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
-                
-                // 操作按钮区域
-                HStack(spacing: 12) {
-                    Button("重置") {
-                        resetForm()
-                    }
-                    .disabled(isSaving)
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
-                    
-                    Spacer()
-                    
-                    Button("保存配置") {
-                        saveAccount()
-                    }
-                    .disabled(!isFormValid || isSaving)
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                }
-                .padding(.bottom, 20)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 16)
-        }
-        .frame(maxWidth: 800)
-        .navigationTitle("账户设置")
-        .onAppear {
-            loadExistingAccount()
-        }
-        .alert("断开连接", isPresented: $showDisconnectConfirmation) {
-            Button("取消", role: .cancel) { }
-            Button("断开连接", role: .destructive) {
-                disconnectFromR2Service()
-            }
-        } message: {
-            Text("确定要断开与 R2 服务的连接吗？\n\n断开后将清除当前会话状态，需要重新连接才能使用文件管理功能。")
-        }
-    }
-    
-    // MARK: - Computed Properties
-    
-    /// 表单验证：检查所有必填字段是否已填写
+    @State private var saveError: String?
+
     private var isFormValid: Bool {
-        !accountID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !accessKeyID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !secretAccessKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !endpointURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        isValidURL(endpointURL)
+        !accountID.trimmingCharacters(in: .whitespaces).isEmpty &&
+        !accessKeyID.trimmingCharacters(in: .whitespaces).isEmpty
     }
-    
-    // MARK: - Methods
-    
-    /// 验证 URL 格式
-    private func isValidURL(_ urlString: String) -> Bool {
-        guard let url = URL(string: urlString.trimmingCharacters(in: .whitespacesAndNewlines)) else {
-            return false
-        }
-        return url.scheme?.lowercased() == "https" && url.host != nil
-    }
-    
-    /// 重置测试结果
-    private func resetTestResult() {
-        testResult = .none
-    }
-    
-    /// 测试连接
-    private func testConnection() {
-        guard isFormValid else { return }
-        
-        isTesting = true
-        testResult = .none
-        
-        Task {
-            do {
-                // 创建临时账户对象进行测试
-                let trimmedBucketName = defaultBucketName.trimmingCharacters(in: .whitespacesAndNewlines)
-                let trimmedPublicDomain = publicDomain.trimmingCharacters(in: .whitespacesAndNewlines)
-                let testAccount = R2Account(
-                    accountID: accountID.trimmingCharacters(in: .whitespacesAndNewlines),
-                    accessKeyID: accessKeyID.trimmingCharacters(in: .whitespacesAndNewlines),
-                    endpointURL: endpointURL.trimmingCharacters(in: .whitespacesAndNewlines),
-                    defaultBucketName: trimmedBucketName.isEmpty ? nil : trimmedBucketName,
-                    publicDomain: trimmedPublicDomain.isEmpty ? nil : trimmedPublicDomain
-                )
-                
-                let testSecretKey = secretAccessKey.trimmingCharacters(in: .whitespacesAndNewlines)
-                
-                // 创建临时 R2Service 实例进行测试
-                let testService = R2Service()
-                try await testService.initialize(with: testAccount, secretAccessKey: testSecretKey)
-                
-                // 执行连接测试
-                let success = try await testService.testConnection()
-                
-                await MainActor.run {
-                    isTesting = false
-                    if success {
-                        testResult = .success
-                        messageManager.showSuccess("连接测试成功", description: "R2 账户配置有效，可以正常连接")
-                        
-                        // 测试成功后自动保存账户配置
-                        saveAccountAfterSuccessfulTest()
-                    } else {
-                        testResult = .failure("连接测试失败")
-                        messageManager.showError("连接测试失败", description: "无法连接到 R2 服务，请检查配置信息")
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Form {
+                Section {
+                    TextField(L.Account.Field.displayName, text: $displayName)
+                    TextField(L.Account.Field.accountID, text: $accountID)
+                        .textContentType(.username)
+                } header: {
+                    Text(L.Account.Add.accountInfo)
+                }
+
+                Section {
+                    TextField(L.Account.Field.accessKeyID, text: $accessKeyID)
+                    SecureField(L.Account.Field.secretAccessKey, text: $secretAccessKey)
+                } header: {
+                    Text(L.Account.Add.credentials)
+                }
+
+                Section {
+                    TextField(L.Account.Field.endpointURL, text: $endpointURL)
+                        .textContentType(.URL)
+                } header: {
+                    Text(L.Account.Add.endpoint)
+                } footer: {
+                    Text(L.Account.Field.endpointHint)
+                }
+
+                Section {
+                    ForEach(Array(publicDomains.enumerated()), id: \.offset) { index, domain in
+                        HStack {
+                            Text(domain)
+                            Spacer()
+                            if defaultDomainIndex == index {
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(.accentColor)
+                            }
+                            Button {
+                                publicDomains.remove(at: index)
+                                if defaultDomainIndex >= publicDomains.count {
+                                    defaultDomainIndex = max(0, publicDomains.count - 1)
+                                }
+                            } label: {
+                                Image(systemName: "minus.circle.fill")
+                                    .foregroundColor(.red)
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            defaultDomainIndex = index
+                        }
+                    }
+
+                    HStack {
+                        TextField(L.Account.Domain.placeholder, text: $newDomain)
+                            .onSubmit { addDomain() }
+                        Button {
+                            addDomain()
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                        .disabled(newDomain.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                } header: {
+                    Text(L.Account.Add.publicDomains)
+                } footer: {
+                    Text(L.Account.Domain.hint)
+                }
+
+                if let error = saveError {
+                    Section {
+                        Label(error, systemImage: "exclamationmark.triangle")
+                            .foregroundColor(.red)
                     }
                 }
-                
-            } catch let error as R2ServiceError {
-                await MainActor.run {
-                    isTesting = false
-                    testResult = .failure(error.localizedDescription)
-                    messageManager.showError(error)
-                }
-            } catch {
-                await MainActor.run {
-                    isTesting = false
-                    let errorMessage = "连接测试失败：\(error.localizedDescription)"
-                    testResult = .failure(errorMessage)
-                    messageManager.showError("连接测试失败", description: error.localizedDescription)
-                }
             }
-        }
-    }
-    
-    /// 测试成功后自动保存账户配置并连接
-    private func saveAccountAfterSuccessfulTest() {
-        guard isFormValid else { return }
-        
-        let trimmedBucketName = defaultBucketName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedPublicDomain = publicDomain.trimmingCharacters(in: .whitespacesAndNewlines)
-        let account = R2Account(
-            accountID: accountID.trimmingCharacters(in: .whitespacesAndNewlines),
-            accessKeyID: accessKeyID.trimmingCharacters(in: .whitespacesAndNewlines),
-            endpointURL: endpointURL.trimmingCharacters(in: .whitespacesAndNewlines),
-            defaultBucketName: trimmedBucketName.isEmpty ? nil : trimmedBucketName,
-            publicDomain: trimmedPublicDomain.isEmpty ? nil : trimmedPublicDomain
-        )
-        
-        do {
-            // 保存账户配置
-            try accountManager.saveAccount(account, secretAccessKey: secretAccessKey.trimmingCharacters(in: .whitespacesAndNewlines))
-            
-            // 触发 R2Service 连接
-            Task {
-                                 do {
-                     // 直接使用当前输入的凭证进行连接
-                     try await r2Service.initialize(with: account, secretAccessKey: secretAccessKey.trimmingCharacters(in: .whitespacesAndNewlines))
-                     
-                     await MainActor.run {
-                         print("🎯 连接成功，当前 r2Service.isConnected = \(r2Service.isConnected)")
-                         print("🎯 r2Service 实例地址: \(Unmanaged.passUnretained(r2Service).toOpaque())")
-                         
-                         // 强制触发状态更新通知
-                         r2Service.objectWillChange.send()
-                         
-                         messageManager.showSuccess("连接成功", description: "已成功连接到 R2 服务，可以选择存储桶了")
-                         
-                         // 延迟一下再检查状态
-                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                             print("🔄 延迟检查: r2Service.isConnected = \(r2Service.isConnected)")
-                         }
-                     }
-                 } catch {
-                     await MainActor.run {
-                         print("❌ 连接失败: \(error.localizedDescription)")
-                         messageManager.showError("连接失败", description: "保存成功但连接失败：\(error.localizedDescription)")
-                     }
-                 }
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+            .disabled(isSaving)
+
+            Divider()
+
+            // 底部按钮栏 - macOS 标准布局
+            HStack {
+                if isSaving {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                    Text(L.Account.Edit.saving)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                Button(L.Common.Button.cancel) {
+                    onDismiss()
+                }
+                .keyboardShortcut(.cancelAction)
+
+                Button(L.Common.Button.save) {
+                    saveAccount()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(!isFormValid || isSaving)
             }
-            
-        } catch {
-            messageManager.showError("保存失败", description: "保存账户配置时发生错误：\(error.localizedDescription)")
+            .padding()
         }
-    }
-    
-    /// 保存账户配置
-    private func saveAccount() {
-        guard isFormValid else {
-            messageManager.showError("表单验证失败", description: "请检查所有必填字段是否正确填写")
-            return
-        }
-        
-        isSaving = true
-        
-        let trimmedBucketName = defaultBucketName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedPublicDomain = publicDomain.trimmingCharacters(in: .whitespacesAndNewlines)
-        let account = R2Account(
-            accountID: accountID.trimmingCharacters(in: .whitespacesAndNewlines),
-            accessKeyID: accessKeyID.trimmingCharacters(in: .whitespacesAndNewlines),
-            endpointURL: endpointURL.trimmingCharacters(in: .whitespacesAndNewlines),
-            defaultBucketName: trimmedBucketName.isEmpty ? nil : trimmedBucketName,
-            publicDomain: trimmedPublicDomain.isEmpty ? nil : trimmedPublicDomain
-        )
-        
-        do {
-            try accountManager.saveAccount(account, secretAccessKey: secretAccessKey.trimmingCharacters(in: .whitespacesAndNewlines))
-            messageManager.showSuccess("保存成功", description: "账户配置已成功保存")
-            // 重置测试结果，因为配置已更改
-            testResult = .none
-        } catch {
-            messageManager.showError("保存失败", description: "保存账户配置时发生错误：\(error.localizedDescription)")
-        }
-        
-        isSaving = false
-    }
-    
-    /// 重置表单
-    private func resetForm() {
-        accountID = ""
-        accessKeyID = ""
-        secretAccessKey = ""
-        endpointURL = ""
-        defaultBucketName = ""
-        publicDomain = ""
-        testResult = .none
-    }
-    
-    /// 加载现有账户配置
-    private func loadExistingAccount() {
-        if let account = accountManager.currentAccount {
+        .frame(width: 450, height: 480)
+        .onAppear {
             accountID = account.accountID
             accessKeyID = account.accessKeyID
+            displayName = account.displayName
             endpointURL = account.endpointURL
-            defaultBucketName = account.defaultBucketName ?? ""
-            publicDomain = account.publicDomain ?? ""
-            
-            // 安全地从 Keychain 加载 SECRET_ACCESS_KEY，提升用户体验
-            do {
-                let credentials = try accountManager.getCompleteCredentials(for: account)
+            publicDomains = account.publicDomains
+            defaultDomainIndex = account.defaultPublicDomainIndex
+
+            // 从 Keychain 加载 Secret Access Key
+            if let credentials = try? accountManager.getCompleteCredentials(for: account) {
                 secretAccessKey = credentials.secretAccessKey
-                print("✅ 成功从 Keychain 加载 SECRET_ACCESS_KEY")
+            }
+        }
+    }
+
+    private func addDomain() {
+        let trimmed = newDomain.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, !publicDomains.contains(trimmed) else { return }
+        publicDomains.append(trimmed)
+        if publicDomains.count == 1 {
+            defaultDomainIndex = 0
+        }
+        newDomain = ""
+    }
+
+    private func saveAccount() {
+        withAnimation { isSaving = true; saveError = nil }
+
+        let trimmedAccountID = accountID.trimmingCharacters(in: .whitespaces)
+        let trimmedAccessKeyID = accessKeyID.trimmingCharacters(in: .whitespaces)
+        let trimmedSecretKey = secretAccessKey.trimmingCharacters(in: .whitespaces)
+        let trimmedDisplayName = displayName.trimmingCharacters(in: .whitespaces)
+        let trimmedEndpoint = endpointURL.trimmingCharacters(in: .whitespaces)
+
+        let updatedAccount = account.updated(
+            accountID: trimmedAccountID,
+            accessKeyID: trimmedAccessKeyID,
+            endpointURL: trimmedEndpoint.isEmpty ? nil : trimmedEndpoint,
+            displayName: trimmedDisplayName.isEmpty ? nil : trimmedDisplayName,
+            publicDomains: publicDomains,
+            defaultPublicDomainIndex: defaultDomainIndex
+        )
+
+        Task {
+            do {
+                if !trimmedSecretKey.isEmpty {
+                    try accountManager.updateAccount(updatedAccount, secretAccessKey: trimmedSecretKey)
+                } else {
+                    try accountManager.updateAccount(updatedAccount)
+                }
+
+                if accountManager.currentAccount?.id == account.id && !trimmedSecretKey.isEmpty {
+                    try? await r2Service.initialize(with: updatedAccount, secretAccessKey: trimmedSecretKey)
+                }
+
+                await MainActor.run {
+                    withAnimation { isSaving = false }
+                    messageManager.showSuccess(
+                        L.Message.Success.accountSaved,
+                        description: L.Message.Success.accountSavedDescription(updatedAccount.displayName)
+                    )
+                    onDismiss()
+                }
             } catch {
-                print("⚠️  从 Keychain 加载 SECRET_ACCESS_KEY 失败: \(error.localizedDescription)")
-                // 加载失败时不影响其他字段，secretAccessKey 保持为空
-                secretAccessKey = ""
+                await MainActor.run {
+                    withAnimation { isSaving = false; saveError = error.localizedDescription }
+                }
             }
-        }
-    }
-    
-    /// 断开 R2 服务连接
-    private func disconnectFromR2Service() {
-        // 调用 R2Service 的断开连接方法
-        r2Service.disconnect()
-        
-        // 重置测试结果
-        testResult = .none
-        
-        // 显示成功消息
-        messageManager.showSuccess("断开连接成功", description: "已成功断开与 R2 服务的连接")
-    }
-    
-
-}
-
-// MARK: - Helper Views
-
-/// 帮助信息项组件
-struct HelpItem: View {
-    let icon: String
-    let title: String
-    let description: String
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .foregroundColor(.blue)
-                .font(.system(size: 16, weight: .medium))
-                .frame(width: 20, height: 20)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.primary)
-                
-                Text(description)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            
-            Spacer()
         }
     }
 }
 
-// MARK: - Preview
+// MARK: - 预览
 
 #Preview {
     AccountSettingsView()
         .environmentObject(MessageManager())
-} 
+        .environmentObject(R2Service.shared)
+        .environmentObject(R2AccountManager.shared)
+}

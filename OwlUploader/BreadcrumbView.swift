@@ -23,29 +23,11 @@ struct BreadcrumbView: View {
         HStack(spacing: 4) {
             // 存储桶层级（根目录）
             if let bucket = selectedBucket {
-                Button(action: {
-                    onNavigate("")
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "externaldrive")
-                            .font(.caption)
-                        Text(bucket.name)
-                            .font(.caption)
-                            .fontWeight(.medium)
-                    }
-                    .foregroundColor(.blue)
-                }
-                .buttonStyle(PlainButtonStyle())
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.blue.opacity(0.08))
-                        .stroke(Color.blue.opacity(0.2), lineWidth: 0.5)
+                BreadcrumbSegmentView(
+                    icon: "externaldrive",
+                    title: bucket.name,
+                    onTap: { onNavigate("") }
                 )
-                .onHover { isHovered in
-                    NSCursor.pointingHand.set()
-                }
                 
                 // 路径分隔符
                 if !currentPrefix.isEmpty {
@@ -58,30 +40,14 @@ struct BreadcrumbView: View {
             // 路径层级
             ForEach(Array(pathSegments.enumerated()), id: \.offset) { index, segment in
                 HStack(spacing: 4) {
-                                         Button(action: {
-                         let targetPrefix = pathSegments[0...index].map(\.name).joined(separator: "/") + "/"
-                         onNavigate(targetPrefix)
-                     }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "folder")
-                                .font(.caption)
-                            Text(segment.name)
-                                .font(.caption)
-                                .fontWeight(.medium)
+                    BreadcrumbSegmentView(
+                        icon: "folder",
+                        title: segment.name,
+                        onTap: {
+                            let targetPrefix = pathSegments[0...index].map(\.name).joined(separator: "/") + "/"
+                            onNavigate(targetPrefix)
                         }
-                        .foregroundColor(.blue)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(Color.blue.opacity(0.08))
-                            .stroke(Color.blue.opacity(0.2), lineWidth: 0.5)
                     )
-                    .onHover { isHovered in
-                        NSCursor.pointingHand.set()
-                    }
                     
                     // 路径分隔符（非最后一个）
                     if index < pathSegments.count - 1 {
@@ -124,6 +90,50 @@ private struct PathSegment {
     
     /// 完整路径
     let path: String
+}
+
+// MARK: - 面包屑段视图
+
+/// 面包屑导航中的单个段视图
+/// 支持点击导航
+private struct BreadcrumbSegmentView: View {
+    /// 图标名称
+    let icon: String
+    
+    /// 显示标题
+    let title: String
+    
+    /// 点击回调
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.caption)
+                Text(title)
+                    .font(.caption)
+                    .fontWeight(.medium)
+            }
+            .foregroundColor(.blue)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.blue.opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.blue.opacity(0.2), lineWidth: 0.5)
+        )
+        .onHover { isHovered in
+            if isHovered {
+                NSCursor.pointingHand.set()
+            }
+        }
+    }
 }
 
 // MARK: - 预览
