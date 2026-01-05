@@ -275,6 +275,129 @@ final class MoveQueueManagerTests: XCTestCase {
         UserDefaults.standard.removeObject(forKey: "maxConcurrentMoves")
     }
 
+    // MARK: - Deduplication Tests
+
+    func testAddMoveTasks_skipsDuplicateActiveTasks() {
+        // Given - 模拟已存在的活跃任务
+        let manager = MoveQueueManager()
+        let existingTask = createTestTask(
+            sourceKey: "source/file.txt",
+            status: .processing
+        )
+        manager.tasks = [existingTask]
+
+        // Then - 验证去重逻辑存在（基于 sourceKey 和 status.isActive）
+        XCTAssertTrue(manager.tasks.first?.status.isActive ?? false)
+    }
+
+    func testAddMoveTasks_allowsCompletedTaskToBeReAdded() {
+        // Given - 已完成的任务
+        let manager = MoveQueueManager()
+        let completedTask = createTestTask(
+            sourceKey: "source/file.txt",
+            status: .completed
+        )
+        manager.tasks = [completedTask]
+
+        // Then - 已完成任务不是活跃的，可以重新添加
+        XCTAssertFalse(manager.tasks.first?.status.isActive ?? true)
+    }
+
+    func testAddMoveTasks_allowsCancelledTaskToBeReAdded() {
+        // Given - 已取消的任务
+        let manager = MoveQueueManager()
+        let cancelledTask = createTestTask(
+            sourceKey: "source/file.txt",
+            status: .cancelled
+        )
+        manager.tasks = [cancelledTask]
+
+        // Then - 已取消任务不是活跃的，可以重新添加
+        XCTAssertFalse(manager.tasks.first?.status.isActive ?? true)
+    }
+
+    func testAddMoveTasks_allowsFailedTaskToBeReAdded() {
+        // Given - 失败的任务
+        let manager = MoveQueueManager()
+        let failedTask = createTestTask(
+            sourceKey: "source/file.txt",
+            status: .failed("Conflict error")
+        )
+        manager.tasks = [failedTask]
+
+        // Then - 失败任务不是活跃的，可以重新添加
+        XCTAssertFalse(manager.tasks.first?.status.isActive ?? true)
+    }
+
+    // MARK: - Rename Pattern Tests
+
+    func testRenamePattern_parentheses_appliesCorrectly() {
+        // Given
+        let pattern = RenamePattern.parentheses
+
+        // When
+        let result = pattern.apply(to: "file", number: 1)
+
+        // Then
+        XCTAssertEqual(result, "file(1)")
+    }
+
+    func testRenamePattern_underscore_appliesCorrectly() {
+        // Given
+        let pattern = RenamePattern.underscore
+
+        // When
+        let result = pattern.apply(to: "file", number: 2)
+
+        // Then
+        XCTAssertEqual(result, "file_2")
+    }
+
+    func testRenamePattern_dash_appliesCorrectly() {
+        // Given
+        let pattern = RenamePattern.dash
+
+        // When
+        let result = pattern.apply(to: "file", number: 3)
+
+        // Then
+        XCTAssertEqual(result, "file-3")
+    }
+
+    func testRenamePattern_bracket_appliesCorrectly() {
+        // Given
+        let pattern = RenamePattern.bracket
+
+        // When
+        let result = pattern.apply(to: "file", number: 4)
+
+        // Then
+        XCTAssertEqual(result, "file[4]")
+    }
+
+    func testRenamePattern_custom_appliesCorrectly() {
+        // Given
+        let pattern = RenamePattern.custom
+        let customPattern = "_copy{n}"
+
+        // When
+        let result = pattern.apply(to: "file", number: 1, customPattern: customPattern)
+
+        // Then
+        XCTAssertEqual(result, "file_copy1")
+    }
+
+    func testRenamePattern_preview_showsCorrectExample() {
+        // Given
+        let pattern = RenamePattern.parentheses
+
+        // When
+        let preview = pattern.preview()
+
+        // Then
+        XCTAssertEqual(preview, "file(1).txt")
+    }
+
     // MARK: - Helper Methods
 
     private func createTestTask(

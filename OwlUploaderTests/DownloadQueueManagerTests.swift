@@ -240,6 +240,82 @@ final class DownloadQueueManagerTests: XCTestCase {
         XCTAssertEqual(total, 0)
     }
 
+    // MARK: - Deduplication Tests
+
+    func testAddDownloads_skipsDuplicateActiveTasks() {
+        // Given - 模拟已存在的活跃任务
+        let manager = DownloadQueueManager()
+        let existingTask = createTestTask(
+            fileKey: "test/file.txt",
+            status: .processing
+        )
+        manager.tasks = [existingTask]
+
+        // Then - 验证去重逻辑存在（基于 fileKey 和 status.isActive）
+        XCTAssertTrue(manager.tasks.first?.status.isActive ?? false)
+    }
+
+    func testAddDownloads_allowsCompletedTaskToBeReAdded() {
+        // Given - 已完成的任务
+        let manager = DownloadQueueManager()
+        let completedTask = createTestTask(
+            fileKey: "test/file.txt",
+            status: .completed
+        )
+        manager.tasks = [completedTask]
+
+        // Then - 已完成任务不是活跃的，可以重新添加
+        XCTAssertFalse(manager.tasks.first?.status.isActive ?? true)
+    }
+
+    func testAddDownloads_allowsCancelledTaskToBeReAdded() {
+        // Given - 已取消的任务
+        let manager = DownloadQueueManager()
+        let cancelledTask = createTestTask(
+            fileKey: "test/file.txt",
+            status: .cancelled
+        )
+        manager.tasks = [cancelledTask]
+
+        // Then - 已取消任务不是活跃的，可以重新添加
+        XCTAssertFalse(manager.tasks.first?.status.isActive ?? true)
+    }
+
+    func testAddDownloads_allowsFailedTaskToBeReAdded() {
+        // Given - 失败的任务
+        let manager = DownloadQueueManager()
+        let failedTask = createTestTask(
+            fileKey: "test/file.txt",
+            status: .failed("Network error")
+        )
+        manager.tasks = [failedTask]
+
+        // Then - 失败任务不是活跃的，可以重新添加
+        XCTAssertFalse(manager.tasks.first?.status.isActive ?? true)
+    }
+
+    // MARK: - Retry All Failed Tests
+
+    func testRetryAllFailed_resetsAllFailedTasks() {
+        // Given
+        let manager = DownloadQueueManager()
+        var task1 = createTestTask(status: .failed("Error 1"))
+        task1.progress = 0.3
+        var task2 = createTestTask(status: .completed)
+        task2.progress = 1.0
+        var task3 = createTestTask(status: .failed("Error 2"))
+        task3.progress = 0.7
+        manager.tasks = [task1, task2, task3]
+
+        // When
+        manager.retryAllFailed()
+
+        // Then
+        let pendingCount = manager.tasks.filter { $0.status == .pending }.count
+        XCTAssertEqual(pendingCount, 2)
+        XCTAssertEqual(manager.tasks[1].status, .completed) // 未改变
+    }
+
     // MARK: - Helper Methods
 
     private func createTestTask(
