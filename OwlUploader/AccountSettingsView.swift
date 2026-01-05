@@ -183,6 +183,9 @@ struct GeneralTabView: View {
     @StateObject private var languageManager = LanguageManager.shared
     @State private var concurrentUploads: Double = Double(UploadQueueManager.getMaxConcurrentUploads())
     @State private var concurrentMoves: Double = Double(MoveQueueManager.getMaxConcurrentMoves())
+    @State private var conflictResolution: ConflictResolution = MoveQueueManager.getConflictResolution()
+    @State private var renamePattern: RenamePattern = MoveQueueManager.getRenamePattern()
+    @State private var customPatternString: String = MoveQueueManager.getCustomPatternString()
     @State private var previousLanguage: String = ""
 
     var body: some View {
@@ -241,10 +244,56 @@ struct GeneralTabView: View {
                 .onChange(of: concurrentMoves) { _, newValue in
                     MoveQueueManager.setMaxConcurrentMoves(Int(newValue))
                 }
+
+                // 冲突解决策略
+                Picker(L.Move.ConflictResolution.title, selection: $conflictResolution) {
+                    Text(L.Move.ConflictResolution.skip).tag(ConflictResolution.skip)
+                    Text(L.Move.ConflictResolution.rename).tag(ConflictResolution.rename)
+                    Text(L.Move.ConflictResolution.replace).tag(ConflictResolution.replace)
+                }
+                .onChange(of: conflictResolution) { _, newValue in
+                    UserDefaults.standard.set(newValue.rawValue, forKey: "moveConflictResolution")
+                }
+
+                // 重命名模式（仅在选择 rename 时显示）
+                if conflictResolution == .rename {
+                    Picker(L.Move.ConflictResolution.patternTitle, selection: $renamePattern) {
+                        ForEach(RenamePattern.allCases) { pattern in
+                            if pattern == .custom {
+                                Text(pattern.displayName).tag(pattern)
+                            } else {
+                                Text(pattern.displayName).tag(pattern)
+                            }
+                        }
+                    }
+                    .onChange(of: renamePattern) { _, newValue in
+                        UserDefaults.standard.set(newValue.rawValue, forKey: "moveRenamePattern")
+                    }
+
+                    // 自定义模式输入（仅在选择 custom 时显示）
+                    if renamePattern == .custom {
+                        HStack {
+                            TextField(L.Move.ConflictResolution.customPlaceholder, text: $customPatternString)
+                                .textFieldStyle(.roundedBorder)
+                                .onChange(of: customPatternString) { _, newValue in
+                                    UserDefaults.standard.set(newValue, forKey: "moveCustomPattern")
+                                }
+
+                            // 预览
+                            Text(renamePattern.preview(customPattern: customPatternString))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
             } header: {
                 Text(L.Settings.Move.title)
             } footer: {
-                Text(L.Settings.Move.concurrentHint)
+                if conflictResolution == .rename && renamePattern == .custom {
+                    Text(L.Move.ConflictResolution.patternHint)
+                } else {
+                    Text(L.Settings.Move.concurrentHint)
+                }
             }
         }
         .formStyle(.grouped)
@@ -252,6 +301,9 @@ struct GeneralTabView: View {
         .onAppear {
             concurrentUploads = Double(UploadQueueManager.getMaxConcurrentUploads())
             concurrentMoves = Double(MoveQueueManager.getMaxConcurrentMoves())
+            conflictResolution = MoveQueueManager.getConflictResolution()
+            renamePattern = MoveQueueManager.getRenamePattern()
+            customPatternString = MoveQueueManager.getCustomPatternString()
             previousLanguage = languageManager.selectedLanguage
         }
         .onChange(of: languageManager.selectedLanguage) { oldValue, newValue in

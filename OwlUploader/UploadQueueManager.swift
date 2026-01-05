@@ -113,6 +113,9 @@ class UploadQueueManager: ObservableObject, TaskQueueManagerProtocol {
     /// 当前正在上传的任务数量
     private var activeUploadCount: Int = 0
 
+    /// 存储活跃的上传 Task 句柄（用于取消）
+    private var activeTasks: [UUID: AsyncTask<Void, Never>] = [:]
+
     /// R2 服务引用
     private weak var r2Service: R2Service?
 
@@ -133,6 +136,12 @@ class UploadQueueManager: ObservableObject, TaskQueueManagerProtocol {
 
     /// UI 更新间隔（秒）
     private let uiUpdateInterval: TimeInterval = 1.0
+
+    /// 上次进度 UI 更新时间（用于进度回调节流）
+    private var lastProgressUpdateTime: Date = .distantPast
+
+    /// 进度 UI 更新间隔（秒）- 比整体更新更频繁
+    private let progressUpdateInterval: TimeInterval = 0.1
 
     // MARK: - Computed Properties
 
@@ -249,6 +258,15 @@ class UploadQueueManager: ObservableObject, TaskQueueManagerProtocol {
                     remotePath = safePrefix.isEmpty ? url.lastPathComponent : "\(safePrefix)\(url.lastPathComponent)"
                 }
 
+                // 跳过已存在的活跃任务（防止重复添加）
+                let existingActiveTask = tasks.first { task in
+                    task.localURL == url && task.status.isActive
+                }
+                if existingActiveTask != nil {
+                    print("⚠️ [UploadQueue] 跳过重复任务: \(url.lastPathComponent)")
+                    continue
+                }
+
                 // 创建上传任务（不立即读取文件数据）
                 let task = UploadQueueTask(
                     id: UUID(),
@@ -279,6 +297,10 @@ class UploadQueueManager: ObservableObject, TaskQueueManagerProtocol {
 
     /// 取消任务
     func cancelTask(_ task: UploadQueueTask) {
+        // 取消正在执行的 Task
+        activeTasks[task.id]?.cancel()
+        activeTasks[task.id] = nil
+
         if let index = tasks.firstIndex(where: { $0.id == task.id }) {
             tasks[index].status = .cancelled
         }
@@ -359,9 +381,11 @@ class UploadQueueManager: ObservableObject, TaskQueueManagerProtocol {
 
                     // 启动上传任务但不等待完成（真正的并发）
                     let taskId = nextTask.id
-                    AsyncTask {
+                    let uploadTask = AsyncTask {
                         await self.performUpload(taskId: taskId, task: nextTask)
                     }
+                    // 存储 Task 句柄以便取消
+                    activeTasks[taskId] = uploadTask
                 }
 
                 // 更新速度和ETA
@@ -430,6 +454,15 @@ class UploadQueueManager: ObservableObject, TaskQueueManagerProtocol {
         objectWillChange.send()
     }
 
+    /// 节流的进度 UI 更新（用于进度回调）
+    private func throttledProgressUpdate() {
+        let now = Date()
+        if now.timeIntervalSince(lastProgressUpdateTime) >= progressUpdateInterval {
+            lastProgressUpdateTime = now
+            objectWillChange.send()
+        }
+    }
+
     /// 执行单个上传任务（由 processQueue 并发调用）
     /// - Parameters:
     ///   - taskId: 任务 ID
@@ -449,22 +482,14 @@ class UploadQueueManager: ObservableObject, TaskQueueManagerProtocol {
         }
 
         do {
-            // 在后台线程读取文件数据
-            // 注意：需要在读取时处理安全作用域权限
-            let data = try await AsyncTask.detached(priority: .userInitiated) {
-                // 获取安全作用域权限
-                let needsSecurityScope = task.localURL.startAccessingSecurityScopedResource()
+            // 获取安全作用域权限
+            let needsSecurityScope = task.localURL.startAccessingSecurityScopedResource()
 
-                defer {
-                    if needsSecurityScope {
-                        task.localURL.stopAccessingSecurityScopedResource()
-                    }
+            defer {
+                if needsSecurityScope {
+                    task.localURL.stopAccessingSecurityScopedResource()
                 }
-
-                let fileData = try Data(contentsOf: task.localURL)
-                return fileData
-            }.value
-            print("⬆️ [Upload] 文件数据读取完成: \(task.fileName), \(data.count) bytes")
+            }
 
             // 检查是否已取消
             let isCancelled = await MainActor.run {
@@ -474,8 +499,8 @@ class UploadQueueManager: ObservableObject, TaskQueueManagerProtocol {
                 if tasks[currentIndex].status != .processing {
                     return true
                 }
-                // 更新进度为10%（文件读取完成）
-                tasks[currentIndex].progress = 0.1
+                // 更新进度为5%（开始上传）
+                tasks[currentIndex].progress = 0.05
                 return false
             }
 
@@ -485,23 +510,34 @@ class UploadQueueManager: ObservableObject, TaskQueueManagerProtocol {
                 return
             }
 
-            // 执行上传
-            print("⬆️ [Upload] 开始上传到 R2: \(task.remotePath)")
-            try await r2Service.uploadData(
+            // 使用流式上传，避免将整个文件加载到内存
+            print("⬆️ [Upload] 开始流式上传到 R2: \(task.remotePath)")
+            try await r2Service.uploadFileStream(
                 bucket: bucketName,
                 key: task.remotePath,
-                data: data,
+                fileURL: task.localURL,
                 contentType: task.contentType
-            )
+            ) { progress in
+                AsyncTask { @MainActor in
+                    if let idx = self.tasks.firstIndex(where: { $0.id == taskId }) {
+                        // 将进度映射到 0.05 - 0.95 范围（保留首尾用于状态更新）
+                        self.tasks[idx].progress = 0.05 + progress * 0.9
+                        self.throttledProgressUpdate()
+                    }
+                }
+            }
             print("✅ [Upload] 上传完成: \(task.fileName)")
 
-            // 更新状态为完成
+            // 更新状态为完成（仅当任务仍在处理中时，避免覆盖已取消状态）
             await MainActor.run {
                 if let idx = tasks.firstIndex(where: { $0.id == taskId }) {
-                    tasks[idx].progress = 1.0
-                    tasks[idx].status = .completed
+                    if tasks[idx].status == .processing {
+                        tasks[idx].progress = 1.0
+                        tasks[idx].status = .completed
+                    }
                 }
                 activeUploadCount -= 1
+                activeTasks[taskId] = nil
             }
 
         } catch {
@@ -509,9 +545,15 @@ class UploadQueueManager: ObservableObject, TaskQueueManagerProtocol {
             // 更新失败状态
             await MainActor.run {
                 if let idx = tasks.firstIndex(where: { $0.id == taskId }) {
-                    tasks[idx].status = .failed(error.localizedDescription)
+                    // 区分取消和失败
+                    if error is CancellationError {
+                        tasks[idx].status = .cancelled
+                    } else {
+                        tasks[idx].status = .failed(error.localizedDescription)
+                    }
                 }
                 activeUploadCount -= 1
+                activeTasks[taskId] = nil
             }
         }
 

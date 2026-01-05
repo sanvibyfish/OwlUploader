@@ -32,6 +32,7 @@ enum L {
             static let loading = String(localized: "common.label.loading", defaultValue: "Loading...")
             static let pleaseWait = String(localized: "common.label.pleaseWait", defaultValue: "Please wait")
             static let unknown = String(localized: "common.label.unknown", defaultValue: "Unknown")
+            static let taskQueue = String(localized: "common.label.taskQueue", defaultValue: "Task Queue")
         }
 
         enum Status {
@@ -266,6 +267,27 @@ enum L {
             static let moveFailed = String(localized: "move.message.moveFailed", defaultValue: "Move Failed")
             static let noMoveNeeded = String(localized: "move.message.noMoveNeeded", defaultValue: "No Move Needed")
             static let alreadyAtDestination = String(localized: "move.message.alreadyAtDestination", defaultValue: "File is already at the destination")
+            static let destinationExists = String(localized: "move.message.destinationExists", defaultValue: "Destination already exists")
+
+            static func destinationExistsDetail(_ name: String) -> String {
+                String(format: NSLocalizedString("move.message.destinationExistsDetail", value: "Cannot move: '%@' already exists at the destination", comment: ""), name)
+            }
+
+            static func skipped(_ name: String) -> String {
+                String(format: NSLocalizedString("move.message.skipped", value: "Skipped: '%@'", comment: ""), name)
+            }
+        }
+
+        enum ConflictResolution {
+            static let title = String(localized: "move.conflictResolution.title", defaultValue: "When file exists")
+            static let skip = String(localized: "move.conflictResolution.skip", defaultValue: "Skip")
+            static let rename = String(localized: "move.conflictResolution.rename", defaultValue: "Rename")
+            static let replace = String(localized: "move.conflictResolution.replace", defaultValue: "Replace")
+            static let patternTitle = String(localized: "move.conflictResolution.patternTitle", defaultValue: "Rename pattern")
+            static let patternHint = String(localized: "move.conflictResolution.patternHint", defaultValue: "Use {n} for number. Example: file{n}.txt → file(1).txt")
+            static let custom = String(localized: "move.conflictResolution.custom", defaultValue: "Custom...")
+            static let customPlaceholder = String(localized: "move.conflictResolution.customPlaceholder", defaultValue: "e.g. -abc{n}")
+            static let preview = String(localized: "move.conflictResolution.preview", defaultValue: "Preview")
         }
 
         static let rootDirectory = String(localized: "move.rootDirectory", defaultValue: "Root")
@@ -466,6 +488,9 @@ enum L {
             static let title = String(localized: "settings.move.title", defaultValue: "Move Settings")
             static let concurrentMoves = String(localized: "settings.move.concurrentMoves", defaultValue: "Concurrent Moves")
             static let concurrentHint = String(localized: "settings.move.concurrentHint", defaultValue: "Number of files to move simultaneously")
+            static let conflictResolution = String(localized: "settings.move.conflictResolution", defaultValue: "When file exists")
+            static let renamePattern = String(localized: "settings.move.renamePattern", defaultValue: "Rename pattern")
+            static let renamePatternHint = String(localized: "settings.move.renamePatternHint", defaultValue: "Pattern for renaming conflicting files")
         }
 
         enum Theme {
@@ -508,6 +533,18 @@ enum L {
 
             static func batchMessage(_ count: Int) -> String {
                 String(format: NSLocalizedString("alert.delete.batch.message", value: "Delete %d files?", comment: ""), count)
+            }
+
+            static func multipleFilesMessage(_ count: Int) -> String {
+                String(format: NSLocalizedString("alert.delete.multipleFiles.message", value: "Are you sure you want to delete %d files?\n\nThis action cannot be undone.", comment: ""), count)
+            }
+
+            static func multipleFoldersMessage(_ count: Int) -> String {
+                String(format: NSLocalizedString("alert.delete.multipleFolders.message", value: "Are you sure you want to delete %d folders?\n\nAll contents will be deleted and cannot be recovered.", comment: ""), count)
+            }
+
+            static func multipleItemsMessage(_ fileCount: Int, _ folderCount: Int) -> String {
+                String(format: NSLocalizedString("alert.delete.multipleItems.message", value: "Are you sure you want to delete %d files and %d folders?\n\nThis action cannot be undone.", comment: ""), fileCount, folderCount)
             }
 
             static let irreversible = String(localized: "alert.delete.irreversible", defaultValue: "This action cannot be undone.")
@@ -965,6 +1002,10 @@ extension L {
             }
 
             static let partialDownload = String(localized: "message.warning.partialDownload.title", defaultValue: "Partially Downloaded")
+
+            static func partialDownloadDescription(_ success: Int, _ failed: Int) -> String {
+                String(format: NSLocalizedString("message.warning.partialDownload.description", value: "%d downloaded, %d failed", comment: ""), success, failed)
+            }
         }
 
         // MARK: - Info Messages

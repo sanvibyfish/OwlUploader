@@ -48,6 +48,9 @@ struct FileListView: View {
     /// 上传队列管理器
     @StateObject private var uploadQueueManager = UploadQueueManager()
 
+    /// 下载队列管理器
+    @StateObject private var downloadQueueManager = DownloadQueueManager()
+
     /// 移动队列管理器
     @StateObject private var moveQueueManager = MoveQueueManager()
 
@@ -56,6 +59,9 @@ struct FileListView: View {
     
     /// 要删除的文件对象（用于确认对话框）
     @State private var fileToDelete: FileObject?
+
+    /// 要删除的多个文件对象（用于批量删除确认对话框）
+    @State private var filesToDelete: [FileObject] = []
 
     /// 文件夹内文件数量（用于删除确认）
     @State private var folderFileCount: Int = 0
@@ -108,10 +114,10 @@ struct FileListView: View {
                     }
                 }
 
-            // 组合队列面板（上传 + 移动）
-            if uploadQueueManager.isQueuePanelVisible || moveQueueManager.isQueuePanelVisible {
+            // 组合队列面板（上传 + 下载 + 移动）
+            if uploadQueueManager.isQueuePanelVisible || downloadQueueManager.isQueuePanelVisible || moveQueueManager.isQueuePanelVisible {
                 Divider()
-                CombinedQueueView(uploadManager: uploadQueueManager, moveManager: moveQueueManager)
+                CombinedQueueView(uploadManager: uploadQueueManager, downloadManager: downloadQueueManager, moveManager: moveQueueManager)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
@@ -125,7 +131,7 @@ struct FileListView: View {
                 )
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: uploadQueueManager.isQueuePanelVisible || moveQueueManager.isQueuePanelVisible)
+        .animation(.easeInOut(duration: 0.2), value: uploadQueueManager.isQueuePanelVisible || downloadQueueManager.isQueuePanelVisible || moveQueueManager.isQueuePanelVisible)
         .navigationTitle(r2Service.selectedBucket?.name ?? "Files")
         .navigationSubtitle(currentPrefix.isEmpty ? "" : currentPrefix)
         .toolbar { fileListToolbarContent }
@@ -165,21 +171,39 @@ struct FileListView: View {
         .sheet(isPresented: $showingDiagnostics) {
             DiagnosticsView(r2Service: r2Service)
         }
-        // 冲突解决对话框
+        // 删除确认对话框（支持单文件和多文件）
         .alert(L.Alert.Delete.title, isPresented: $showingDeleteConfirmation) {
             Button(L.Common.Button.cancel, role: .cancel) {
                 fileToDelete = nil
+                filesToDelete = []
                 folderFileCount = 0
             }
             Button(L.Common.Button.delete, role: .destructive) {
-                if let fileToDelete = fileToDelete {
+                if !filesToDelete.isEmpty {
+                    // 批量删除
+                    deleteFiles(filesToDelete)
+                    filesToDelete = []
+                    folderFileCount = 0
+                } else if let fileToDelete = fileToDelete {
+                    // 单文件删除
                     deleteFile(fileToDelete)
                     self.fileToDelete = nil
                     self.folderFileCount = 0
                 }
             }
         } message: {
-            if let file = fileToDelete {
+            if !filesToDelete.isEmpty {
+                // 批量删除消息
+                let fileCount = filesToDelete.filter { !$0.isDirectory }.count
+                let folderCount = filesToDelete.filter { $0.isDirectory }.count
+                if fileCount > 0 && folderCount > 0 {
+                    Text(L.Alert.Delete.multipleItemsMessage(fileCount, folderCount))
+                } else if folderCount > 0 {
+                    Text(L.Alert.Delete.multipleFoldersMessage(folderCount))
+                } else {
+                    Text(L.Alert.Delete.multipleFilesMessage(fileCount))
+                }
+            } else if let file = fileToDelete {
                 if file.isDirectory {
                     if folderFileCount > 0 {
                         Text(L.Alert.Delete.folderMessage(file.name, folderFileCount))
@@ -201,9 +225,15 @@ struct FileListView: View {
                 selectionManager.clearSelection()
             },
             deleteSelected: {
-                // 目前只支持单个删除
-                if let firstKey = selectionManager.selectedItems.first,
-                   let file = fileObjects.first(where: { $0.key == firstKey }) {
+                // 获取所有选中的文件
+                let selectedKeys = selectionManager.getSelectedKeys()
+                let selectedFiles = fileObjects.filter { selectedKeys.contains($0.key) }
+
+                if selectedFiles.count > 1 {
+                    // 多文件删除
+                    requestDeleteFiles(selectedFiles)
+                } else if let file = selectedFiles.first {
+                    // 单文件删除
                     requestDeleteFile(file)
                 }
             },
@@ -690,10 +720,10 @@ struct FileListView: View {
                         handleFileItemDoubleTap(file)
                     },
                     onDeleteFile: { file in
-                        requestDeleteFile(file)
+                        handleDeleteFile(file)
                     },
                     onDownloadFile: { file in
-                        downloadFile(file)
+                        handleDownloadFile(file)
                     },
                     onPreview: { file in
                         fileToPreview = file
@@ -725,10 +755,10 @@ struct FileListView: View {
                         handleFileItemDoubleTap(file)
                     },
                     onDeleteFile: { file in
-                        requestDeleteFile(file)
+                        handleDeleteFile(file)
                     },
                     onDownloadFile: { file in
-                        downloadFile(file)
+                        handleDownloadFile(file)
                     },
                     onPreview: { file in
                         fileToPreview = file
@@ -884,6 +914,20 @@ struct FileListView: View {
         }
     }
 
+    /// 处理右键菜单下载文件
+    /// 如果文件是多选的一部分，则下载所有选中的文件
+    private func handleDownloadFile(_ file: FileObject) {
+        let selectedKeys = selectionManager.getSelectedKeys()
+
+        // 如果点击的文件是选中项的一部分，且选中了多个文件，则批量下载
+        if selectedKeys.contains(file.key) && selectedKeys.count > 1 {
+            batchDownloadSelectedFiles()
+        } else {
+            // 单文件下载
+            downloadFile(file)
+        }
+    }
+
     /// 处理文件下载
     /// - Parameter fileObject: 要下载的文件对象
     private func downloadFile(_ fileObject: FileObject) {
@@ -892,34 +936,47 @@ struct FileListView: View {
 
         // 创建保存面板
         let savePanel = NSSavePanel()
-        savePanel.title = "Save File"
+        savePanel.title = L.SavePanel.saveFile
         savePanel.nameFieldStringValue = fileObject.name
         savePanel.canCreateDirectories = true
 
         savePanel.begin { response in
             guard response == .OK, let saveURL = savePanel.url else { return }
 
-            Task {
-                do {
-                    try await r2Service.downloadObject(
-                        bucket: bucket.name,
-                        key: fileObject.key,
-                        to: saveURL
-                    )
-                    await MainActor.run {
-                        messageManager.showSuccess(
+            Task { @MainActor in
+                // 获取保存目录
+                let destinationFolder = saveURL.deletingLastPathComponent()
+
+                // 配置下载队列管理器
+                downloadQueueManager.configure(r2Service: r2Service, bucketName: bucket.name)
+
+                // 设置完成回调
+                downloadQueueManager.onQueueComplete = {
+                    let completed = self.downloadQueueManager.completedTasks.count
+                    let failed = self.downloadQueueManager.failedTasks.count
+
+                    if failed == 0 && completed > 0 {
+                        self.messageManager.showSuccess(
                             L.Message.Success.downloadComplete,
                             description: L.Message.Success.downloadDescription(fileObject.name)
                         )
-                    }
-                } catch {
-                    await MainActor.run {
-                        messageManager.showError(
+                    } else if failed > 0 {
+                        self.messageManager.showError(
                             L.Message.Error.downloadFailed,
-                            description: error.localizedDescription
+                            description: self.downloadQueueManager.failedTasks.first?.status.failureMessage ?? ""
                         )
                     }
                 }
+
+                // 使用用户指定的文件名（可能与原文件名不同）
+                let downloadFile: (key: String, name: String, size: Int64) = (
+                    key: fileObject.key,
+                    name: saveURL.lastPathComponent,
+                    size: fileObject.size ?? 0
+                )
+
+                // 添加到下载队列
+                downloadQueueManager.addDownloads([downloadFile], to: destinationFolder)
             }
         }
     }
@@ -999,41 +1056,37 @@ struct FileListView: View {
         openPanel.begin { response in
             guard response == .OK, let folderURL = openPanel.url else { return }
 
-            Task {
+            Task { @MainActor in
                 guard let bucket = r2Service.selectedBucket else { return }
 
-                var successCount = 0
-                var failCount = 0
+                // 配置下载队列管理器
+                downloadQueueManager.configure(r2Service: r2Service, bucketName: bucket.name)
 
-                for file in selectedFiles {
-                    let saveURL = folderURL.appendingPathComponent(file.name)
+                // 设置完成回调
+                downloadQueueManager.onQueueComplete = {
+                    let completed = self.downloadQueueManager.completedTasks.count
+                    let failed = self.downloadQueueManager.failedTasks.count
 
-                    do {
-                        try await r2Service.downloadObject(
-                            bucket: bucket.name,
-                            key: file.key,
-                            to: saveURL
-                        )
-                        successCount += 1
-                    } catch {
-                        failCount += 1
-                        print("Failed to download \(file.name): \(error)")
-                    }
-                }
-
-                await MainActor.run {
-                    if failCount == 0 {
-                        messageManager.showSuccess(
+                    if failed == 0 && completed > 0 {
+                        self.messageManager.showSuccess(
                             L.Message.Success.downloadComplete,
-                            description: L.Message.Success.downloadBatchDescription(successCount)
+                            description: L.Message.Success.downloadBatchDescription(completed)
                         )
-                    } else {
-                        messageManager.showWarning(
+                    } else if failed > 0 {
+                        self.messageManager.showWarning(
                             L.Message.Warning.partialDownload,
-                            description: L.Message.Warning.partialDeleteDescription(successCount, failCount)
+                            description: L.Message.Warning.partialDownloadDescription(completed, failed)
                         )
                     }
                 }
+
+                // 构建下载任务列表
+                let downloadFiles: [(key: String, name: String, size: Int64)] = selectedFiles.map { file in
+                    (key: file.key, name: file.name, size: file.size ?? 0)
+                }
+
+                // 添加到下载队列
+                downloadQueueManager.addDownloads(downloadFiles, to: folderURL)
             }
         }
     }
@@ -1181,6 +1234,28 @@ struct FileListView: View {
         }
     }
 
+    /// 请求删除多个文件或文件夹（显示确认对话框）
+    /// - Parameter files: 要删除的文件对象列表
+    private func requestDeleteFiles(_ files: [FileObject]) {
+        print("🗑️ 请求批量删除 \(files.count) 个项目")
+        filesToDelete = files
+        folderFileCount = 0
+        showingDeleteConfirmation = true
+    }
+
+    /// 处理右键菜单删除文件
+    /// 如果文件是多选的一部分，则删除所有选中的文件
+    private func handleDeleteFile(_ file: FileObject) {
+        let selectedKeys = selectionManager.getSelectedKeys()
+
+        if selectedKeys.contains(file.key) && selectedKeys.count > 1 {
+            let selectedFiles = fileObjects.filter { selectedKeys.contains($0.key) }
+            requestDeleteFiles(selectedFiles)
+        } else {
+            requestDeleteFile(file)
+        }
+    }
+
     /// 统计文件夹内的文件数量
     private func countFilesInFolder(_ folder: FileObject) {
         guard let bucket = r2Service.selectedBucket else {
@@ -1229,6 +1304,71 @@ struct FileListView: View {
             deleteFolder(fileObject, in: bucket.name)
         } else {
             deleteSingleFile(fileObject, in: bucket.name)
+        }
+    }
+
+    /// 执行批量文件删除操作
+    /// - Parameter files: 要删除的文件对象列表
+    private func deleteFiles(_ files: [FileObject]) {
+        guard canLoadFiles else {
+            messageManager.showError(L.Message.Error.cannotDelete, description: L.Message.Error.serviceNotReady)
+            return
+        }
+
+        guard let bucket = r2Service.selectedBucket else {
+            messageManager.showError(L.Message.Error.cannotDelete, description: L.Message.Error.noBucketSelected)
+            return
+        }
+
+        let bucketName = bucket.name
+        print("🗑️ 开始批量删除 \(files.count) 个项目")
+
+        // 分离文件和文件夹
+        let regularFiles = files.filter { !$0.isDirectory }
+        let folders = files.filter { $0.isDirectory }
+
+        Task {
+            var successCount = 0
+            var failedCount = 0
+
+            // 1. 使用批量 API 删除所有普通文件
+            if !regularFiles.isEmpty {
+                let fileKeys = regularFiles.map { $0.key }
+                do {
+                    let failedKeys = try await r2Service.deleteObjects(bucket: bucketName, keys: fileKeys)
+                    successCount += fileKeys.count - failedKeys.count
+                    failedCount += failedKeys.count
+                } catch {
+                    print("❌ 批量删除文件失败: \(error.localizedDescription)")
+                    failedCount += fileKeys.count
+                }
+            }
+
+            // 2. 逐个删除文件夹（每个文件夹内部使用批量删除）
+            for folder in folders {
+                do {
+                    let (deletedCount, _) = try await r2Service.deleteFolder(bucket: bucketName, folderKey: folder.key)
+                    if deletedCount > 0 {
+                        successCount += 1
+                    }
+                } catch {
+                    print("❌ 删除文件夹失败: \(folder.name) - \(error.localizedDescription)")
+                    failedCount += 1
+                }
+            }
+
+            await MainActor.run {
+                if failedCount == 0 {
+                    print("✅ 批量删除完成: 成功 \(successCount) 个")
+                    messageManager.showSuccess(L.Message.Success.deleteComplete, description: L.Message.Success.deleteBatchDescription(successCount))
+                } else {
+                    print("⚠️ 批量删除完成: 成功 \(successCount) 个，失败 \(failedCount) 个")
+                    messageManager.showWarning(L.Message.Warning.partialDelete, description: L.Message.Warning.partialDeleteDescription(successCount, failedCount))
+                }
+                // 清除选择并刷新列表
+                selectionManager.clearSelection()
+                loadFileList()
+            }
         }
     }
 

@@ -47,6 +47,12 @@ enum TaskStatus: Equatable {
         return false
     }
 
+    /// 获取失败信息（仅失败状态有值）
+    var failureMessage: String? {
+        if case .failed(let message) = self { return message }
+        return nil
+    }
+
     /// 状态图标名称
     var iconName: String {
         switch self {

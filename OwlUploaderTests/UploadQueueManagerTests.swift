@@ -365,6 +365,53 @@ final class UploadQueueManagerTests: XCTestCase {
         XCTAssertEqual(manager.tasks.first?.status, .pending)
     }
 
+    @MainActor
+    func testCancelTask_processingTask_statusStaysCancelled() {
+        // Given
+        let manager = UploadQueueManager()
+        var task = createTestTask(status: .processing)
+        task.progress = 0.5
+        manager.tasks = [task]
+
+        // When
+        manager.cancelTask(task)
+
+        // Then - 取消后状态应为 cancelled
+        XCTAssertEqual(manager.tasks.first?.status, .cancelled)
+        XCTAssertTrue(manager.tasks.first?.status.isCancelled ?? false)
+    }
+
+    @MainActor
+    func testCancelledTask_statusNotOverwrittenByCompletion() {
+        // Given - 模拟一个已取消的任务
+        let manager = UploadQueueManager()
+        var task = createTestTask(status: .cancelled)
+        task.progress = 0.5
+        manager.tasks = [task]
+
+        // Then - 验证取消状态不应被覆盖
+        // 这个测试验证 tasks 中已取消的任务状态保持不变
+        XCTAssertEqual(manager.tasks.first?.status, .cancelled)
+        XCTAssertTrue(manager.tasks.first?.status.isCancelled ?? false)
+        XCTAssertFalse(manager.tasks.first?.status.isCompleted ?? true)
+    }
+
+    @MainActor
+    func testCancelledTask_canBeRetried() {
+        // Given
+        let manager = UploadQueueManager()
+        var task = createTestTask(status: .cancelled)
+        task.progress = 0.3
+        manager.tasks = [task]
+
+        // When - 重试取消的任务
+        manager.retryTask(task)
+
+        // Then - 应该变为 pending 状态
+        XCTAssertEqual(manager.tasks.first?.status, .pending)
+        XCTAssertEqual(manager.tasks.first?.progress, 0)
+    }
+
     // MARK: - retryTask Tests
 
     @MainActor

@@ -147,6 +147,74 @@ final class R2ServiceTests: XCTestCase {
         XCTAssertNil(service.selectedBucket)
     }
 
+    // MARK: - Adaptive Part Size Tests
+
+    func testAdaptivePartSize_mediumFile_returns20MB() {
+        // Given - 200MB 文件（在 100MB-500MB 范围内）
+        let fileSize: Int64 = 200 * 1024 * 1024
+
+        // When
+        let partSize = r2Service.testCalculatePartSize(for: fileSize)
+
+        // Then
+        XCTAssertEqual(partSize, 20 * 1024 * 1024, "200MB 文件应使用 20MB 分片")
+    }
+
+    func testAdaptivePartSize_largeFile_returns50MB() {
+        // Given - 1GB 文件（在 500MB-2GB 范围内）
+        let fileSize: Int64 = 1 * 1024 * 1024 * 1024
+
+        // When
+        let partSize = r2Service.testCalculatePartSize(for: fileSize)
+
+        // Then
+        XCTAssertEqual(partSize, 50 * 1024 * 1024, "1GB 文件应使用 50MB 分片")
+    }
+
+    func testAdaptivePartSize_veryLargeFile_returns100MB() {
+        // Given - 5GB 文件（> 2GB）
+        let fileSize: Int64 = 5 * 1024 * 1024 * 1024
+
+        // When
+        let partSize = r2Service.testCalculatePartSize(for: fileSize)
+
+        // Then
+        XCTAssertEqual(partSize, 100 * 1024 * 1024, "5GB 文件应使用 100MB 分片")
+    }
+
+    func testAdaptivePartSize_boundaryAt500MB_returns20MB() {
+        // Given - 正好 500MB（边界值，应在 100MB-500MB 范围内）
+        let fileSize: Int64 = 500 * 1024 * 1024
+
+        // When
+        let partSize = r2Service.testCalculatePartSize(for: fileSize)
+
+        // Then
+        XCTAssertEqual(partSize, 20 * 1024 * 1024, "500MB 边界文件应使用 20MB 分片")
+    }
+
+    func testAdaptivePartSize_boundaryAt2GB_returns50MB() {
+        // Given - 正好 2GB（边界值，应在 500MB-2GB 范围内）
+        let fileSize: Int64 = 2 * 1024 * 1024 * 1024
+
+        // When
+        let partSize = r2Service.testCalculatePartSize(for: fileSize)
+
+        // Then
+        XCTAssertEqual(partSize, 50 * 1024 * 1024, "2GB 边界文件应使用 50MB 分片")
+    }
+
+    func testAdaptivePartSize_justOver2GB_returns100MB() {
+        // Given - 略大于 2GB
+        let fileSize: Int64 = 2 * 1024 * 1024 * 1024 + 1
+
+        // When
+        let partSize = r2Service.testCalculatePartSize(for: fileSize)
+
+        // Then
+        XCTAssertEqual(partSize, 100 * 1024 * 1024, "超过 2GB 的文件应使用 100MB 分片")
+    }
+
 }
 
 // MARK: - R2ServiceError Tests (不需要 @MainActor)

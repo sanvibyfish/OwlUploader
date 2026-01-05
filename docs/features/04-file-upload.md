@@ -11,8 +11,9 @@
 | `FileListView.swift` | 上传按钮与文件选择器 |
 | `FileDropView.swift` | 拖拽上传 NSView 组件 |
 | `Queue/UploadQueueManager.swift` | 上传队列管理 |
+| `Queue/DownloadQueueManager.swift` | 下载队列管理 |
 | `Queue/MoveQueueManager.swift` | 移动队列管理 |
-| `Queue/CombinedQueueView.swift` | 合并队列 UI（上传+移动） |
+| `Queue/CombinedQueueView.swift` | 合并队列 UI（上传+下载+移动） |
 | `Queue/QueueTask.swift` | 队列任务协议 |
 | `R2Service.swift` | 文件上传 API |
 
@@ -28,6 +29,8 @@
 - **并发控制**: 支持 1-10 个文件同时上传（默认 5 个）
 - **并发配置**: 可在设置页面调整并发上传数
 - **真正并行**: 多个文件真正同时上传，非串行执行
+- **分片上传**: 大文件自动使用 S3 Multipart Upload
+- **自适应分片**: 根据文件大小动态调整分片大小
 - **上传状态显示**: 显示上传进度和状态
 - **自动刷新**: 上传完成后自动刷新文件列表
 - **无阻塞 UI**: 上传过程中不阻塞用户操作界面
@@ -70,6 +73,50 @@
 - 空文件
 - 超过 5GB 的文件
 
+## 分片上传 (Multipart Upload)
+
+### 自适应分片策略
+
+系统根据文件大小自动选择最优的上传策略：
+
+| 文件大小 | 上传方式 | 分片大小 | 说明 |
+|---------|---------|---------|------|
+| ≤ 100MB | 简单上传 | - | 单次 PUT 请求，无额外 API 开销 |
+| 100MB - 500MB | 分片上传 | **20MB** | 5-25 个分片 |
+| 500MB - 2GB | 分片上传 | **50MB** | 10-40 个分片 |
+| > 2GB | 分片上传 | **100MB** | 减少 API 调用开销 |
+
+### 并发分片上传
+
+- **并发数**: 12 个分片同时上传
+- **内存峰值**: 约 240MB - 1.2GB（取决于分片大小）
+- **失败重试**: 单个分片失败会自动重试
+- **断点续传**: 分片上传支持中断后继续
+
+### 分片上传流程
+
+```mermaid
+flowchart TD
+    A[开始上传] --> B{文件大小 > 100MB?}
+    B -->|否| C[简单上传 PutObject]
+    B -->|是| D[初始化分片上传]
+    D --> E[计算分片大小]
+    E --> F[并发上传分片]
+    F --> G{所有分片完成?}
+    G -->|否| F
+    G -->|是| H[完成分片上传]
+    H --> I[上传成功]
+    C --> I
+```
+
+### 性能优化建议
+
+| 网络条件 | 建议 |
+|---------|------|
+| **高延迟网络** (如跨洲访问) | 大分片减少往返次数 |
+| **低延迟网络** (如同区域) | 小分片利用并发优势 |
+| **不稳定网络** | 小分片降低重传成本 |
+
 ## 交互流程
 
 ```mermaid
@@ -103,12 +150,35 @@ let maxFileSize = 5 * 1024 * 1024 * 1024  // 5GB
 
 ## API 方法
 
-### 上传文件
+### 简单上传（小文件）
 ```swift
 func uploadFile(
-    localURL: URL, 
-    remotePath: String, 
-    originalFileName: String
+    bucket: String,
+    key: String,
+    localFilePath: URL
+) async throws
+```
+
+### 流式上传（支持进度回调）
+```swift
+func uploadFileStream(
+    bucket: String,
+    key: String,
+    fileURL: URL,
+    contentType: String,
+    progress: @escaping (Double) -> Void
+) async throws
+```
+
+### 分片上传（大文件，内部自动调用）
+```swift
+private func uploadMultipart(
+    bucket: String,
+    key: String,
+    fileURL: URL,
+    fileSize: Int64,
+    contentType: String,
+    progress: @escaping (Double) -> Void
 ) async throws
 ```
 
@@ -207,19 +277,22 @@ class UploadQueueManager: ObservableObject {
 
 ## 合并队列视图
 
-`CombinedQueueView` 统一显示上传和移动两种任务队列，提供一致的用户体验：
+`CombinedQueueView` 统一显示上传、下载和移动三种任务队列，提供一致的用户体验：
 
 ### 界面布局
 
 ```
 ┌─────────────────────────────────────────────┐
-│  队列 (3 个任务)                    [▼] [×]  │
+│  任务队列 (5 个任务)                 [▼] [×]  │
 ├─────────────────────────────────────────────┤
 │  ████████████░░░░░░░░░  45%                 │  <- 总进度条
 ├─────────────────────────────────────────────┤
 │  📤 上传中                                   │
 │    photo.jpg        上传中 35%              │
 │    document.pdf     等待中                   │
+├─────────────────────────────────────────────┤
+│  📥 下载中                                   │
+│    video.mp4        下载中 68%              │
 ├─────────────────────────────────────────────┤
 │  📁 移动中                                   │
 │    folder/          → images/ 完成          │
@@ -232,7 +305,7 @@ class UploadQueueManager: ObservableObject {
 
 | 功能 | 说明 |
 |------|------|
-| **统一显示** | 同时显示上传和移动任务 |
+| **统一显示** | 同时显示上传、下载和移动任务 |
 | **总进度** | 综合所有任务计算总体进度 |
 | **分组展示** | 按任务类型分组，清晰区分 |
 | **可展开/收起** | 点击标题栏折叠面板 |

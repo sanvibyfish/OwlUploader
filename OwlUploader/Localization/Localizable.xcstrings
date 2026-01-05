@@ -674,6 +674,39 @@
         }
       }
     },
+    "alert.delete.multipleFiles.message" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Are you sure you want to delete %d files?\n\nThis action cannot be undone."
+          }
+        }
+      }
+    },
+    "alert.delete.multipleFolders.message" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Are you sure you want to delete %d folders?\n\nAll contents will be deleted and cannot be recovered."
+          }
+        }
+      }
+    },
+    "alert.delete.multipleItems.message" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Are you sure you want to delete %1$d files and %2$d folders?\n\nThis action cannot be undone."
+          }
+        }
+      }
+    },
     "alert.delete.title" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -1378,6 +1411,17 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "请稍候"
+          }
+        }
+      }
+    },
+    "common.label.taskQueue" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Task Queue"
           }
         }
       }
@@ -2560,6 +2604,17 @@
         }
       }
     },
+    "files.contextMenu.moveTo" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Move to"
+          }
+        }
+      }
+    },
     "files.contextMenu.newFolder" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -2573,17 +2628,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新建文件夹"
-          }
-        }
-      }
-    },
-    "files.contextMenu.moveTo" : {
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Move to"
           }
         }
       }
@@ -5119,6 +5163,23 @@
         }
       }
     },
+    "message.warning.partialDownload.description" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$d downloaded, %2$d failed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "下载成功 %d 个，失败 %d 个"
+          }
+        }
+      }
+    },
     "message.warning.partialDownload.title" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -5170,6 +5231,105 @@
         }
       }
     },
+    "move.conflictResolution.custom" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Custom..."
+          }
+        }
+      }
+    },
+    "move.conflictResolution.customPlaceholder" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "e.g. -abc{n}"
+          }
+        }
+      }
+    },
+    "move.conflictResolution.patternHint" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Use {n} for number. Example: file{n}.txt → file(1).txt"
+          }
+        }
+      }
+    },
+    "move.conflictResolution.patternTitle" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Rename pattern"
+          }
+        }
+      }
+    },
+    "move.conflictResolution.preview" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Preview"
+          }
+        }
+      }
+    },
+    "move.conflictResolution.rename" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Rename"
+          }
+        }
+      }
+    },
+    "move.conflictResolution.replace" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Replace"
+          }
+        }
+      }
+    },
+    "move.conflictResolution.skip" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Skip"
+          }
+        }
+      }
+    },
+    "move.conflictResolution.title" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "When file exists"
+          }
+        }
+      }
+    },
     "move.message.alreadyAtDestination" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -5177,6 +5337,46 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "File is already at the destination"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文件已在目标位置"
+          }
+        }
+      }
+    },
+    "move.message.destinationExists" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Destination already exists"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目标位置已存在同名文件"
+          }
+        }
+      }
+    },
+    "move.message.destinationExistsDetail" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Cannot move: '%@' already exists at the destination"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法移动：'%@' 在目标位置已存在"
           }
         }
       }
@@ -5199,6 +5399,23 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "No Move Needed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无需移动"
+          }
+        }
+      }
+    },
+    "move.message.skipped" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Skipped: '%@'"
           }
         }
       }
@@ -5511,6 +5728,39 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Concurrent Moves"
+          }
+        }
+      }
+    },
+    "settings.move.conflictResolution" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "When file exists"
+          }
+        }
+      }
+    },
+    "settings.move.renamePattern" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Rename pattern"
+          }
+        }
+      }
+    },
+    "settings.move.renamePatternHint" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Pattern for renaming conflicting files"
           }
         }
       }

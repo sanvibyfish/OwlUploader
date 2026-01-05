@@ -3,7 +3,7 @@
 //  OwlUploader
 //
 //  组合队列视图
-//  同时显示上传和移动任务
+//  同时显示上传、下载和移动任务
 //
 
 import SwiftUI
@@ -12,6 +12,7 @@ import SwiftUI
 struct CombinedQueueView: View {
 
     @ObservedObject var uploadManager: UploadQueueManager
+    @ObservedObject var downloadManager: DownloadQueueManager
     @ObservedObject var moveManager: MoveQueueManager
 
     /// 是否展开面板
@@ -19,17 +20,17 @@ struct CombinedQueueView: View {
 
     /// 是否有任何任务
     var hasTasks: Bool {
-        !uploadManager.tasks.isEmpty || !moveManager.tasks.isEmpty
+        !uploadManager.tasks.isEmpty || !downloadManager.tasks.isEmpty || !moveManager.tasks.isEmpty
     }
 
     /// 总任务数
     var totalTaskCount: Int {
-        uploadManager.tasks.count + moveManager.tasks.count
+        uploadManager.tasks.count + downloadManager.tasks.count + moveManager.tasks.count
     }
 
     /// 是否有活动任务
     var hasActiveTasks: Bool {
-        uploadManager.hasActiveTasks || moveManager.hasActiveTasks
+        uploadManager.hasActiveTasks || downloadManager.hasActiveTasks || moveManager.hasActiveTasks
     }
 
     var body: some View {
@@ -60,7 +61,7 @@ struct CombinedQueueView: View {
             // 标题和进度信息
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text(L.Upload.Queue.title)
+                    Text(L.Common.Label.taskQueue)
                         .font(.headline)
 
                     Text(L.Upload.Queue.fileCount(totalTaskCount))
@@ -71,17 +72,40 @@ struct CombinedQueueView: View {
                     if uploadManager.hasActiveTasks {
                         Text("•")
                             .foregroundColor(.secondary)
-                        Text(uploadManager.formattedSpeed)
-                            .font(.caption)
-                            .foregroundColor(.blue)
-                            .monospacedDigit()
-
-                        if uploadManager.estimatedTimeRemaining > 0 {
-                            Text(L.Upload.Queue.remaining(uploadManager.formattedETA))
+                        HStack(spacing: 2) {
+                            Image(systemName: "arrow.up")
+                                .font(.caption2)
+                            Text(uploadManager.formattedSpeed)
                                 .font(.caption)
-                                .foregroundColor(.secondary)
                                 .monospacedDigit()
                         }
+                        .foregroundColor(.blue)
+                    }
+
+                    // 下载速度和剩余时间
+                    if downloadManager.hasActiveTasks {
+                        Text("•")
+                            .foregroundColor(.secondary)
+                        HStack(spacing: 2) {
+                            Image(systemName: "arrow.down")
+                                .font(.caption2)
+                            Text(downloadManager.formattedSpeed)
+                                .font(.caption)
+                                .monospacedDigit()
+                        }
+                        .foregroundColor(.green)
+                    }
+
+                    // 剩余时间（取最长的）
+                    let maxETA = max(uploadManager.estimatedTimeRemaining, downloadManager.estimatedTimeRemaining)
+                    if maxETA > 0 {
+                        let formattedETA = uploadManager.estimatedTimeRemaining > downloadManager.estimatedTimeRemaining
+                            ? uploadManager.formattedETA
+                            : downloadManager.formattedETA
+                        Text(L.Upload.Queue.remaining(formattedETA))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .monospacedDigit()
                     }
                 }
 
@@ -130,6 +154,14 @@ struct CombinedQueueView: View {
                     .foregroundColor(.blue)
             }
 
+            // 下载中
+            let downloadingCount = downloadManager.downloadingTasks.count
+            if downloadingCount > 0 {
+                Text("\(downloadingCount) \(L.Files.Toolbar.download)")
+                    .font(.caption)
+                    .foregroundColor(.green)
+            }
+
             // 移动中
             let movingCount = moveManager.processingTasks.count
             if movingCount > 0 {
@@ -139,7 +171,7 @@ struct CombinedQueueView: View {
             }
 
             // 等待中
-            let pendingCount = uploadManager.pendingTasks.count + moveManager.pendingTasks.count
+            let pendingCount = uploadManager.pendingTasks.count + downloadManager.pendingTasks.count + moveManager.pendingTasks.count
             if pendingCount > 0 {
                 Text(L.Upload.Queue.pending(pendingCount))
                     .font(.caption)
@@ -147,7 +179,7 @@ struct CombinedQueueView: View {
             }
 
             // 已完成
-            let completedCount = uploadManager.completedTasks.count + moveManager.completedTasks.count
+            let completedCount = uploadManager.completedTasks.count + downloadManager.completedTasks.count + moveManager.completedTasks.count
             if completedCount > 0 {
                 Text(L.Upload.Queue.completed(completedCount))
                     .font(.caption)
@@ -155,7 +187,7 @@ struct CombinedQueueView: View {
             }
 
             // 失败
-            let failedCount = uploadManager.failedTasks.count + moveManager.failedTasks.count
+            let failedCount = uploadManager.failedTasks.count + downloadManager.failedTasks.count + moveManager.failedTasks.count
             if failedCount > 0 {
                 Text(L.Upload.Queue.failed(failedCount))
                     .font(.caption)
@@ -167,10 +199,11 @@ struct CombinedQueueView: View {
     /// 操作按钮
     private var actionButtons: some View {
         HStack(spacing: 8) {
-            let hasFailedTasks = !uploadManager.failedTasks.isEmpty || !moveManager.failedTasks.isEmpty
+            let hasFailedTasks = !uploadManager.failedTasks.isEmpty || !downloadManager.failedTasks.isEmpty || !moveManager.failedTasks.isEmpty
             if hasFailedTasks {
                 Button(L.Upload.Action.retryFailed) {
                     uploadManager.retryAllFailed()
+                    downloadManager.retryAllFailed()
                     for task in moveManager.failedTasks {
                         moveManager.retryTask(task)
                     }
@@ -179,10 +212,11 @@ struct CombinedQueueView: View {
                 .controlSize(.small)
             }
 
-            let hasCompletedTasks = !uploadManager.completedTasks.isEmpty || !moveManager.completedTasks.isEmpty
+            let hasCompletedTasks = !uploadManager.completedTasks.isEmpty || !downloadManager.completedTasks.isEmpty || !moveManager.completedTasks.isEmpty
             if hasCompletedTasks {
                 Button(L.Upload.Action.clearCompleted) {
                     uploadManager.clearCompleted()
+                    downloadManager.clearCompleted()
                     moveManager.clearCompleted()
                 }
                 .buttonStyle(.bordered)
@@ -191,6 +225,7 @@ struct CombinedQueueView: View {
 
             Button(action: {
                 uploadManager.clearAll()
+                downloadManager.clearAll()
                 moveManager.clearAll()
             }) {
                 Image(systemName: "xmark")
@@ -214,6 +249,15 @@ struct CombinedQueueView: View {
                     )
                 }
 
+                // 下载任务
+                ForEach(downloadManager.tasks) { task in
+                    DownloadTaskRow(
+                        task: task,
+                        onCancel: { downloadManager.cancelTask(task) },
+                        onRetry: { downloadManager.retryTask(task) }
+                    )
+                }
+
                 // 移动任务
                 ForEach(moveManager.tasks) { task in
                     MoveTaskRow(
@@ -232,10 +276,11 @@ struct CombinedQueueView: View {
     /// 总进度
     private var overallProgress: Double {
         let uploadProgress = uploadManager.totalProgress * Double(uploadManager.tasks.count)
+        let downloadProgress = downloadManager.totalProgress * Double(downloadManager.tasks.count)
         let moveProgress = moveManager.totalProgress * Double(moveManager.tasks.count)
         let total = Double(totalTaskCount)
         guard total > 0 else { return 0 }
-        return (uploadProgress + moveProgress) / total
+        return (uploadProgress + downloadProgress + moveProgress) / total
     }
 
     /// 总进度百分比
@@ -413,5 +458,91 @@ struct MoveTaskRow: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .background(task.status == .processing ? Color.orange.opacity(0.05) : Color.clear)
+    }
+}
+
+// MARK: - 下载任务行
+
+/// 下载任务行视图
+struct DownloadTaskRow: View {
+    let task: DownloadQueueTask
+    let onCancel: () -> Void
+    let onRetry: () -> Void
+
+    /// 状态显示文本
+    private var statusText: String {
+        switch task.status {
+        case .pending:
+            return L.Upload.Status.pending
+        case .processing:
+            return L.Files.Toolbar.download
+        case .completed:
+            return L.Upload.Status.completed
+        case .failed(let error):
+            return L.Upload.Status.failed(error)
+        case .cancelled:
+            return L.Upload.Status.cancelled
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // 状态图标（下载用绿色区分）
+            Image(systemName: task.status == .processing ? "arrow.down.circle.fill" : task.status.iconName)
+                .foregroundColor(task.status == .processing ? .green : task.status.iconColor)
+                .frame(width: 20)
+
+            // 文件信息
+            VStack(alignment: .leading, spacing: 2) {
+                Text(task.displayName)
+                    .font(.caption)
+                    .lineLimit(1)
+
+                HStack(spacing: 8) {
+                    Text(task.formattedSize)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+
+                    Text(statusText)
+                        .font(.caption2)
+                        .foregroundColor(task.status == .processing ? .green : task.status.iconColor)
+                }
+            }
+
+            Spacer()
+
+            // 进度或操作按钮
+            if task.status == .processing {
+                ProgressView(value: task.progress)
+                    .progressViewStyle(.linear)
+                    .frame(width: 60)
+                    .tint(.green)
+
+                Button(action: onCancel) {
+                    Image(systemName: "xmark.circle")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(.secondary)
+
+            } else if case .failed = task.status {
+                Button(L.Common.Button.retry) {
+                    onRetry()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+
+            } else if task.status == .pending {
+                Button(action: onCancel) {
+                    Image(systemName: "xmark.circle")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(.secondary)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(task.status == .processing ? Color.green.opacity(0.05) : Color.clear)
     }
 }
