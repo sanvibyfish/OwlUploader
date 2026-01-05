@@ -86,6 +86,9 @@ struct FileListView: View {
     
     /// 要预览的文件对象
     @State private var fileToPreview: FileObject?
+
+    /// 要重命名的文件对象
+    @State private var fileToRename: FileObject?
     
     /// 拖拽目标状态
     @State private var isTargeted: Bool = false
@@ -160,6 +163,16 @@ struct FileListView: View {
             CreateFolderSheet(
                 isPresented: $showingCreateFolderSheet,
                 onCreateFolder: createFolderWithName
+            )
+        }
+        .sheet(item: $fileToRename) { file in
+            RenameSheet(
+                isPresented: Binding(
+                    get: { fileToRename != nil },
+                    set: { if !$0 { fileToRename = nil } }
+                ),
+                file: file,
+                onRename: handleRename
             )
         }
         .fileImporter(
@@ -737,6 +750,10 @@ struct FileListView: View {
                     onMoveToPath: { file, destinationPath in
                         handleMoveToPath(file: file, destinationPath: destinationPath)
                     },
+                    onRename: { file in
+                        print("📝 [Rename] Triggered for file: \(file.name)")
+                        fileToRename = file
+                    },
                     currentFolders: filteredFiles.filter { $0.isDirectory },
                     currentPrefix: currentPrefix
                 )
@@ -771,6 +788,10 @@ struct FileListView: View {
                     },
                     onMoveToPath: { file, destinationPath in
                         handleMoveToPath(file: file, destinationPath: destinationPath)
+                    },
+                    onRename: { file in
+                        print("📝 [Rename] Triggered for file: \(file.name)")
+                        fileToRename = file
                     },
                     currentFolders: filteredFiles.filter { $0.isDirectory },
                     currentPrefix: currentPrefix
@@ -1434,7 +1455,51 @@ struct FileListView: View {
             }
         }
     }
-    
+
+    // MARK: - 重命名文件
+
+    /// 处理重命名文件
+    /// - Parameters:
+    ///   - file: 要重命名的文件
+    ///   - newName: 新名称
+    private func handleRename(file: FileObject, newName: String) {
+        guard let bucketName = r2Service.selectedBucket?.name else { return }
+
+        let oldName = file.isDirectory ? String(file.name.dropLast()) : file.name
+
+        Task {
+            do {
+                // 构建新的 key（保留目录路径）
+                let directory = file.key.components(separatedBy: "/").dropLast().joined(separator: "/")
+                let newKey = directory.isEmpty ? newName : "\(directory)/\(newName)"
+
+                // 文件夹需要保留尾部斜杠
+                let finalNewKey = file.isDirectory ? "\(newKey)/" : newKey
+
+                try await r2Service.renameObject(
+                    bucket: bucketName,
+                    oldKey: file.key,
+                    newKey: finalNewKey
+                )
+
+                await MainActor.run {
+                    messageManager.showSuccess(
+                        L.Message.Success.renameComplete,
+                        description: L.Message.Success.renameDescription(oldName, newName)
+                    )
+                    loadFileList()
+                }
+            } catch {
+                await MainActor.run {
+                    messageManager.showError(
+                        L.Message.Error.renameFailed,
+                        description: error.localizedDescription
+                    )
+                }
+            }
+        }
+    }
+
     // MARK: - 移动文件
 
     /// 处理右键菜单移动文件到指定路径

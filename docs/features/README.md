@@ -206,6 +206,7 @@ OwlUploader/
 | 07 | 安全存储 | [07-security-keychain.md](./07-security-keychain.md) | Keychain 凭证安全存储 |
 | 08 | 系统诊断 | [08-diagnostics.md](./08-diagnostics.md) | 连接诊断与故障排除 |
 | 09 | **Finder UI 设计规范** | [09-finder-ui-design.md](./09-finder-ui-design.md) | UI 组件、交互模式、视觉规范 |
+| 10 | **文件重命名** | [10-file-rename.md](./10-file-rename.md) | 文件与文件夹重命名功能 |
 
 ---
 
@@ -287,6 +288,7 @@ OwlUploader/
 - [x] 文件下载功能
 - [x] 批量操作（多选删除、下载）
 - [x] 文件移动功能（右键菜单移动到其他目录）
+- [x] 文件重命名功能（智能验证、实时反馈）
 - [x] 本地化支持（中文/英文）
 - [x] 导航历史（前进/后退）
 - [x] 合并队列视图（上传+移动）
@@ -295,6 +297,7 @@ OwlUploader/
 - [ ] 文件夹上传（保持目录结构）
 - [ ] 上传/下载历史记录
 - [ ] 文件共享链接生成（过期设置）
+- [ ] 批量重命名（模式替换）
 
 ---
 

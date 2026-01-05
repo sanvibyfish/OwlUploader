@@ -41,6 +41,9 @@ struct FileGridItemView: View {
     /// 移动到指定路径回调：(文件, 目标路径)
     var onMoveToPath: ((FileObject, String) -> Void)?
 
+    /// 重命名回调
+    var onRename: ((FileObject) -> Void)?
+
     /// 当前目录下的文件夹列表（用于移动到子菜单）
     var currentFolders: [FileObject] = []
 
@@ -121,6 +124,11 @@ struct FileGridItemView: View {
 
         // 移动到子菜单
         moveToMenu
+
+        // 重命名
+        Button(action: { onRename?(fileObject) }) {
+            Label(L.Files.ContextMenu.rename, systemImage: "pencil")
+        }
 
         Divider()
 

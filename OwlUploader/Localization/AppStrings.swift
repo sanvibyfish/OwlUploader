@@ -189,6 +189,7 @@ enum L {
             static let delete = String(localized: "files.contextMenu.delete", defaultValue: "Delete")
             static let moveTo = String(localized: "files.contextMenu.moveTo", defaultValue: "Move to")
             static let parentFolder = String(localized: "files.contextMenu.parentFolder", defaultValue: "Parent Folder (..)")
+            static let rename = String(localized: "files.contextMenu.rename", defaultValue: "Rename")
         }
 
         static let defaultFileName = String(localized: "files.defaultFileName", defaultValue: "File")
@@ -408,6 +409,20 @@ enum L {
             static let invalidName = String(localized: "folder.create.invalidName", defaultValue: "Folder name contains invalid characters")
             static let createButton = String(localized: "folder.create.button", defaultValue: "Create Folder")
         }
+    }
+
+    // MARK: - Rename
+
+    enum Rename {
+        static let title = String(localized: "rename.title", defaultValue: "Rename")
+        static let nameLabel = String(localized: "rename.nameLabel", defaultValue: "New Name:")
+        static let namePlaceholder = String(localized: "rename.namePlaceholder", defaultValue: "Enter new name")
+        static let renameButton = String(localized: "rename.renameButton", defaultValue: "Rename")
+        static let invalidCharsHint = String(localized: "rename.invalidCharsHint",
+            defaultValue: "Names cannot contain: \\ / : * ? \" < > |")
+        static let invalidName = String(localized: "rename.invalidName", defaultValue: "Invalid name")
+        static let validName = String(localized: "rename.validName", defaultValue: "Valid name")
+        static let sameName = String(localized: "rename.sameName", defaultValue: "Name unchanged")
     }
 
     // MARK: - Welcome
@@ -872,6 +887,13 @@ extension L {
                 String(format: NSLocalizedString("message.success.folder.created.description", value: "Folder '%@' created successfully", comment: ""), name)
             }
 
+            // Rename
+            static let renameComplete = String(localized: "message.success.rename.title", defaultValue: "Renamed Successfully")
+
+            static func renameDescription(_ oldName: String, _ newName: String) -> String {
+                String(format: NSLocalizedString("message.success.rename.description", value: "'%@' renamed to '%@'", comment: ""), oldName, newName)
+            }
+
             // Account
             static let accountAdded = String(localized: "message.success.account.added.title", defaultValue: "Account Added")
 
@@ -930,6 +952,7 @@ extension L {
             static let uploadFailed = String(localized: "message.error.upload.title", defaultValue: "Upload Failed")
             static let downloadFailed = String(localized: "message.error.download.title", defaultValue: "Download Failed")
             static let deleteFailed = String(localized: "message.error.delete.title", defaultValue: "Delete Failed")
+            static let renameFailed = String(localized: "message.error.rename.title", defaultValue: "Rename Failed")
             static let connectionFailed = String(localized: "message.error.connection.title", defaultValue: "Connection Failed")
             static let saveFailed = String(localized: "message.error.save.title", defaultValue: "Save Failed")
             static let importFailed = String(localized: "message.error.import.title", defaultValue: "Import Failed")

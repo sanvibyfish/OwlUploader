@@ -2660,6 +2660,17 @@
         }
       }
     },
+    "files.contextMenu.rename" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Rename"
+          }
+        }
+      }
+    },
     "files.contextMenu.upload" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -4534,6 +4545,17 @@
         }
       }
     },
+    "message.error.rename.title" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Rename Failed"
+          }
+        }
+      }
+    },
     "message.error.save.title" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -5040,6 +5062,28 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "链接已复制"
+          }
+        }
+      }
+    },
+    "message.success.rename.description" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "'%1$@' renamed to '%2$@'"
+          }
+        }
+      }
+    },
+    "message.success.rename.title" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Renamed Successfully"
           }
         }
       }
@@ -5607,6 +5651,94 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "不支持预览此文件类型"
+          }
+        }
+      }
+    },
+    "rename.invalidCharsHint" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Names cannot contain: \\ / : * ? \" < > |"
+          }
+        }
+      }
+    },
+    "rename.invalidName" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Invalid name"
+          }
+        }
+      }
+    },
+    "rename.nameLabel" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "New Name:"
+          }
+        }
+      }
+    },
+    "rename.namePlaceholder" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Enter new name"
+          }
+        }
+      }
+    },
+    "rename.renameButton" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Rename"
+          }
+        }
+      }
+    },
+    "rename.sameName" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Name unchanged"
+          }
+        }
+      }
+    },
+    "rename.title" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Rename"
+          }
+        }
+      }
+    },
+    "rename.validName" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Valid name"
           }
         }
       }
