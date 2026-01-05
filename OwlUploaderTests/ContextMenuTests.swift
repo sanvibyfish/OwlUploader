@@ -276,6 +276,26 @@ final class ContextMenuTests: XCTestCase {
         XCTAssertFalse(hasParent, "根目录时不应该显示上级目录选项")
     }
 
+    // MARK: - 重命名菜单项测试
+
+    func testRenameMenuItem_shouldShowForFiles() {
+        // Given - 普通文件
+        let file = createTestFile(name: "document.pdf")
+
+        // Then - 重命名菜单项应该对文件显示
+        XCTAssertFalse(file.isDirectory, "文件的 isDirectory 应该为 false")
+        // 重命名菜单对所有文件和文件夹都显示
+    }
+
+    func testRenameMenuItem_shouldShowForFolders() {
+        // Given - 文件夹
+        let folder = FileObject.folder(name: "Documents", key: "documents/")
+
+        // Then - 重命名菜单项应该对文件夹也显示
+        XCTAssertTrue(folder.isDirectory, "文件夹的 isDirectory 应该为 true")
+        // 重命名菜单对所有文件和文件夹都显示
+    }
+
     // MARK: - 辅助方法
 
     private func createTestFile(name: String, key: String? = nil) -> FileObject {

@@ -1470,7 +1470,11 @@ struct FileListView: View {
         Task {
             do {
                 // 构建新的 key（保留目录路径）
-                let directory = file.key.components(separatedBy: "/").dropLast().joined(separator: "/")
+                // 对于文件夹，先移除尾部斜杠再处理
+                let keyForProcessing = file.isDirectory && file.key.hasSuffix("/")
+                    ? String(file.key.dropLast())
+                    : file.key
+                let directory = keyForProcessing.components(separatedBy: "/").dropLast().joined(separator: "/")
                 let newKey = directory.isEmpty ? newName : "\(directory)/\(newName)"
 
                 // 文件夹需要保留尾部斜杠

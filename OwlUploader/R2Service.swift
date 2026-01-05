@@ -520,6 +520,12 @@ class R2Service: ObservableObject {
     /// 适用于 API Token 没有 listBuckets 权限但有特定存储桶访问权限的情况
     /// - Parameter bucketName: 存储桶名称
     func selectBucketDirectly(_ bucketName: String) async throws -> BucketItem {
+        // 如果已断开但仍有当前账户配置，尝试自动重新初始化
+        if s3Client == nil, let account = accountManager.currentAccount {
+            let credentials = try accountManager.getCompleteCredentials(for: account)
+            try await initialize(with: credentials.account, secretAccessKey: credentials.secretAccessKey)
+        }
+
         guard let s3Client = s3Client else {
             throw R2ServiceError.accountNotConfigured
         }

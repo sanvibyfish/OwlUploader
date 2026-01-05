@@ -1,20 +1,21 @@
-# 05. 文件下载与删除 (File Download & Delete)
+# 05. 文件下载、删除与重命名 (File Download, Delete & Rename)
 
 ## 功能概述
 
-文件下载与删除模块提供从 R2 存储下载文件到本地，以及删除远程文件的功能。支持单文件和批量操作。
+文件下载、删除与重命名模块提供从 R2 存储下载文件到本地、删除远程文件和重命名文件/文件夹的功能。支持单文件和批量操作。
 
 ## 核心组件
 
 | 文件 | 职责 |
 |------|-----|
-| `FileListView.swift` | 下载/删除操作入口、批量操作 |
+| `FileListView.swift` | 下载/删除/重命名操作入口、批量操作 |
 | `FilePreviewView.swift` | 文件预览视图 |
 | `FileGridItemView.swift` | 网格视图文件项操作 |
 | `FileTableView.swift` | 表格视图文件项操作 |
 | `FinderToolbar.swift` | 批量操作工具栏 |
 | `SelectionManager.swift` | 多选状态管理 |
-| `R2Service.swift` | 下载/删除 API |
+| `RenameSheet.swift` | 重命名对话框组件 |
+| `R2Service.swift` | 下载/删除/重命名 API |
 
 ## 功能特性
 
@@ -27,6 +28,8 @@
 - **单文件删除**: 删除单个文件
 - **批量删除**: 选择多个文件后批量删除（使用批量 API 优化）
 - **删除确认**: 删除前显示确认对话框
+- **文件重命名**: 右键菜单重命名文件
+- **文件夹重命名**: 右键菜单重命名文件夹
 - **操作反馈**: 成功/失败状态提示
 - **多选支持**: Cmd+Click 添加选择，Shift+Click 范围选择
 - **任务取消**: 支持取消进行中的下载任务
@@ -269,6 +272,94 @@ flowchart TD
 
 - **全部成功**: "Deleted Successfully - N files deleted"
 - **部分失败**: "Partially Deleted - M succeeded, N failed"
+
+## 文件重命名
+
+### 触发方式
+
+右键点击文件或文件夹，选择「重命名」菜单项。
+
+### 重命名对话框
+
+```
+┌─────────────────────────────────────────┐
+│              Rename                      │
+│                                          │
+│  New Name:                               │
+│  ┌────────────────────────────────────┐ │
+│  │ document.pdf                       │ │
+│  └────────────────────────────────────┘ │
+│  Names cannot contain: \ / : * ? " < > |│
+│  ✓ Valid name                           │
+│                                          │
+│  [Cancel]                    [Rename]   │
+└─────────────────────────────────────────┘
+```
+
+### 验证规则
+
+| 规则 | 说明 |
+|------|------|
+| 非空 | 名称不能为空或仅包含空格 |
+| 非法字符 | 不能包含 `\ / : * ? " < > \|` |
+| 名称变化 | 新名称必须与原名称不同 |
+
+### 验证状态提示
+
+| 状态 | 颜色 | 说明 |
+|------|------|------|
+| ✓ Valid name | 绿色 | 名称有效且与原名不同 |
+| Name unchanged | 橙色 | 名称与原名相同 |
+| Invalid name | 红色 | 包含非法字符 |
+
+### 键盘快捷键
+
+| 快捷键 | 功能 |
+|--------|------|
+| `Enter` | 确认重命名 |
+| `Esc` | 取消操作 |
+
+### 重命名 API
+
+```swift
+func renameObject(
+    bucket: String,
+    oldKey: String,
+    newKey: String
+) async throws
+```
+
+**实现原理**: R2/S3 不支持原生重命名，通过 Copy + Delete 实现：
+1. 复制对象到新 key
+2. 删除原对象
+
+### Key 构建逻辑
+
+重命名时需要保留原有的目录路径：
+
+**文件重命名**:
+```swift
+// 原 key: "documents/reports/old.pdf"
+// 新名称: "new.pdf"
+// 新 key: "documents/reports/new.pdf"
+```
+
+**文件夹重命名**:
+```swift
+// 原 key: "projects/2024/reports/"
+// 新名称: "documents"
+// 新 key: "projects/2024/documents/"
+```
+
+注意：文件夹 key 以 `/` 结尾，处理时需要先去除再添加。
+
+### 错误处理
+
+| 错误类型 | 描述 | 处理方式 |
+|---------|------|---------|
+| `renameFailed` | 重命名请求失败 | 显示错误消息 |
+| `copyFailed` | 复制对象失败 | 显示错误消息 |
+| `networkError` | 网络连接错误 | 建议重试 |
 
 ## 相关链接
 

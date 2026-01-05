@@ -123,10 +123,12 @@ struct SidebarView: View {
     // MARK: - Logic
 
     private func toggleExpansion(for account: R2Account) {
-        if expandedAccounts.contains(account.id) {
-            expandedAccounts.remove(account.id)
-        } else {
-            expandedAccounts.insert(account.id)
+        withAnimation(.easeInOut(duration: 0.2)) {
+            if expandedAccounts.contains(account.id) {
+                expandedAccounts.remove(account.id)
+            } else {
+                expandedAccounts.insert(account.id)
+            }
         }
     }
 
@@ -282,6 +284,10 @@ struct AccountRow: View {
                 Image(systemName: "cloud.fill")
                     .font(.system(size: 16))
                     .foregroundColor(isConnected ? AppColors.success : .secondary)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                onToggle()
             }
         }
         .contextMenu {
