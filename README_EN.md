@@ -46,8 +46,8 @@ A clean and efficient **Cloudflare R2 Object Storage Management Tool** designed 
 
 ## 📋 System Requirements
 
-- **Operating System**: macOS 13.0 (Ventura) and later
-- **Architecture**: Support for Intel and Apple Silicon (M1/M2) processors
+- **Operating System**: macOS 15.4 and later
+- **Architecture**: Support for Intel and Apple Silicon processors
 - **Network**: Stable internet connection required to access Cloudflare R2
 
 ## 🛠 Tech Stack
@@ -62,11 +62,11 @@ A clean and efficient **Cloudflare R2 Object Storage Management Tool** designed 
 
 ### 📥 Download
 
-👉 [Click to Download OwlUploader for macOS (.dmg)](https://github.com/sanvibyfish/OwlUploader/releases/download/v1.0.0/OwlUploader.dmg)
+👉 [Download OwlUploader on App Store](https://apps.apple.com/cn/app/owluploader/id6746383161?l=en-GB&mt=12)
 
-- **Latest Version**: v1.0.0
-- **File Size**: ~15MB
-- **System Requirements**: macOS 13.0 (Ventura) and later
+- **Latest Version**: v1.1.0
+- **File Size**: 18.3 MB
+- **System Requirements**: macOS 15.4 and later
 
 ### Build from Source
 
@@ -82,7 +82,7 @@ A clean and efficient **Cloudflare R2 Object Storage Management Tool** designed 
    ```
 
 3. **Build and Run**
-   - Ensure Xcode version 15.0 or higher
+   - Ensure Xcode version 16.0 or higher
    - Select target device (Mac)
    - Press `Cmd + R` to run the project
 
