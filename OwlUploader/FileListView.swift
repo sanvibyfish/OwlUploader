@@ -950,11 +950,21 @@ struct FileListView: View {
     }
 
     /// 处理文件下载
-    /// - Parameter fileObject: 要下载的文件对象
+    /// - Parameter fileObject: 要下载的文件或文件夹对象
     private func downloadFile(_ fileObject: FileObject) {
-        guard !fileObject.isDirectory else { return }
         guard let bucket = r2Service.selectedBucket else { return }
 
+        if fileObject.isDirectory {
+            // 文件夹下载：选择目标文件夹
+            downloadFolder(fileObject, bucket: bucket)
+        } else {
+            // 单文件下载：选择保存位置和文件名
+            downloadSingleFile(fileObject, bucket: bucket)
+        }
+    }
+
+    /// 下载单个文件
+    private func downloadSingleFile(_ fileObject: FileObject, bucket: BucketItem) {
         // 创建保存面板
         let savePanel = NSSavePanel()
         savePanel.title = L.SavePanel.saveFile
@@ -998,6 +1008,93 @@ struct FileListView: View {
 
                 // 添加到下载队列
                 downloadQueueManager.addDownloads([downloadFile], to: destinationFolder)
+            }
+        }
+    }
+
+    /// 下载文件夹
+    private func downloadFolder(_ folderObject: FileObject, bucket: BucketItem) {
+        // 使用 NSOpenPanel 选择目标文件夹
+        let openPanel = NSOpenPanel()
+        openPanel.title = "选择保存位置"
+        openPanel.prompt = "选择文件夹"
+        openPanel.canChooseFiles = false
+        openPanel.canChooseDirectories = true
+        openPanel.canCreateDirectories = true
+        openPanel.allowsMultipleSelection = false
+
+        openPanel.begin { response in
+            guard response == .OK, let destinationFolder = openPanel.url else { return }
+
+            Task { @MainActor in
+                do {
+                    // 显示加载提示
+                    self.messageManager.showInfo(
+                        "正在扫描文件夹",
+                        description: "正在列出 \(folderObject.name) 中的所有文件..."
+                    )
+
+                    // 递归列出文件夹内所有文件
+                    let files = try await self.r2Service.listAllFilesInFolder(
+                        bucket: bucket.name,
+                        folderPrefix: folderObject.key
+                    )
+
+                    guard !files.isEmpty else {
+                        self.messageManager.showWarning(
+                            "文件夹为空",
+                            description: "\(folderObject.name) 中没有文件"
+                        )
+                        return
+                    }
+
+                    // 创建文件夹目录结构
+                    let folderName = folderObject.name.hasSuffix("/")
+                        ? String(folderObject.name.dropLast())
+                        : folderObject.name
+                    let localFolderURL = destinationFolder.appendingPathComponent(folderName)
+
+                    // 配置下载队列管理器
+                    self.downloadQueueManager.configure(r2Service: self.r2Service, bucketName: bucket.name)
+
+                    // 设置完成回调
+                    self.downloadQueueManager.onQueueComplete = {
+                        let completed = self.downloadQueueManager.completedTasks.count
+                        let failed = self.downloadQueueManager.failedTasks.count
+
+                        if failed == 0 && completed > 0 {
+                            self.messageManager.showSuccess(
+                                L.Message.Success.downloadComplete,
+                                description: "成功下载 \(completed) 个文件"
+                            )
+                        } else if failed > 0 {
+                            self.messageManager.showWarning(
+                                "部分下载失败",
+                                description: "成功: \(completed), 失败: \(failed)"
+                            )
+                        }
+                    }
+
+                    // 为每个文件创建下载任务，保持相对路径
+                    let downloadFiles: [(key: String, name: String, size: Int64)] = files.map { file in
+                        // 使用相对路径作为本地文件名（保持目录结构）
+                        return (key: file.key, name: file.relativePath, size: file.size)
+                    }
+
+                    // 添加到下载队列
+                    self.downloadQueueManager.addDownloads(downloadFiles, to: localFolderURL)
+
+                    self.messageManager.showSuccess(
+                        "开始下载",
+                        description: "正在下载 \(files.count) 个文件到 \(folderName)"
+                    )
+
+                } catch {
+                    self.messageManager.showError(
+                        "文件夹下载失败",
+                        description: error.localizedDescription
+                    )
+                }
             }
         }
     }

@@ -316,6 +316,95 @@ final class DownloadQueueManagerTests: XCTestCase {
         XCTAssertEqual(manager.tasks[1].status, .completed) // 未改变
     }
 
+    // MARK: - Nested Path Download Tests
+
+    func testAddDownloads_withNestedRelativePath_createsCorrectLocalURL() {
+        // Given - 模拟文件夹下载场景，文件有嵌套相对路径
+        let manager = DownloadQueueManager()
+        let destinationFolder = URL(fileURLWithPath: "/tmp/downloads/mybucket")
+        let filesWithNestedPaths: [(key: String, name: String, size: Int64)] = [
+            (key: "blog/images/cover.jpg", name: "images/cover.jpg", size: 1024),
+            (key: "blog/posts/article.md", name: "posts/article.md", size: 2048),
+            (key: "blog/assets/styles/main.css", name: "assets/styles/main.css", size: 512)
+        ]
+
+        // When
+        manager.addDownloads(filesWithNestedPaths, to: destinationFolder)
+
+        // Then - 验证本地 URL 正确包含嵌套路径
+        XCTAssertEqual(manager.tasks.count, 3)
+
+        let task1 = manager.tasks.first { $0.fileKey == "blog/images/cover.jpg" }
+        XCTAssertEqual(task1?.localURL.path, "/tmp/downloads/mybucket/images/cover.jpg")
+
+        let task2 = manager.tasks.first { $0.fileKey == "blog/posts/article.md" }
+        XCTAssertEqual(task2?.localURL.path, "/tmp/downloads/mybucket/posts/article.md")
+
+        let task3 = manager.tasks.first { $0.fileKey == "blog/assets/styles/main.css" }
+        XCTAssertEqual(task3?.localURL.path, "/tmp/downloads/mybucket/assets/styles/main.css")
+    }
+
+    func testAddDownloads_withFlatPath_createsCorrectLocalURL() {
+        // Given - 普通单文件下载（无嵌套路径）
+        let manager = DownloadQueueManager()
+        let destinationFolder = URL(fileURLWithPath: "/tmp/downloads")
+        let files: [(key: String, name: String, size: Int64)] = [
+            (key: "document.pdf", name: "document.pdf", size: 4096)
+        ]
+
+        // When
+        manager.addDownloads(files, to: destinationFolder)
+
+        // Then
+        XCTAssertEqual(manager.tasks.count, 1)
+        XCTAssertEqual(manager.tasks.first?.localURL.path, "/tmp/downloads/document.pdf")
+    }
+
+    func testDownloadTask_localURLParentDirectory_canBeExtracted() {
+        // Given - 创建带嵌套路径的下载任务
+        let task = createTestTask(
+            fileKey: "screenshots/blog/cover.jpg",
+            fileName: "blog/cover.jpg"
+        )
+
+        // When - 提取父目录（这是下载前需要创建的目录）
+        let parentDirectory = task.localURL.deletingLastPathComponent()
+
+        // Then
+        XCTAssertTrue(parentDirectory.path.contains("blog"),
+                      "父目录路径应包含子目录")
+        XCTAssertFalse(parentDirectory.path.hasSuffix("cover.jpg"),
+                       "父目录路径不应包含文件名")
+    }
+
+    func testAddDownloads_preservesRelativePathStructure() {
+        // Given - 模拟真实的文件夹下载：从 R2 的 screenshots/blog/ 下载到本地
+        let manager = DownloadQueueManager()
+        let localFolderURL = URL(fileURLWithPath: "/Users/test/Downloads/blog")
+
+        // R2 中的文件（带相对路径）
+        let filesFromR2: [(key: String, name: String, size: Int64)] = [
+            (key: "screenshots/blog/2025/jan/image1.jpg", name: "2025/jan/image1.jpg", size: 1000),
+            (key: "screenshots/blog/2025/jan/image2.jpg", name: "2025/jan/image2.jpg", size: 2000),
+            (key: "screenshots/blog/2025/feb/image3.jpg", name: "2025/feb/image3.jpg", size: 3000)
+        ]
+
+        // When
+        manager.addDownloads(filesFromR2, to: localFolderURL)
+
+        // Then - 验证目录结构保持一致
+        let expectedPaths = [
+            "/Users/test/Downloads/blog/2025/jan/image1.jpg",
+            "/Users/test/Downloads/blog/2025/jan/image2.jpg",
+            "/Users/test/Downloads/blog/2025/feb/image3.jpg"
+        ]
+
+        for (index, task) in manager.tasks.enumerated() {
+            XCTAssertEqual(task.localURL.path, expectedPaths[index],
+                           "任务 \(index) 的本地路径应保持目录结构")
+        }
+    }
+
     // MARK: - Helper Methods
 
     private func createTestTask(

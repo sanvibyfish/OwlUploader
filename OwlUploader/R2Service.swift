@@ -803,7 +803,57 @@ class R2Service: ObservableObject {
             throw serviceError
         }
     }
-    
+
+    /// 递归列出文件夹内的所有文件（不包括子文件夹）
+    /// - Parameters:
+    ///   - bucket: 存储桶名称
+    ///   - folderPrefix: 文件夹前缀（以 / 结尾）
+    /// - Returns: 文件夹内所有文件的数组，每个元素包含相对路径
+    func listAllFilesInFolder(bucket: String, folderPrefix: String) async throws -> [(key: String, size: Int64, relativePath: String)] {
+        guard let s3Client = s3Client else {
+            throw R2ServiceError.accountNotConfigured
+        }
+
+        var allFiles: [(key: String, size: Int64, relativePath: String)] = []
+        var continuationToken: String? = nil
+
+        // 确保 folderPrefix 以 / 结尾
+        let normalizedPrefix = folderPrefix.hasSuffix("/") ? folderPrefix : folderPrefix + "/"
+
+        print("📂 开始递归列出文件夹内容: \(normalizedPrefix)")
+
+        repeat {
+            // 不使用 delimiter，这样会返回所有子文件和子文件夹内容
+            let input = ListObjectsV2Input(
+                bucket: bucket,
+                continuationToken: continuationToken,
+                maxKeys: 1000,
+                prefix: normalizedPrefix
+            )
+
+            let response = try await s3Client.listObjectsV2(input: input)
+
+            if let contents = response.contents {
+                for object in contents {
+                    if let key = object.key,
+                       let size = object.size,
+                       !key.hasSuffix("/") {  // 排除文件夹对象
+
+                        // 计算相对路径（去除 folderPrefix 部分）
+                        let relativePath = String(key.dropFirst(normalizedPrefix.count))
+                        allFiles.append((key: key, size: Int64(size), relativePath: relativePath))
+                        print("  ✅ 找到文件: \(relativePath) (\(size) bytes)")
+                    }
+                }
+            }
+
+            continuationToken = response.nextContinuationToken
+        } while continuationToken != nil
+
+        print("📂 文件夹扫描完成，共 \(allFiles.count) 个文件")
+        return allFiles
+    }
+
     /// 创建文件夹
     /// 在 S3/R2 中，文件夹通过创建一个以 `/` 结尾的空对象来表示
     /// - Parameters:
@@ -1394,6 +1444,10 @@ class R2Service: ObservableObject {
                 ))
             }
 
+            // 确保父目录存在
+            let parentDirectory = localURL.deletingLastPathComponent()
+            try FileManager.default.createDirectory(at: parentDirectory, withIntermediateDirectories: true, attributes: nil)
+
             // 创建文件并获取 FileHandle
             FileManager.default.createFile(atPath: localURL.path, contents: nil, attributes: nil)
             let fileHandle = try FileHandle(forWritingTo: localURL)
@@ -1505,6 +1559,10 @@ class R2Service: ObservableObject {
         print("📦 分段下载: \(totalChunks) 个分段，每个 \(downloadChunkSize / 1024 / 1024)MB，并发数: \(downloadConcurrency)")
 
         do {
+            // 确保父目录存在
+            let parentDirectory = localURL.deletingLastPathComponent()
+            try FileManager.default.createDirectory(at: parentDirectory, withIntermediateDirectories: true, attributes: nil)
+
             // 创建本地文件并预分配大小
             FileManager.default.createFile(atPath: localURL.path, contents: nil, attributes: nil)
             let fileHandle = try FileHandle(forWritingTo: localURL)

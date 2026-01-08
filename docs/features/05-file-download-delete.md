@@ -16,6 +16,7 @@
 | `SelectionManager.swift` | 多选状态管理 |
 | `RenameSheet.swift` | 重命名对话框组件 |
 | `R2Service.swift` | 下载/删除/重命名 API |
+| `DownloadQueueManager.swift` | 下载队列管理、进度追踪、任务去重 |
 
 ## 功能特性
 
@@ -24,6 +25,7 @@
 - **文件预览**: 双击文件打开预览窗口
 - **单文件下载**: 右键菜单或悬停按钮下载
 - **批量下载**: 选择多个文件后批量下载到指定目录
+- **文件夹下载**: 右键菜单下载整个文件夹，保持目录结构
 - **下载位置选择**: 通过系统对话框选择保存位置
 - **单文件删除**: 删除单个文件
 - **批量删除**: 选择多个文件后批量删除（使用批量 API 优化）
@@ -34,6 +36,7 @@
 - **多选支持**: Cmd+Click 添加选择，Shift+Click 范围选择
 - **任务取消**: 支持取消进行中的下载任务
 - **任务去重**: 自动跳过已在队列中的活跃任务
+- **自动创建目录**: 下载时自动创建所需的本地目录结构
 
 ## 已知问题 / 改进方向
 
@@ -104,15 +107,64 @@
 4. 选择保存目录
 5. 所有文件下载到指定目录
 
+### 文件夹下载
+
+1. 右键点击文件夹，选择「下载」
+2. 选择本地保存位置
+3. 系统扫描文件夹内所有文件
+4. 自动创建本地目录结构
+5. 批量下载所有文件到对应子目录
+
+**目录结构保持**:
+
+```
+R2 存储桶:                          本地下载目录:
+screenshots/                        ~/Downloads/screenshots/
+├── blog/                    →      ├── blog/
+│   ├── 2025/                       │   ├── 2025/
+│   │   ├── cover.jpg               │   │   ├── cover.jpg
+│   │   └── thumb.png               │   │   └── thumb.png
+│   └── assets/                     │   └── assets/
+│       └── logo.svg                │       └── logo.svg
+```
+
 ### 下载 API
 
 ```swift
+// 普通下载（小文件）
 func downloadObject(
     bucket: String,
     key: String,
     to localURL: URL
 ) async throws
+
+// 分段下载（大文件，> 10MB）
+func downloadObjectChunked(
+    bucket: String,
+    key: String,
+    to localURL: URL,
+    fileSize: Int64,
+    progress: @escaping (Int64, Int64) -> Void
+) async throws
 ```
+
+### 目录自动创建
+
+下载文件时会自动创建所需的父目录：
+
+```swift
+// 下载前自动创建目录
+let parentDirectory = localURL.deletingLastPathComponent()
+try FileManager.default.createDirectory(
+    at: parentDirectory,
+    withIntermediateDirectories: true,
+    attributes: nil
+)
+```
+
+这确保了：
+- 文件夹下载时，子目录结构会被正确创建
+- 不会因为目录不存在而导致下载失败
 
 ## 文件删除
 

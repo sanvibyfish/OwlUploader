@@ -121,16 +121,19 @@ struct FileTableView: View {
                 }
                 Divider()
 
-                // 下载和复制链接（仅文件显示）
+                // 下载（文件和文件夹都支持）
+                Button(action: { onDownloadFile?(file) }) {
+                    Label(L.Files.ContextMenu.download, systemImage: "arrow.down.circle")
+                }
+
+                // 复制链接（仅文件显示）
                 if !file.isDirectory {
-                    Button(action: { onDownloadFile?(file) }) {
-                        Label(L.Files.ContextMenu.download, systemImage: "arrow.down.circle")
-                    }
                     Button(action: { copyFileURL(file) }) {
                         Label(L.Files.ContextMenu.copyLink, systemImage: "link")
                     }
-                    Divider()
                 }
+
+                Divider()
 
                 // 移动到子菜单
                 moveToMenu(for: file)

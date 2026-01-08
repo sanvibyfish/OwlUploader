@@ -385,6 +385,120 @@ final class R2ServiceErrorTests: XCTestCase {
         XCTAssertFalse(error.isRetryable)
     }
 
+    // MARK: - Download Directory Creation Tests
+
+    func testDownloadDirectoryCreation_parentDirectoryCreatedWhenNeeded() {
+        // Given - 一个不存在的嵌套路径
+        let tempDir = FileManager.default.temporaryDirectory
+        let testDir = tempDir.appendingPathComponent("OwlUploaderTests_\(UUID().uuidString)")
+        let nestedPath = testDir.appendingPathComponent("subfolder/nested/file.txt")
+
+        // When - 模拟下载前的目录创建逻辑
+        let parentDirectory = nestedPath.deletingLastPathComponent()
+        do {
+            try FileManager.default.createDirectory(at: parentDirectory, withIntermediateDirectories: true, attributes: nil)
+        } catch {
+            XCTFail("创建父目录失败: \(error)")
+        }
+
+        // Then - 验证目录已创建
+        var isDirectory: ObjCBool = false
+        let exists = FileManager.default.fileExists(atPath: parentDirectory.path, isDirectory: &isDirectory)
+        XCTAssertTrue(exists, "父目录应该存在")
+        XCTAssertTrue(isDirectory.boolValue, "应该是一个目录")
+
+        // Cleanup
+        try? FileManager.default.removeItem(at: testDir)
+    }
+
+    func testDownloadDirectoryCreation_existingDirectoryNotAffected() {
+        // Given - 已存在的目录
+        let tempDir = FileManager.default.temporaryDirectory
+        let testDir = tempDir.appendingPathComponent("OwlUploaderTests_\(UUID().uuidString)")
+        let filePath = testDir.appendingPathComponent("existing_file.txt")
+
+        // 先创建目录和一个标记文件
+        do {
+            try FileManager.default.createDirectory(at: testDir, withIntermediateDirectories: true, attributes: nil)
+            try "marker".write(to: testDir.appendingPathComponent("marker.txt"), atomically: true, encoding: .utf8)
+        } catch {
+            XCTFail("设置测试环境失败: \(error)")
+        }
+
+        // When - 再次执行目录创建逻辑（模拟下载）
+        let parentDirectory = filePath.deletingLastPathComponent()
+        do {
+            try FileManager.default.createDirectory(at: parentDirectory, withIntermediateDirectories: true, attributes: nil)
+        } catch {
+            XCTFail("目录创建不应失败: \(error)")
+        }
+
+        // Then - 验证原有文件仍然存在
+        XCTAssertTrue(FileManager.default.fileExists(atPath: testDir.appendingPathComponent("marker.txt").path),
+                      "已存在的文件不应被影响")
+
+        // Cleanup
+        try? FileManager.default.removeItem(at: testDir)
+    }
+
+    func testDownloadDirectoryCreation_multiLevelNestedPath() {
+        // Given - 多层嵌套路径（模拟文件夹下载场景）
+        let tempDir = FileManager.default.temporaryDirectory
+        let testDir = tempDir.appendingPathComponent("OwlUploaderTests_\(UUID().uuidString)")
+        let deepPath = testDir.appendingPathComponent("blog/2025/images/thumbnails/cover.jpg")
+
+        // When - 创建多层嵌套目录
+        let parentDirectory = deepPath.deletingLastPathComponent()
+        do {
+            try FileManager.default.createDirectory(at: parentDirectory, withIntermediateDirectories: true, attributes: nil)
+        } catch {
+            XCTFail("创建多层目录失败: \(error)")
+        }
+
+        // Then - 验证所有层级目录都已创建
+        XCTAssertTrue(FileManager.default.fileExists(atPath: testDir.appendingPathComponent("blog").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: testDir.appendingPathComponent("blog/2025").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: testDir.appendingPathComponent("blog/2025/images").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: testDir.appendingPathComponent("blog/2025/images/thumbnails").path))
+
+        // Cleanup
+        try? FileManager.default.removeItem(at: testDir)
+    }
+
+    func testDownloadDirectoryCreation_fileCanBeCreatedAfterDirectorySetup() {
+        // Given - 嵌套路径
+        let tempDir = FileManager.default.temporaryDirectory
+        let testDir = tempDir.appendingPathComponent("OwlUploaderTests_\(UUID().uuidString)")
+        let filePath = testDir.appendingPathComponent("downloads/blog/image.jpg")
+
+        // When - 先创建目录，然后创建文件（模拟完整的下载流程）
+        let parentDirectory = filePath.deletingLastPathComponent()
+        do {
+            try FileManager.default.createDirectory(at: parentDirectory, withIntermediateDirectories: true, attributes: nil)
+            // 模拟 FileManager.createFile
+            let success = FileManager.default.createFile(atPath: filePath.path, contents: nil, attributes: nil)
+            XCTAssertTrue(success, "文件创建应该成功")
+
+            // 模拟 FileHandle 打开
+            let fileHandle = try FileHandle(forWritingTo: filePath)
+            fileHandle.write("test content".data(using: .utf8)!)
+            try fileHandle.close()
+        } catch {
+            XCTFail("文件操作失败: \(error)")
+        }
+
+        // Then - 验证文件已创建并有内容
+        XCTAssertTrue(FileManager.default.fileExists(atPath: filePath.path))
+        if let content = try? String(contentsOf: filePath, encoding: .utf8) {
+            XCTAssertEqual(content, "test content")
+        } else {
+            XCTFail("无法读取文件内容")
+        }
+
+        // Cleanup
+        try? FileManager.default.removeItem(at: testDir)
+    }
+
     // MARK: - MIME Type Tests (文档性测试)
 
     func testMIMEType_commonExtensionsMapping() {
