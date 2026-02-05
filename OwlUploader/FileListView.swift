@@ -205,16 +205,6 @@ struct FileListView: View {
                     uploadConflictData = nil
                     conflictResolutionHandler?(resolutions)
                     conflictResolutionHandler = nil
-                },
-                onCancel: {
-                    // 取消时，告知处理器跳过所有冲突文件
-                    var skipAll: [UUID: ConflictAction] = [:]
-                    for conflict in data.conflicts {
-                        skipAll[conflict.id] = .skip
-                    }
-                    uploadConflictData = nil
-                    conflictResolutionHandler?(skipAll)
-                    conflictResolutionHandler = nil
                 }
             )
         }

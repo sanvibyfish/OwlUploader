@@ -41,7 +41,6 @@ struct UploadConflictData: Identifiable {
 struct UploadConflictSheet: View {
     let conflicts: [UploadConflict]
     let onResolution: ([UUID: ConflictAction]) -> Void
-    let onCancel: () -> Void
 
     /// 当前处理的冲突索引
     @State private var currentIndex: Int = 0
@@ -114,6 +113,7 @@ struct UploadConflictSheet: View {
         }
         .frame(width: 450, height: 380)
         .background(Color(NSColor.windowBackgroundColor))
+        .interactiveDismissDisabled(true)
     }
 
     // MARK: - 文件对比视图
@@ -234,11 +234,15 @@ struct UploadConflictSheet: View {
         ByteCountFormatter.string(fromByteCount: size, countStyle: .file)
     }
 
-    private func formatDate(_ date: Date) -> String {
+    private static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
-        return formatter.string(from: date)
+        return formatter
+    }()
+
+    private func formatDate(_ date: Date) -> String {
+        Self.dateFormatter.string(from: date)
     }
 }
 
@@ -257,8 +261,7 @@ struct UploadConflictSheet: View {
                 remoteModDate: Date().addingTimeInterval(-86400)
             )
         ],
-        onResolution: { _ in },
-        onCancel: { }
+        onResolution: { _ in }
     )
 }
 
@@ -284,7 +287,6 @@ struct UploadConflictSheet: View {
                 remoteModDate: Date().addingTimeInterval(-172800)
             )
         ],
-        onResolution: { _ in },
-        onCancel: { }
+        onResolution: { _ in }
     )
 }

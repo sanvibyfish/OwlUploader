@@ -164,13 +164,13 @@ class ThumbnailCache: ObservableObject {
     /// 说明：当文件被覆盖上传后，调用此方法清除旧缓存。
     /// 由于缓存 key 格式为 "URL_尺寸"，需要清除所有可能的尺寸。
     func invalidateCache(for urlString: String) {
-        // 常用的缩略图尺寸
-        let commonSizes = [20, 40, 64, 128, 256, 512]
-        for size in commonSizes {
+        // 覆盖 UI 中实际使用的尺寸及其 Retina 2x 变体
+        // Table: 20 (2x=40), Grid: 64 (2x=128), 及其他常见尺寸
+        let sizes = [20, 40, 64, 128, 256, 512]
+        for size in sizes {
             let cacheKey = "\(urlString)_\(size)" as NSString
             cache.removeObject(forKey: cacheKey)
         }
-        print("🗑️ ThumbnailCache: 已清除缓存 - \(urlString)")
     }
 
 }

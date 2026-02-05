@@ -2424,10 +2424,10 @@ class R2Service: ObservableObject {
             return "\(baseURL)?v=\(timestamp)"
         }
 
-        // 如果没有修改时间，使用 ETag 的哈希值
+        // 如果没有修改时间，使用 ETag 作为版本号（去掉引号）
         if let eTag = fileObject.eTag {
-            let hashValue = abs(eTag.hashValue)
-            return "\(baseURL)?v=\(hashValue)"
+            let cleanETag = eTag.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+            return "\(baseURL)?v=\(cleanETag)"
         }
 
         // 都没有时返回原 URL

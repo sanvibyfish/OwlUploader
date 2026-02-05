@@ -4400,6 +4400,12 @@
             "state" : "new",
             "value" : "Please check Cloudflare Zone ID and API Token configuration."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请检查 Cloudflare Zone ID 和 API Token 配置。"
+          }
         }
       }
     },
@@ -4410,6 +4416,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "CDN Cache Purge Failed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CDN 缓存清除失败"
           }
         }
       }
@@ -4722,6 +4734,12 @@
             "state" : "new",
             "value" : "Failed to Scan Folder"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文件夹扫描失败"
+          }
         }
       }
     },
@@ -4731,6 +4749,12 @@
         "en" : {
           "stringUnit" : {
             "state" : "new",
+            "value" : "%1$@: %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "%1$@: %2$@"
           }
         }
@@ -4812,6 +4836,12 @@
             "state" : "new",
             "value" : "Scanning Folders"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在扫描文件夹"
+          }
         }
       }
     },
@@ -4822,6 +4852,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Listing all files in %d folder(s)..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在列出 %d 个文件夹中的所有文件…"
           }
         }
       }
@@ -5484,6 +5520,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Selected folders are empty, no files to download"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所选文件夹为空，没有可下载的文件"
           }
         }
       }
@@ -6507,6 +6549,12 @@
             "state" : "new",
             "value" : "Keep Both"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保留两者"
+          }
         }
       }
     },
@@ -6517,6 +6565,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Replace"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "替换"
           }
         }
       }
@@ -6529,6 +6583,12 @@
             "state" : "new",
             "value" : "Skip"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳过"
+          }
         }
       }
     },
@@ -6539,6 +6599,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Stop"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止"
           }
         }
       }
@@ -6551,6 +6617,12 @@
             "state" : "new",
             "value" : "Apply to all %d remaining conflicts"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应用到剩余全部 %d 个冲突"
+          }
         }
       }
     },
@@ -6561,6 +6633,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Existing file"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "现有文件"
           }
         }
       }
@@ -6573,6 +6651,12 @@
             "state" : "new",
             "value" : "New file (uploading)"
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新文件（正在上传）"
+          }
         }
       }
     },
@@ -6583,6 +6667,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "An item named \"%@\" already exists. Do you want to replace it?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名为「%@」的项目已存在。要替换它吗？"
           }
         }
       }

@@ -126,6 +126,9 @@ class UploadQueueManager: ObservableObject, TaskQueueManagerProtocol {
     /// 当前存储桶名称
     private var bucketName: String = ""
 
+    /// 待批量 purge 的 CDN URL 列表
+    private var pendingCDNPurgeURLs: [String] = []
+
     /// 速度计算的滑动窗口
     private var speedSamples: [(bytes: Int64, time: Date)] = []
 
@@ -264,11 +267,20 @@ class UploadQueueManager: ObservableObject, TaskQueueManagerProtocol {
         // 2. 获取目标目录中已存在的文件列表
         var existingFiles: [String: (size: Int64, modDate: Date?)] = [:]
         do {
-            let prefix = prefix.isEmpty ? nil : prefix
-            let objects = try await r2Service.listObjects(bucket: bucketName, prefix: prefix)
-            for obj in objects {
-                if !obj.isDirectory {
-                    existingFiles[obj.key] = (size: obj.size ?? 0, modDate: obj.lastModifiedDate)
+            if baseFolder != nil, !prefix.isEmpty {
+                // 文件夹上传到指定目录：递归获取该目录下所有文件
+                let allFiles = try await r2Service.listAllFilesInFolder(bucket: bucketName, folderPrefix: prefix)
+                for file in allFiles {
+                    existingFiles[file.key] = (size: file.size, modDate: nil)
+                }
+            } else {
+                // 普通文件上传：只查当前目录层级
+                let prefixParam = prefix.isEmpty ? nil : prefix
+                let objects = try await r2Service.listObjects(bucket: bucketName, prefix: prefixParam)
+                for obj in objects {
+                    if !obj.isDirectory {
+                        existingFiles[obj.key] = (size: obj.size ?? 0, modDate: obj.lastModifiedDate)
+                    }
                 }
             }
         } catch {
@@ -647,6 +659,25 @@ class UploadQueueManager: ObservableObject, TaskQueueManagerProtocol {
             // 最终 UI 更新
             objectWillChange.send()
 
+            // 批量 purge CDN 缓存（Cloudflare 单次最多 30 个 URL）
+            if !pendingCDNPurgeURLs.isEmpty, let r2Service = self.r2Service {
+                let urlsToPurge = pendingCDNPurgeURLs
+                pendingCDNPurgeURLs.removeAll()
+                print("🔄 [UploadQueue] 批量 purge CDN 缓存: \(urlsToPurge.count) 个 URL")
+                AsyncTask {
+                    var failedCount = 0
+                    for batch in stride(from: 0, to: urlsToPurge.count, by: 30) {
+                        let end = min(batch + 30, urlsToPurge.count)
+                        let batchURLs = Array(urlsToPurge[batch..<end])
+                        let success = await r2Service.purgeCDNCache(for: batchURLs)
+                        if !success { failedCount += batchURLs.count }
+                    }
+                    if failedCount > 0 {
+                        print("⚠️ [UploadQueue] CDN purge 部分失败: \(failedCount)/\(urlsToPurge.count) 个 URL")
+                    }
+                }
+            }
+
             // 触发完成回调（刷新文件列表等）
             if completedTasks.count > 0 {
                 print("🔄 [UploadQueue] 触发完成回调，\(completedTasks.count) 个任务已完成")
@@ -785,11 +816,9 @@ class UploadQueueManager: ObservableObject, TaskQueueManagerProtocol {
                 // 清除旧缩略图缓存（确保覆盖上传后显示新图片）
                 r2Service.invalidateThumbnailCache(for: task.remotePath, in: bucketName)
 
-                // 清除 CDN 缓存（公开链接）- 如果配置了
+                // 收集待 purge 的 CDN URL（队列完成时统一批量 purge）
                 if let fileURL = r2Service.generateBaseURL(for: task.remotePath, in: bucketName) {
-                    AsyncTask {
-                        await r2Service.purgeCDNCache(for: [fileURL])
-                    }
+                    self.pendingCDNPurgeURLs.append(fileURL)
                 }
             }
 
