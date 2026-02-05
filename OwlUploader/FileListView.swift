@@ -92,9 +92,17 @@ struct FileListView: View {
     
     /// 拖拽目标状态
     @State private var isTargeted: Bool = false
-    
+
     /// 上次成功加载的路径（用于空状态显示，防止导航时闪烁）
     @State private var lastLoadedPrefix: String = ""
+
+    // MARK: - 上传冲突状态
+
+    /// 当前检测到的上传冲突（使用 item 方式显示 sheet，确保数据传递正确）
+    @State private var uploadConflictData: UploadConflictData?
+
+    /// 冲突处理回调（用户选择后调用）
+    @State private var conflictResolutionHandler: (([UUID: ConflictAction]) -> Void)?
 
     /// 文件来源枚举
     private enum FileSource {
@@ -148,6 +156,11 @@ struct FileListView: View {
             moveQueueManager.onQueueComplete = {
                 loadFileList()
             }
+            // 设置上传冲突检测回调
+            uploadQueueManager.onConflictsDetected = { conflicts, handler in
+                conflictResolutionHandler = handler
+                uploadConflictData = UploadConflictData(conflicts: conflicts)
+            }
         }
         .onChange(of: r2Service.selectedBucket) { _ in
             currentPrefix = ""
@@ -183,6 +196,27 @@ struct FileListView: View {
         )
         .sheet(isPresented: $showingDiagnostics) {
             DiagnosticsView(r2Service: r2Service)
+        }
+        // 上传冲突处理弹窗（使用 item 方式确保数据正确传递）
+        .sheet(item: $uploadConflictData) { data in
+            UploadConflictSheet(
+                conflicts: data.conflicts,
+                onResolution: { resolutions in
+                    uploadConflictData = nil
+                    conflictResolutionHandler?(resolutions)
+                    conflictResolutionHandler = nil
+                },
+                onCancel: {
+                    // 取消时，告知处理器跳过所有冲突文件
+                    var skipAll: [UUID: ConflictAction] = [:]
+                    for conflict in data.conflicts {
+                        skipAll[conflict.id] = .skip
+                    }
+                    uploadConflictData = nil
+                    conflictResolutionHandler?(skipAll)
+                    conflictResolutionHandler = nil
+                }
+            )
         }
         // 删除确认对话框（支持单文件和多文件）
         .alert(L.Alert.Delete.title, isPresented: $showingDeleteConfirmation) {
@@ -754,6 +788,9 @@ struct FileListView: View {
                         print("📝 [Rename] Triggered for file: \(file.name)")
                         fileToRename = file
                     },
+                    onPurgeCDNCache: { file in
+                        handlePurgeCDNCache(file: file)
+                    },
                     currentFolders: filteredFiles.filter { $0.isDirectory },
                     currentPrefix: currentPrefix
                 )
@@ -792,6 +829,9 @@ struct FileListView: View {
                     onRename: { file in
                         print("📝 [Rename] Triggered for file: \(file.name)")
                         fileToRename = file
+                    },
+                    onPurgeCDNCache: { file in
+                        handlePurgeCDNCache(file: file)
                     },
                     currentFolders: filteredFiles.filter { $0.isDirectory },
                     currentPrefix: currentPrefix
@@ -1602,6 +1642,48 @@ struct FileListView: View {
     }
 
     // MARK: - 移动文件
+
+    /// 处理刷新 CDN 缓存
+    /// 如果文件是多选的一部分，则刷新所有选中文件的缓存
+    private func handlePurgeCDNCache(file: FileObject) {
+        guard let bucket = r2Service.selectedBucket else {
+            messageManager.showError(L.Message.Error.noBucketSelected)
+            return
+        }
+
+        let selectedKeys = selectionManager.getSelectedKeys()
+        let filesToPurge: [FileObject]
+
+        if selectedKeys.contains(file.key) && selectedKeys.count > 1 {
+            filesToPurge = fileObjects.filter { selectedKeys.contains($0.key) && !$0.isDirectory }
+        } else {
+            filesToPurge = file.isDirectory ? [] : [file]
+        }
+
+        guard !filesToPurge.isEmpty else {
+            messageManager.showInfo(L.Message.Info.noFilesToPurge)
+            return
+        }
+
+        // 收集所有需要清除缓存的 URL
+        let urls = filesToPurge.compactMap { r2Service.generateBaseURL(for: $0.key, in: bucket.name) }
+
+        guard !urls.isEmpty else {
+            messageManager.showError(L.Message.Error.noPublicDomain)
+            return
+        }
+
+        // 调用 CDN 缓存清除 API
+        Task {
+            await r2Service.purgeCDNCache(for: urls)
+            await MainActor.run {
+                messageManager.showSuccess(
+                    L.Message.Success.cdnCachePurged,
+                    description: L.Message.Success.cdnCachePurgedDescription(filesToPurge.count)
+                )
+            }
+        }
+    }
 
     /// 处理右键菜单移动文件到指定路径
     /// 如果文件是多选的一部分，则移动所有选中的文件

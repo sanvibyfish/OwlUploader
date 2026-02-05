@@ -44,6 +44,9 @@ struct FileGridItemView: View {
     /// 重命名回调
     var onRename: ((FileObject) -> Void)?
 
+    /// 刷新 CDN 缓存回调
+    var onPurgeCDNCache: ((FileObject) -> Void)?
+
     /// 当前目录下的文件夹列表（用于移动到子菜单）
     var currentFolders: [FileObject] = []
 
@@ -52,12 +55,12 @@ struct FileGridItemView: View {
 
     @State private var isHovering = false
 
-    /// 缩略图URL
+    /// 缩略图URL（带版本参数，用于绕过 CDN 缓存）
     private var thumbnailURL: String? {
         guard fileObject.isImage,
               let r2Service = r2Service,
               let bucketName = bucketName else { return nil }
-        return r2Service.generateFileURL(for: fileObject, in: bucketName)
+        return r2Service.generateThumbnailURL(for: fileObject, in: bucketName)
     }
 
     // MARK: - 样式计算属性（简化类型推断）
@@ -120,6 +123,11 @@ struct FileGridItemView: View {
         if !fileObject.isDirectory {
             Button(action: copyFileURL) {
                 Label(L.Files.ContextMenu.copyLink, systemImage: "link")
+            }
+
+            // 刷新 CDN 缓存
+            Button(action: { onPurgeCDNCache?(fileObject) }) {
+                Label(L.Files.ContextMenu.purgeCDNCache, systemImage: "arrow.triangle.2.circlepath")
             }
         }
 

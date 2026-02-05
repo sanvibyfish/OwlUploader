@@ -238,6 +238,91 @@
         }
       }
     },
+    "account.cdn.title" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "CDN Cache"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CDN 缓存"
+          }
+        }
+      }
+    },
+    "account.cdn.autoPurge" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Auto purge CDN cache after upload"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上传后自动清除 CDN 缓存"
+          }
+        }
+      }
+    },
+    "account.cdn.zoneID" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Cloudflare Zone ID"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cloudflare Zone ID"
+          }
+        }
+      }
+    },
+    "account.cdn.apiToken" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Cloudflare API Token"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cloudflare API Token"
+          }
+        }
+      }
+    },
+    "account.cdn.hint" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "When enabled, CDN cache will be purged after overwriting files. Requires Zone ID and API Token with Cache Purge permission."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用后，覆盖上传文件时会自动清除 CDN 缓存。需要配置 Zone ID 和具有 Cache Purge 权限的 API Token。"
+          }
+        }
+      }
+    },
     "account.domain.empty" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -2566,6 +2651,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "复制链接"
+          }
+        }
+      }
+    },
+    "files.contextMenu.purgeCDNCache" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Purge CDN Cache"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刷新 CDN 缓存"
           }
         }
       }
@@ -5066,6 +5168,74 @@
         }
       }
     },
+    "message.success.cdnCachePurged.title" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "CDN Cache Purged"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CDN 缓存已清除"
+          }
+        }
+      }
+    },
+    "message.success.cdnCachePurged.description" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Purged cache for %d file(s)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已清除 %d 个文件的缓存"
+          }
+        }
+      }
+    },
+    "message.info.noFilesToPurge" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "No files to purge. Folders cannot have CDN cache purged."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有可清除的文件。文件夹无法清除 CDN 缓存。"
+          }
+        }
+      }
+    },
+    "message.error.noPublicDomain" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "No public domain configured. Please add a public domain in account settings."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未配置公共域名。请在账户设置中添加公共域名。"
+          }
+        }
+      }
+    },
     "message.success.rename.description" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -6248,6 +6418,94 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "重试失败"
+          }
+        }
+      }
+    },
+    "upload.conflict.action.keepBoth" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Keep Both"
+          }
+        }
+      }
+    },
+    "upload.conflict.action.replace" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Replace"
+          }
+        }
+      }
+    },
+    "upload.conflict.action.skip" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Skip"
+          }
+        }
+      }
+    },
+    "upload.conflict.action.stop" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Stop"
+          }
+        }
+      }
+    },
+    "upload.conflict.applyToAllRemaining" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Apply to all %d remaining conflicts"
+          }
+        }
+      }
+    },
+    "upload.conflict.existingFile" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Existing file"
+          }
+        }
+      }
+    },
+    "upload.conflict.newFile" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "New file (uploading)"
+          }
+        }
+      }
+    },
+    "upload.conflict.title.withName" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "An item named \"%@\" already exists. Do you want to replace it?"
           }
         }
       }

@@ -47,6 +47,9 @@ struct FileTableView: View {
     /// 重命名回调
     var onRename: ((FileObject) -> Void)?
 
+    /// 刷新 CDN 缓存回调
+    var onPurgeCDNCache: ((FileObject) -> Void)?
+
     /// 当前目录下的文件夹列表（用于移动到子菜单）
     var currentFolders: [FileObject] = []
 
@@ -130,6 +133,11 @@ struct FileTableView: View {
                 if !file.isDirectory {
                     Button(action: { copyFileURL(file) }) {
                         Label(L.Files.ContextMenu.copyLink, systemImage: "link")
+                    }
+
+                    // 刷新 CDN 缓存
+                    Button(action: { onPurgeCDNCache?(file) }) {
+                        Label(L.Files.ContextMenu.purgeCDNCache, systemImage: "arrow.triangle.2.circlepath")
                     }
                 }
 
@@ -332,12 +340,12 @@ private struct FileNameCell: View {
     var r2Service: R2Service?
     var bucketName: String?
 
-    /// 缩略图URL
+    /// 缩略图URL（带版本参数，用于绕过 CDN 缓存）
     private var thumbnailURL: String? {
         guard fileObject.isImage,
               let r2Service = r2Service,
               let bucketName = bucketName else { return nil }
-        return r2Service.generateFileURL(for: fileObject, in: bucketName)
+        return r2Service.generateThumbnailURL(for: fileObject, in: bucketName)
     }
 
     var body: some View {

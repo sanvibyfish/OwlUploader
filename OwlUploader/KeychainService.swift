@@ -300,7 +300,65 @@ extension KeychainService {
     /// - Parameter account: R2 账户对象
     /// - Returns: 如果已存储返回 true，否则返回 false
     func hasSecretAccessKey(for account: R2Account) -> Bool {
-        return exists(service: R2Account.keychainServiceName, 
+        return exists(service: R2Account.keychainServiceName,
+                     account: account.keychainAccountIdentifier)
+    }
+}
+
+// MARK: - Cloudflare API Token 扩展
+
+extension KeychainService {
+
+    /// 为 R2Account 存储 Cloudflare API Token
+    /// - Parameters:
+    ///   - apiToken: Cloudflare API Token
+    ///   - account: R2 账户对象
+    /// - Throws: KeychainError
+    func storeCloudflareAPIToken(_ apiToken: String, for account: R2Account) throws {
+        try store(apiToken,
+                 service: R2Account.cloudflareAPITokenServiceName,
+                 account: account.keychainAccountIdentifier)
+    }
+
+    /// 为 R2Account 读取 Cloudflare API Token
+    /// - Parameter account: R2 账户对象
+    /// - Returns: Cloudflare API Token，如果不存在则返回 nil
+    func retrieveCloudflareAPIToken(for account: R2Account) -> String? {
+        return try? retrieve(service: R2Account.cloudflareAPITokenServiceName,
+                            account: account.keychainAccountIdentifier)
+    }
+
+    /// 为 R2Account 更新或存储 Cloudflare API Token
+    /// - Parameters:
+    ///   - apiToken: 新的 Cloudflare API Token
+    ///   - account: R2 账户对象
+    /// - Throws: KeychainError
+    func updateCloudflareAPIToken(_ apiToken: String, for account: R2Account) throws {
+        do {
+            try update(apiToken,
+                      service: R2Account.cloudflareAPITokenServiceName,
+                      account: account.keychainAccountIdentifier)
+        } catch KeychainError.itemNotFound {
+            // 如果项目不存在，则创建新的
+            try store(apiToken,
+                     service: R2Account.cloudflareAPITokenServiceName,
+                     account: account.keychainAccountIdentifier)
+        }
+    }
+
+    /// 为 R2Account 删除 Cloudflare API Token
+    /// - Parameter account: R2 账户对象
+    /// - Throws: KeychainError
+    func deleteCloudflareAPIToken(for account: R2Account) throws {
+        try delete(service: R2Account.cloudflareAPITokenServiceName,
+                  account: account.keychainAccountIdentifier)
+    }
+
+    /// 检查 R2Account 是否已存储 Cloudflare API Token
+    /// - Parameter account: R2 账户对象
+    /// - Returns: 如果已存储返回 true，否则返回 false
+    func hasCloudflareAPIToken(for account: R2Account) -> Bool {
+        return exists(service: R2Account.cloudflareAPITokenServiceName,
                      account: account.keychainAccountIdentifier)
     }
 } 

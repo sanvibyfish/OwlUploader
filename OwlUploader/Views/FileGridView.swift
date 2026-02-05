@@ -44,6 +44,9 @@ struct FileGridView: View {
     /// 重命名回调
     var onRename: ((FileObject) -> Void)?
 
+    /// 刷新 CDN 缓存回调
+    var onPurgeCDNCache: ((FileObject) -> Void)?
+
     /// 当前目录下的文件夹列表（用于移动到子菜单）
     var currentFolders: [FileObject] = []
 
@@ -79,6 +82,7 @@ struct FileGridView: View {
                         onUpload: onUpload,
                         onMoveToPath: onMoveToPath,
                         onRename: onRename,
+                        onPurgeCDNCache: onPurgeCDNCache,
                         currentFolders: currentFolders,
                         currentPrefix: currentPrefix
                     )

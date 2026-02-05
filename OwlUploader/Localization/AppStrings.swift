@@ -186,6 +186,7 @@ enum L {
             static let upload = String(localized: "files.contextMenu.upload", defaultValue: "Upload")
             static let download = String(localized: "files.contextMenu.download", defaultValue: "Download")
             static let copyLink = String(localized: "files.contextMenu.copyLink", defaultValue: "Copy Link")
+            static let purgeCDNCache = String(localized: "files.contextMenu.purgeCDNCache", defaultValue: "Purge CDN Cache")
             static let delete = String(localized: "files.contextMenu.delete", defaultValue: "Delete")
             static let moveTo = String(localized: "files.contextMenu.moveTo", defaultValue: "Move to")
             static let parentFolder = String(localized: "files.contextMenu.parentFolder", defaultValue: "Parent Folder (..)")
@@ -241,6 +242,32 @@ enum L {
         enum Action {
             static let retryFailed = String(localized: "upload.action.retryFailed", defaultValue: "Retry Failed")
             static let clearCompleted = String(localized: "upload.action.clearCompleted", defaultValue: "Clear Completed")
+        }
+
+        // MARK: - 上传冲突（macOS 原生风格）
+        enum Conflict {
+            /// 带文件名的标题（Finder 风格）
+            static func titleWithName(_ fileName: String) -> String {
+                String(format: NSLocalizedString("upload.conflict.title.withName", value: "An item named \"%@\" already exists. Do you want to replace it?", comment: ""), fileName)
+            }
+
+            /// 新文件（要上传的）
+            static let newFile = String(localized: "upload.conflict.newFile", defaultValue: "New file (uploading)")
+
+            /// 现有文件（远程的）
+            static let existingFile = String(localized: "upload.conflict.existingFile", defaultValue: "Existing file")
+
+            /// 应用到全部剩余冲突
+            static func applyToAllRemaining(_ count: Int) -> String {
+                String(format: NSLocalizedString("upload.conflict.applyToAllRemaining", value: "Apply to all %d remaining conflicts", comment: ""), count)
+            }
+
+            enum Action {
+                static let replace = String(localized: "upload.conflict.action.replace", defaultValue: "Replace")
+                static let keepBoth = String(localized: "upload.conflict.action.keepBoth", defaultValue: "Keep Both")
+                static let skip = String(localized: "upload.conflict.action.skip", defaultValue: "Skip")
+                static let stop = String(localized: "upload.conflict.action.stop", defaultValue: "Stop")
+            }
         }
 
         static func uploadingFile(_ name: String) -> String {
@@ -334,6 +361,14 @@ enum L {
             static let hint = String(localized: "account.domain.hint", defaultValue: "Optional. Used for generating share links and thumbnail preview.")
             static let setDefault = String(localized: "account.domain.setDefault", defaultValue: "Set default")
             static let defaultLabel = String(localized: "account.domain.defaultLabel", defaultValue: "Default")
+        }
+
+        enum CDN {
+            static let title = String(localized: "account.cdn.title", defaultValue: "CDN Cache")
+            static let autoPurge = String(localized: "account.cdn.autoPurge", defaultValue: "Auto purge CDN cache after upload")
+            static let zoneID = String(localized: "account.cdn.zoneID", defaultValue: "Cloudflare Zone ID")
+            static let apiToken = String(localized: "account.cdn.apiToken", defaultValue: "Cloudflare API Token")
+            static let hint = String(localized: "account.cdn.hint", defaultValue: "When enabled, CDN cache will be purged after overwriting files. Requires Zone ID and API Token with Cache Purge permission.")
         }
 
         enum Delete {
@@ -944,6 +979,13 @@ extension L {
             // Link
             static let linkCopied = String(localized: "message.success.linkCopied.title", defaultValue: "Link Copied")
             static let linkCopiedDescription = String(localized: "message.success.linkCopied.description", defaultValue: "File URL copied to clipboard")
+
+            // CDN Cache
+            static let cdnCachePurged = String(localized: "message.success.cdnCachePurged.title", defaultValue: "CDN Cache Purged")
+
+            static func cdnCachePurgedDescription(_ count: Int) -> String {
+                String(format: NSLocalizedString("message.success.cdnCachePurged.description", value: "Purged cache for %d file(s)", comment: ""), count)
+            }
         }
 
         // MARK: - Error Messages
@@ -967,6 +1009,8 @@ extension L {
                 defaultValue: "Please select a bucket first")
             static let enterBucketName = String(localized: "message.error.enterBucketName",
                 defaultValue: "Please enter bucket name")
+            static let noPublicDomain = String(localized: "message.error.noPublicDomain",
+                defaultValue: "No public domain configured. Please add a public domain in account settings.")
 
             static func fileNotExists(_ fileName: String) -> String {
                 String(format: NSLocalizedString("message.error.fileNotExists", value: "Cannot find file '%@'. Please reselect.", comment: ""), fileName)
@@ -1035,6 +1079,7 @@ extension L {
 
         enum Info {
             static let accountDisconnected = String(localized: "message.info.accountDisconnected", defaultValue: "Account disconnected")
+            static let noFilesToPurge = String(localized: "message.info.noFilesToPurge", defaultValue: "No files to purge. Folders cannot have CDN cache purged.")
         }
     }
 }

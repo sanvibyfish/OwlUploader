@@ -453,4 +453,144 @@ final class R2AccountTests: XCTestCase {
         XCTAssertTrue(updated.hasBucket("my-bucket"))
         XCTAssertFalse(removed.hasBucket("my-bucket"))
     }
+
+    // MARK: - CDN Configuration Tests (v1.0.1)
+
+    func testInit_cdnFieldsDefaultValues() {
+        // Given & When
+        let account = R2Account(
+            accountID: "abc123def456",
+            accessKeyID: "AKIAIOSFODNN7EXAMPLE"
+        )
+
+        // Then — CDN 相关字段默认关闭
+        XCTAssertNil(account.cloudflareZoneID)
+        XCTAssertFalse(account.autoPurgeCDNCache)
+    }
+
+    func testInit_withCDNConfiguration() {
+        // Given & When
+        let account = R2Account(
+            accountID: "abc123def456",
+            accessKeyID: "AKIAIOSFODNN7EXAMPLE",
+            cloudflareZoneID: "zone-abc-123",
+            autoPurgeCDNCache: true
+        )
+
+        // Then
+        XCTAssertEqual(account.cloudflareZoneID, "zone-abc-123")
+        XCTAssertTrue(account.autoPurgeCDNCache)
+    }
+
+    func testUpdated_changesCDNFields() {
+        // Given
+        let original = R2Account(
+            accountID: "abc123def456",
+            accessKeyID: "AKIAIOSFODNN7EXAMPLE"
+        )
+
+        // When
+        let updated = original.updated(
+            cloudflareZoneID: "new-zone-id",
+            autoPurgeCDNCache: true
+        )
+
+        // Then
+        XCTAssertEqual(updated.cloudflareZoneID, "new-zone-id")
+        XCTAssertTrue(updated.autoPurgeCDNCache)
+    }
+
+    func testUpdated_preservesCDNFieldsWhenNotChanged() {
+        // Given
+        let original = R2Account(
+            accountID: "abc123def456",
+            accessKeyID: "AKIAIOSFODNN7EXAMPLE",
+            cloudflareZoneID: "existing-zone",
+            autoPurgeCDNCache: true
+        )
+
+        // When — 只更新 displayName，不改 CDN 字段
+        let updated = original.updated(displayName: "New Name")
+
+        // Then — CDN 字段应保持不变
+        XCTAssertEqual(updated.cloudflareZoneID, "existing-zone")
+        XCTAssertTrue(updated.autoPurgeCDNCache)
+    }
+
+    func testUpdated_canClearCDNZoneID() {
+        // Given
+        let original = R2Account(
+            accountID: "abc123def456",
+            accessKeyID: "AKIAIOSFODNN7EXAMPLE",
+            cloudflareZoneID: "old-zone",
+            autoPurgeCDNCache: true
+        )
+
+        // When — 使用双重 Optional 传 nil 来清除 Zone ID
+        let updated = original.updated(
+            cloudflareZoneID: nil as String?,
+            autoPurgeCDNCache: false
+        )
+
+        // Then
+        XCTAssertNil(updated.cloudflareZoneID)
+        XCTAssertFalse(updated.autoPurgeCDNCache)
+    }
+
+    func testCodable_encodesAndDecodesCDNFields() throws {
+        // Given
+        let original = R2Account(
+            accountID: "abc123def456",
+            accessKeyID: "AKIAIOSFODNN7EXAMPLE",
+            cloudflareZoneID: "test-zone-id",
+            autoPurgeCDNCache: true
+        )
+
+        // When
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(original)
+
+        let decoder = JSONDecoder()
+        let decoded = try decoder.decode(R2Account.self, from: data)
+
+        // Then
+        XCTAssertEqual(decoded.cloudflareZoneID, "test-zone-id")
+        XCTAssertTrue(decoded.autoPurgeCDNCache)
+    }
+
+    func testCodable_decodesLegacyDataWithoutCDNFields() throws {
+        // Given — 先编码一个带 CDN 字段的账户，再从 JSON 中移除 CDN 字段，模拟旧版数据
+        let original = R2Account(
+            accountID: "abc123def456",
+            accessKeyID: "AKIAIOSFODNN7EXAMPLE",
+            cloudflareZoneID: "should-be-removed",
+            autoPurgeCDNCache: true
+        )
+
+        let encoder = JSONEncoder()
+        let fullData = try encoder.encode(original)
+        var jsonObject = try JSONSerialization.jsonObject(with: fullData) as! [String: Any]
+
+        // 移除 CDN 字段，模拟旧版本保存的数据
+        jsonObject.removeValue(forKey: "cloudflareZoneID")
+        jsonObject.removeValue(forKey: "autoPurgeCDNCache")
+
+        let legacyData = try JSONSerialization.data(withJSONObject: jsonObject)
+
+        // When
+        let decoder = JSONDecoder()
+        let decoded = try decoder.decode(R2Account.self, from: legacyData)
+
+        // Then — CDN 字段应使用默认值
+        XCTAssertNil(decoded.cloudflareZoneID)
+        XCTAssertFalse(decoded.autoPurgeCDNCache)
+        // 其他字段应正常解码
+        XCTAssertEqual(decoded.accountID, "abc123def456")
+    }
+
+    func testCloudflareAPITokenServiceName_isDifferentFromKeychainServiceName() {
+        // Then — 两个服务名应该隔离
+        XCTAssertNotEqual(R2Account.keychainServiceName, R2Account.cloudflareAPITokenServiceName)
+        XCTAssertEqual(R2Account.cloudflareAPITokenServiceName, "OwlUploader.CloudflareAPIToken")
+    }
 }
