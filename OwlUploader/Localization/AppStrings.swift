@@ -1012,6 +1012,11 @@ extension L {
             static let noPublicDomain = String(localized: "message.error.noPublicDomain",
                 defaultValue: "No public domain configured. Please add a public domain in account settings.")
 
+            static let cdnPurgeFailed = String(localized: "message.error.cdnPurgeFailed.title",
+                defaultValue: "CDN Cache Purge Failed")
+            static let cdnPurgeFailedDescription = String(localized: "message.error.cdnPurgeFailed.description",
+                defaultValue: "Please check Cloudflare Zone ID and API Token configuration.")
+
             static func fileNotExists(_ fileName: String) -> String {
                 String(format: NSLocalizedString("message.error.fileNotExists", value: "Cannot find file '%@'. Please reselect.", comment: ""), fileName)
             }
@@ -1080,6 +1085,25 @@ extension L {
         enum Info {
             static let accountDisconnected = String(localized: "message.info.accountDisconnected", defaultValue: "Account disconnected")
             static let noFilesToPurge = String(localized: "message.info.noFilesToPurge", defaultValue: "No files to purge. Folders cannot have CDN cache purged.")
+
+            static let scanningFolders = String(localized: "message.info.scanningFolders", defaultValue: "Scanning Folders")
+
+            static func scanningFoldersDescription(_ count: Int) -> String {
+                String(format: NSLocalizedString("message.info.scanningFolders.description", value: "Listing all files in %d folder(s)...", comment: ""), count)
+            }
+        }
+
+        // MARK: - Error Messages (Batch Download)
+
+        enum BatchDownload {
+            static let scanFolderFailed = String(localized: "message.error.scanFolderFailed", defaultValue: "Failed to Scan Folder")
+
+            static func scanFolderFailedDescription(_ name: String, _ error: String) -> String {
+                String(format: NSLocalizedString("message.error.scanFolderFailed.description", value: "%@: %@", comment: ""), name, error)
+            }
+
+            static let selectedFoldersEmpty = String(localized: "message.warning.selectedFoldersEmpty",
+                defaultValue: "Selected folders are empty, no files to download")
         }
     }
 }

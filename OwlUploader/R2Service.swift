@@ -850,8 +850,44 @@ class R2Service: ObservableObject {
             continuationToken = response.nextContinuationToken
         } while continuationToken != nil
 
-        print("📂 文件夹扫描完成，共 \(allFiles.count) 个文件")
-        return allFiles
+        // 过滤不带尾斜杠的目录占位符对象
+        let filteredFiles = R2Service.filterDirectoryPlaceholders(from: allFiles)
+
+        print("📂 文件夹扫描完成，共 \(filteredFiles.count) 个文件（原始 \(allFiles.count) 个）")
+        return filteredFiles
+    }
+
+    /// 从文件列表中过滤掉目录占位符对象
+    /// R2/S3 中某些工具会创建不带尾斜杠的目录占位符（如 `t1`、`t1/t2`），
+    /// 这些对象的 key 恰好等于其他文件路径中的目录前缀，下载时会与实际目录冲突。
+    /// - Parameter files: 原始文件列表
+    /// - Returns: 过滤掉目录占位符后的文件列表
+    nonisolated static func filterDirectoryPlaceholders(from files: [(key: String, size: Int64, relativePath: String)]) -> [(key: String, size: Int64, relativePath: String)] {
+        // 收集所有 relativePath 中出现的目录前缀
+        var directoryPrefixes = Set<String>()
+        for file in files {
+            let components = file.relativePath.split(separator: "/")
+            // 只有多段路径才会产生目录前缀（如 "a/b/c.txt" → "a", "a/b"）
+            if components.count > 1 {
+                var prefix = ""
+                for component in components.dropLast() {
+                    if !prefix.isEmpty { prefix += "/" }
+                    prefix += String(component)
+                    directoryPrefixes.insert(prefix)
+                }
+            }
+        }
+
+        guard !directoryPrefixes.isEmpty else { return files }
+
+        let filtered = files.filter { !directoryPrefixes.contains($0.relativePath) }
+
+        let removedCount = files.count - filtered.count
+        if removedCount > 0 {
+            print("🗂️ 过滤了 \(removedCount) 个目录占位符对象")
+        }
+
+        return filtered
     }
 
     /// 创建文件夹
@@ -2292,36 +2328,39 @@ class R2Service: ObservableObject {
     /// 说明：当启用了自动清除 CDN 缓存且配置了 Zone ID 和 API Token 时，
     /// 此方法会调用 Cloudflare API 主动清除 CDN 缓存，确保公开链接立即返回新内容。
     /// 如果未配置或调用失败，会静默跳过，不影响上传流程。
-    func purgeCDNCache(for urls: [String]) async {
+    @discardableResult
+    func purgeCDNCache(for urls: [String], force: Bool = false) async -> Bool {
         guard let account = currentAccount else {
             print("⚠️ [CDN Purge] 跳过：无当前账户")
-            return
+            return false
         }
 
-        // 检查是否启用了自动清除
-        guard account.autoPurgeCDNCache else {
-            print("⚠️ [CDN Purge] 跳过：未启用自动清除 CDN 缓存")
-            return
+        // 非强制模式下检查是否启用了自动清除
+        if !force {
+            guard account.autoPurgeCDNCache else {
+                print("⚠️ [CDN Purge] 跳过：未启用自动清除 CDN 缓存")
+                return false
+            }
         }
 
         // 检查 Zone ID
         guard let zoneID = account.cloudflareZoneID, !zoneID.isEmpty else {
             print("⚠️ [CDN Purge] 跳过：未配置 Cloudflare Zone ID")
-            return
+            return false
         }
 
         // 从 Keychain 获取 API Token
         guard let apiToken = KeychainService.shared.retrieveCloudflareAPIToken(for: account),
               !apiToken.isEmpty else {
             print("⚠️ [CDN Purge] 跳过：未配置 Cloudflare API Token")
-            return
+            return false
         }
 
         // 构建请求
         let endpoint = "https://api.cloudflare.com/client/v4/zones/\(zoneID)/purge_cache"
         guard let url = URL(string: endpoint) else {
             print("❌ [CDN Purge] 无效的 API 端点 URL")
-            return
+            return false
         }
 
         var request = URLRequest(url: url)
@@ -2334,7 +2373,7 @@ class R2Service: ObservableObject {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
         } catch {
             print("❌ [CDN Purge] JSON 序列化失败: \(error.localizedDescription)")
-            return
+            return false
         }
 
         // 发送请求
@@ -2343,11 +2382,12 @@ class R2Service: ObservableObject {
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 print("❌ [CDN Purge] 无效的响应类型")
-                return
+                return false
             }
 
             if httpResponse.statusCode == 200 {
                 print("✅ [CDN Purge] 缓存已清除: \(urls)")
+                return true
             } else {
                 // 尝试解析错误信息
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -2357,9 +2397,11 @@ class R2Service: ObservableObject {
                 } else {
                     print("❌ [CDN Purge] API 请求失败，状态码: \(httpResponse.statusCode)")
                 }
+                return false
             }
         } catch {
             print("❌ [CDN Purge] 网络请求失败: \(error.localizedDescription)")
+            return false
         }
     }
 

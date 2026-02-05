@@ -173,16 +173,6 @@ class ThumbnailCache: ObservableObject {
         print("🗑️ ThumbnailCache: 已清除缓存 - \(urlString)")
     }
 
-    /// 清除指定 URL 前缀的所有缓存
-    /// - Parameter urlPrefix: URL 前缀（如目录路径）
-    ///
-    /// 注意：NSCache 不支持遍历，此方法仅用于标记，实际清除依赖 LRU
-    func invalidateCacheForPrefix(_ urlPrefix: String) {
-        // NSCache 不支持遍历所有 key，只能清空全部
-        // 如果需要精确清除，考虑使用字典 + 手动内存管理
-        print("⚠️ ThumbnailCache: 前缀缓存清除需要清空全部缓存 - \(urlPrefix)")
-        // 暂不实现完全清除，依赖版本号机制
-    }
 }
 
 // MARK: - SwiftUI Thumbnail View

@@ -311,6 +311,11 @@ class UploadQueueManager: ObservableObject, TaskQueueManagerProtocol {
             addSingleFile(url: file.url, remotePath: file.remotePath)
         }
 
+        // 立即开始处理非冲突文件（防止用户离开视图导致队列停滞）
+        if !tasks.isEmpty && !isProcessing {
+            processQueue()
+        }
+
         // 6. 调用冲突回调让用户选择
         print("📥 [UploadQueue] 检测到 \(conflicts.count) 个冲突文件")
 
@@ -344,6 +349,17 @@ class UploadQueueManager: ObservableObject, TaskQueueManagerProtocol {
                     addSingleFile(url: conflict.localURL, remotePath: uniquePath)
                 } catch {
                     print("❌ [UploadQueue] 生成唯一路径失败: \(error)")
+                    // 将失败的文件作为任务添加到队列，让用户看到错误
+                    var failedTask = UploadQueueTask(
+                        id: UUID(),
+                        fileName: conflict.localFileName,
+                        fileSize: conflict.localFileSize,
+                        localURL: conflict.localURL,
+                        remotePath: conflict.remotePath,
+                        contentType: inferContentType(from: conflict.localURL)
+                    )
+                    failedTask.status = .failed(error.localizedDescription)
+                    tasks.append(failedTask)
                 }
 
             case .skip:

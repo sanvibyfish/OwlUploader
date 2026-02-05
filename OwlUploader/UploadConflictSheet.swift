@@ -221,11 +221,11 @@ struct UploadConflictSheet: View {
     }
 
     private func handleStop() {
-        // 跳过所有剩余冲突
+        // 保留已做选择，跳过所有剩余冲突
         for i in currentIndex..<conflicts.count {
             resolutions[conflicts[i].id] = .skip
         }
-        onCancel()
+        onResolution(resolutions)
     }
 
     // MARK: - 格式化

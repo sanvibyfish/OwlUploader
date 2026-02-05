@@ -59,13 +59,49 @@ struct FileTableView: View {
     /// 原生 Table 使用的选择状态
     @State private var tableSelection: Set<String> = []
     
-    /// 原生 Table 使用的排序描述符
-    @State private var sortComparators: [KeyPathComparator<FileObject>] = [
-        KeyPathComparator(\.name, order: .forward)
-    ]
-    
+    /// 计算型排序 Binding：将 sortOrder + sortAscending 映射为 Table 所需的 KeyPathComparator
+    /// 避免使用 @State + onChange 的循环同步问题
+    private var sortComparatorBinding: Binding<[KeyPathComparator<FileObject>]> {
+        Binding(
+            get: { Self.comparators(from: sortOrder, ascending: sortAscending) },
+            set: { newValue in
+                let (order, ascending) = Self.sortOrder(from: newValue)
+                sortOrder = order
+                sortAscending = ascending
+            }
+        )
+    }
+
+    /// 从 FileSortOrder + ascending 生成 KeyPathComparator 数组
+    static func comparators(from sortOrder: FileSortOrder, ascending: Bool) -> [KeyPathComparator<FileObject>] {
+        let order: SortOrder = ascending ? .forward : .reverse
+        switch sortOrder {
+        case .name: return [KeyPathComparator(\.name, order: order)]
+        case .kind: return [KeyPathComparator(\.sortableKind, order: order)]
+        case .dateModified: return [KeyPathComparator(\.sortableDate, order: order)]
+        case .size: return [KeyPathComparator(\.sortableSize, order: order)]
+        }
+    }
+
+    /// 从 KeyPathComparator 数组反解出 FileSortOrder + ascending
+    static func sortOrder(from comparators: [KeyPathComparator<FileObject>]) -> (FileSortOrder, Bool) {
+        guard let first = comparators.first else { return (.name, true) }
+        let keyPathString = String(describing: first.keyPath)
+        let order: FileSortOrder
+        if keyPathString.contains("sortableSize") {
+            order = .size
+        } else if keyPathString.contains("sortableKind") {
+            order = .kind
+        } else if keyPathString.contains("sortableDate") {
+            order = .dateModified
+        } else {
+            order = .name
+        }
+        return (order, first.order == .forward)
+    }
+
     var body: some View {
-        Table(files, selection: $tableSelection, sortOrder: $sortComparators) {
+        Table(files, selection: $tableSelection, sortOrder: sortComparatorBinding) {
             // 名称列
             TableColumn(L.Files.TableColumn.name, value: \.name) { file in
                 FileNameCell(
@@ -181,21 +217,7 @@ struct FileTableView: View {
                 tableSelection = newValue
             }
         }
-        // 同步排序状态：列头 → 菜单
-        .onChange(of: sortComparators) { _, newValue in
-            syncSortOrderFromComparators(newValue)
-        }
-        // 同步排序状态：菜单 → 列头
-        .onChange(of: sortOrder) { _, _ in
-            syncSortComparatorsFromOrder()
-        }
-        .onChange(of: sortAscending) { _, _ in
-            syncSortComparatorsFromOrder()
-        }
         .onAppear {
-            // 初始化排序描述符
-            syncSortComparatorsFromOrder()
-            // 初始化选择状态
             tableSelection = selectionManager.selectedIDs
         }
     }
@@ -206,71 +228,6 @@ struct FileTableView: View {
     private func syncSelectionToManager(_ ids: Set<String>) {
         let selectedFiles = files.filter { ids.contains($0.id) }
         selectionManager.setSelection(selectedFiles)
-    }
-
-    /// 从 FileSortOrder 和 sortAscending 同步到原生排序描述符（菜单 → 列头）
-    private func syncSortComparatorsFromOrder() {
-        let order: SortOrder = sortAscending ? .forward : .reverse
-        let newComparators: [KeyPathComparator<FileObject>]
-        
-        switch sortOrder {
-        case .name:
-            newComparators = [KeyPathComparator(\.name, order: order)]
-        case .kind:
-            newComparators = [KeyPathComparator(\.sortableKind, order: order)]
-        case .dateModified:
-            newComparators = [KeyPathComparator(\.sortableDate, order: order)]
-        case .size:
-            newComparators = [KeyPathComparator(\.sortableSize, order: order)]
-        }
-        
-        // 避免无限循环：只有当排序描述符真正不同时才更新
-        if !comparatorsMatch(sortComparators, newComparators) {
-            sortComparators = newComparators
-        }
-    }
-
-    /// 从原生排序描述符同步到 FileSortOrder 和 sortAscending（列头 → 菜单）
-    private func syncSortOrderFromComparators(_ comparators: [KeyPathComparator<FileObject>]) {
-        guard let first = comparators.first else { return }
-        
-        // 根据 KeyPath 确定排序类型
-        let keyPathString = String(describing: first.keyPath)
-        
-        let newSortOrder: FileSortOrder
-        if keyPathString.contains("name") {
-            newSortOrder = .name
-        } else if keyPathString.contains("sortableKind") {
-            newSortOrder = .kind
-        } else if keyPathString.contains("sortableSize") {
-            newSortOrder = .size
-        } else if keyPathString.contains("sortableDate") {
-            newSortOrder = .dateModified
-        } else {
-            return
-        }
-        
-        // 更新排序方向
-        let newAscending = first.order == .forward
-        if sortAscending != newAscending {
-            sortAscending = newAscending
-        }
-        
-        // 更新排序类型
-        if sortOrder != newSortOrder {
-            sortOrder = newSortOrder
-        }
-    }
-    
-    /// 比较两个排序描述符是否匹配
-    private func comparatorsMatch(_ a: [KeyPathComparator<FileObject>], _ b: [KeyPathComparator<FileObject>]) -> Bool {
-        guard a.count == b.count else { return false }
-        for (c1, c2) in zip(a, b) {
-            if String(describing: c1.keyPath) != String(describing: c2.keyPath) || c1.order != c2.order {
-                return false
-            }
-        }
-        return true
     }
 
     /// 复制文件 URL

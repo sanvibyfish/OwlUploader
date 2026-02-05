@@ -499,6 +499,121 @@ final class R2ServiceErrorTests: XCTestCase {
         try? FileManager.default.removeItem(at: testDir)
     }
 
+    // MARK: - filterDirectoryPlaceholders Tests
+
+    func testFilterDirectoryPlaceholders_removesPlaceholdersWithoutTrailingSlash() {
+        // Given - t1 和 t1/t2 是目录占位符，t1/t2/file.mp3 是真实文件
+        let files: [(key: String, size: Int64, relativePath: String)] = [
+            (key: "vowels/t1", size: 0, relativePath: "t1"),
+            (key: "vowels/t1/t2", size: 0, relativePath: "t1/t2"),
+            (key: "vowels/t1/t2/carrier.mp3", size: 1024, relativePath: "t1/t2/carrier.mp3"),
+        ]
+
+        // When
+        let result = R2Service.filterDirectoryPlaceholders(from: files)
+
+        // Then
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result[0].relativePath, "t1/t2/carrier.mp3")
+    }
+
+    func testFilterDirectoryPlaceholders_preservesLegitimateFiles() {
+        // Given - 所有文件都是真实文件，无占位符
+        let files: [(key: String, size: Int64, relativePath: String)] = [
+            (key: "folder/a.txt", size: 100, relativePath: "a.txt"),
+            (key: "folder/b.png", size: 200, relativePath: "b.png"),
+            (key: "folder/c.pdf", size: 300, relativePath: "c.pdf"),
+        ]
+
+        // When
+        let result = R2Service.filterDirectoryPlaceholders(from: files)
+
+        // Then
+        XCTAssertEqual(result.count, 3, "所有合法文件都应保留")
+    }
+
+    func testFilterDirectoryPlaceholders_emptyList() {
+        // Given
+        let files: [(key: String, size: Int64, relativePath: String)] = []
+
+        // When
+        let result = R2Service.filterDirectoryPlaceholders(from: files)
+
+        // Then
+        XCTAssertTrue(result.isEmpty)
+    }
+
+    func testFilterDirectoryPlaceholders_singleFile() {
+        // Given
+        let files: [(key: String, size: Int64, relativePath: String)] = [
+            (key: "folder/readme.md", size: 50, relativePath: "readme.md"),
+        ]
+
+        // When
+        let result = R2Service.filterDirectoryPlaceholders(from: files)
+
+        // Then
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result[0].relativePath, "readme.md")
+    }
+
+    func testFilterDirectoryPlaceholders_deepNestedPlaceholderChain() {
+        // Given - 深层嵌套的占位符链
+        let files: [(key: String, size: Int64, relativePath: String)] = [
+            (key: "root/a", size: 0, relativePath: "a"),
+            (key: "root/a/b", size: 0, relativePath: "a/b"),
+            (key: "root/a/b/c", size: 0, relativePath: "a/b/c"),
+            (key: "root/a/b/c/file.txt", size: 512, relativePath: "a/b/c/file.txt"),
+        ]
+
+        // When
+        let result = R2Service.filterDirectoryPlaceholders(from: files)
+
+        // Then
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result[0].relativePath, "a/b/c/file.txt")
+    }
+
+    func testFilterDirectoryPlaceholders_similarNameNotFalselyFiltered() {
+        // Given - "t1.txt" 不应被 "t1" 目录前缀误杀
+        let files: [(key: String, size: Int64, relativePath: String)] = [
+            (key: "folder/t1.txt", size: 100, relativePath: "t1.txt"),
+            (key: "folder/t1", size: 0, relativePath: "t1"),
+            (key: "folder/t1/data.csv", size: 500, relativePath: "t1/data.csv"),
+        ]
+
+        // When
+        let result = R2Service.filterDirectoryPlaceholders(from: files)
+
+        // Then
+        XCTAssertEqual(result.count, 2)
+        let paths = result.map { $0.relativePath }
+        XCTAssertTrue(paths.contains("t1.txt"), "t1.txt 不应被过滤")
+        XCTAssertTrue(paths.contains("t1/data.csv"), "t1/data.csv 不应被过滤")
+        XCTAssertFalse(paths.contains("t1"), "t1 占位符应被过滤")
+    }
+
+    func testFilterDirectoryPlaceholders_multipleSubdirectories() {
+        // Given - 多个子目录各自有占位符
+        let files: [(key: String, size: Int64, relativePath: String)] = [
+            (key: "root/docs", size: 0, relativePath: "docs"),
+            (key: "root/docs/readme.md", size: 100, relativePath: "docs/readme.md"),
+            (key: "root/images", size: 0, relativePath: "images"),
+            (key: "root/images/logo.png", size: 200, relativePath: "images/logo.png"),
+            (key: "root/config.json", size: 50, relativePath: "config.json"),
+        ]
+
+        // When
+        let result = R2Service.filterDirectoryPlaceholders(from: files)
+
+        // Then
+        XCTAssertEqual(result.count, 3)
+        let paths = result.map { $0.relativePath }
+        XCTAssertTrue(paths.contains("docs/readme.md"))
+        XCTAssertTrue(paths.contains("images/logo.png"))
+        XCTAssertTrue(paths.contains("config.json"))
+    }
+
     // MARK: - MIME Type Tests (文档性测试)
 
     func testMIMEType_commonExtensionsMapping() {

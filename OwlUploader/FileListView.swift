@@ -1197,12 +1197,16 @@ struct FileListView: View {
     /// 批量下载选中的文件
     private func batchDownloadSelectedFiles() {
         let selectedKeys = selectionManager.getSelectedKeys()
-        let selectedFiles = fileObjects.filter { selectedKeys.contains($0.key) && !$0.isDirectory }
+        let selectedItems = fileObjects.filter { selectedKeys.contains($0.key) }
 
-        guard !selectedFiles.isEmpty else {
+        guard !selectedItems.isEmpty else {
             messageManager.showWarning(L.Message.Warning.noFilesSelected, description: L.Message.Warning.selectFilesToDownload)
             return
         }
+
+        // 分离普通文件和文件夹
+        let selectedFiles = selectedItems.filter { !$0.isDirectory }
+        let selectedFolders = selectedItems.filter { $0.isDirectory }
 
         // 选择保存目录
         let openPanel = NSOpenPanel()
@@ -1216,6 +1220,52 @@ struct FileListView: View {
 
             Task { @MainActor in
                 guard let bucket = r2Service.selectedBucket else { return }
+
+                // 构建下载任务列表：先加入普通文件
+                var allDownloadFiles: [(key: String, name: String, size: Int64)] = selectedFiles.map { file in
+                    (key: file.key, name: file.name, size: file.size ?? 0)
+                }
+
+                // 对选中的文件夹递归获取子文件
+                if !selectedFolders.isEmpty {
+                    self.messageManager.showInfo(
+                        L.Message.Info.scanningFolders,
+                        description: L.Message.Info.scanningFoldersDescription(selectedFolders.count)
+                    )
+
+                    for folder in selectedFolders {
+                        do {
+                            let files = try await self.r2Service.listAllFilesInFolder(
+                                bucket: bucket.name,
+                                folderPrefix: folder.key
+                            )
+
+                            // 文件夹名去除末尾 /
+                            let folderName = folder.name.hasSuffix("/")
+                                ? String(folder.name.dropLast())
+                                : folder.name
+
+                            // 使用 folderName/relativePath 保持目录结构
+                            let folderFiles: [(key: String, name: String, size: Int64)] = files.map { file in
+                                (key: file.key, name: "\(folderName)/\(file.relativePath)", size: file.size)
+                            }
+                            allDownloadFiles.append(contentsOf: folderFiles)
+                        } catch {
+                            self.messageManager.showError(
+                                L.Message.BatchDownload.scanFolderFailed,
+                                description: L.Message.BatchDownload.scanFolderFailedDescription(folder.name, error.localizedDescription)
+                            )
+                        }
+                    }
+                }
+
+                guard !allDownloadFiles.isEmpty else {
+                    self.messageManager.showWarning(
+                        L.Message.Warning.noFilesSelected,
+                        description: L.Message.BatchDownload.selectedFoldersEmpty
+                    )
+                    return
+                }
 
                 // 配置下载队列管理器
                 downloadQueueManager.configure(r2Service: r2Service, bucketName: bucket.name)
@@ -1238,13 +1288,8 @@ struct FileListView: View {
                     }
                 }
 
-                // 构建下载任务列表
-                let downloadFiles: [(key: String, name: String, size: Int64)] = selectedFiles.map { file in
-                    (key: file.key, name: file.name, size: file.size ?? 0)
-                }
-
                 // 添加到下载队列
-                downloadQueueManager.addDownloads(downloadFiles, to: folderURL)
+                downloadQueueManager.addDownloads(allDownloadFiles, to: folderURL)
             }
         }
     }
@@ -1673,14 +1718,21 @@ struct FileListView: View {
             return
         }
 
-        // 调用 CDN 缓存清除 API
+        // 调用 CDN 缓存清除 API（手动触发使用 force 模式，绕过自动清除开关）
         Task {
-            await r2Service.purgeCDNCache(for: urls)
+            let success = await r2Service.purgeCDNCache(for: urls, force: true)
             await MainActor.run {
-                messageManager.showSuccess(
-                    L.Message.Success.cdnCachePurged,
-                    description: L.Message.Success.cdnCachePurgedDescription(filesToPurge.count)
-                )
+                if success {
+                    messageManager.showSuccess(
+                        L.Message.Success.cdnCachePurged,
+                        description: L.Message.Success.cdnCachePurgedDescription(filesToPurge.count)
+                    )
+                } else {
+                    messageManager.showError(
+                        L.Message.Error.cdnPurgeFailed,
+                        description: L.Message.Error.cdnPurgeFailedDescription
+                    )
+                }
             }
         }
     }
