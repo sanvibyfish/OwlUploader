@@ -586,9 +586,11 @@ struct EditAccountSheet: View {
                     try accountManager.updateAccount(updatedAccount)
                 }
 
-                // 保存 Cloudflare API Token 到 Keychain
+                // 保存或删除 Cloudflare API Token
                 if !trimmedAPIToken.isEmpty {
                     try KeychainService.shared.updateCloudflareAPIToken(trimmedAPIToken, for: updatedAccount)
+                } else {
+                    try? KeychainService.shared.deleteCloudflareAPIToken(for: updatedAccount)
                 }
 
                 if accountManager.currentAccount?.id == account.id && !trimmedSecretKey.isEmpty {

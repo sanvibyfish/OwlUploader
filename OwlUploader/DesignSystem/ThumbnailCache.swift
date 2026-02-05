@@ -55,7 +55,9 @@ class ThumbnailCache: ObservableObject {
 
     /// 异步加载缩略图
     func loadThumbnail(from urlString: String, maxSize: CGFloat = 128) async -> NSImage? {
-        let cacheKey = "\(urlString)_\(Int(maxSize))"
+        // 缓存 key 使用不带查询参数的 base URL，使 invalidateCache 能正确匹配
+        let baseURL = urlString.components(separatedBy: "?").first ?? urlString
+        let cacheKey = "\(baseURL)_\(Int(maxSize))"
 
         // 检查缓存
         if let cached = getCachedThumbnail(for: cacheKey) {
@@ -213,8 +215,10 @@ struct AsyncThumbnailView: View {
     private func loadThumbnail() async {
         guard let urlString = urlString, !urlString.isEmpty else { return }
 
-        // 先检查缓存
-        if let cached = ThumbnailCache.shared.getCachedThumbnail(for: "\(urlString)_\(Int(size))") {
+        // 先检查缓存（key 使用 base URL + Retina 2x 尺寸，与 ThumbnailCache 内部保持一致）
+        let baseURL = urlString.components(separatedBy: "?").first ?? urlString
+        let retinaSize = Int(size * 2)
+        if let cached = ThumbnailCache.shared.getCachedThumbnail(for: "\(baseURL)_\(retinaSize)") {
             self.thumbnail = cached
             return
         }
