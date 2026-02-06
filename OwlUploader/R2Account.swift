@@ -50,6 +50,12 @@ struct R2Account: Codable, Identifiable {
     /// 默认公共域名索引
     var defaultPublicDomainIndex: Int
 
+    /// Cloudflare Zone ID（用于清除 CDN 缓存，可选）
+    var cloudflareZoneID: String?
+
+    /// 是否启用自动清除 CDN 缓存
+    var autoPurgeCDNCache: Bool
+
     /// 获取默认公共域名
     var defaultPublicDomain: String? {
         guard !publicDomains.isEmpty,
@@ -77,7 +83,9 @@ struct R2Account: Codable, Identifiable {
     ///   - bucketNames: 存储桶名称列表
     ///   - publicDomains: 公共域名列表
     ///   - defaultPublicDomainIndex: 默认域名索引
-    init(accountID: String, accessKeyID: String, endpointURL: String? = nil, displayName: String? = nil, bucketNames: [String] = [], publicDomains: [String] = [], defaultPublicDomainIndex: Int = 0) {
+    ///   - cloudflareZoneID: Cloudflare Zone ID（可选）
+    ///   - autoPurgeCDNCache: 是否自动清除 CDN 缓存
+    init(accountID: String, accessKeyID: String, endpointURL: String? = nil, displayName: String? = nil, bucketNames: [String] = [], publicDomains: [String] = [], defaultPublicDomainIndex: Int = 0, cloudflareZoneID: String? = nil, autoPurgeCDNCache: Bool = false) {
         self.id = UUID()
         self.accountID = accountID
         self.accessKeyID = accessKeyID
@@ -86,6 +94,8 @@ struct R2Account: Codable, Identifiable {
         self.bucketNames = bucketNames
         self.publicDomains = publicDomains
         self.defaultPublicDomainIndex = defaultPublicDomainIndex
+        self.cloudflareZoneID = cloudflareZoneID
+        self.autoPurgeCDNCache = autoPurgeCDNCache
         self.createdAt = Date()
         self.updatedAt = Date()
     }
@@ -96,6 +106,7 @@ struct R2Account: Codable, Identifiable {
         case id, accountID, accessKeyID, endpointURL, displayName
         case bucketNames, defaultBucketName // 支持两种格式
         case publicDomain, publicDomains, defaultPublicDomainIndex // 支持两种格式
+        case cloudflareZoneID, autoPurgeCDNCache // CDN 缓存配置
         case createdAt, updatedAt
     }
 
@@ -131,6 +142,10 @@ struct R2Account: Codable, Identifiable {
             publicDomains = []
             defaultPublicDomainIndex = 0
         }
+
+        // CDN 缓存配置（可选，默认关闭）
+        cloudflareZoneID = try container.decodeIfPresent(String.self, forKey: .cloudflareZoneID)
+        autoPurgeCDNCache = try container.decodeIfPresent(Bool.self, forKey: .autoPurgeCDNCache) ?? false
     }
 
     func encode(to encoder: Encoder) throws {
@@ -143,6 +158,8 @@ struct R2Account: Codable, Identifiable {
         try container.encode(bucketNames, forKey: .bucketNames)
         try container.encode(publicDomains, forKey: .publicDomains)
         try container.encode(defaultPublicDomainIndex, forKey: .defaultPublicDomainIndex)
+        try container.encodeIfPresent(cloudflareZoneID, forKey: .cloudflareZoneID)
+        try container.encode(autoPurgeCDNCache, forKey: .autoPurgeCDNCache)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(updatedAt, forKey: .updatedAt)
     }
@@ -184,6 +201,8 @@ struct R2Account: Codable, Identifiable {
     ///   - bucketNames: 新的存储桶名称列表
     ///   - publicDomains: 新的公共域名列表
     ///   - defaultPublicDomainIndex: 新的默认域名索引
+    ///   - cloudflareZoneID: 新的 Cloudflare Zone ID
+    ///   - autoPurgeCDNCache: 是否自动清除 CDN 缓存
     /// - Returns: 更新后的账户对象
     func updated(accountID: String? = nil,
                  accessKeyID: String? = nil,
@@ -191,7 +210,9 @@ struct R2Account: Codable, Identifiable {
                  displayName: String? = nil,
                  bucketNames: [String]? = nil,
                  publicDomains: [String]? = nil,
-                 defaultPublicDomainIndex: Int? = nil) -> R2Account {
+                 defaultPublicDomainIndex: Int? = nil,
+                 cloudflareZoneID: String?? = nil,
+                 autoPurgeCDNCache: Bool? = nil) -> R2Account {
         var updated = self
         if let accountID = accountID {
             updated.accountID = accountID
@@ -213,6 +234,12 @@ struct R2Account: Codable, Identifiable {
         }
         if let defaultPublicDomainIndex = defaultPublicDomainIndex {
             updated.defaultPublicDomainIndex = defaultPublicDomainIndex
+        }
+        if let cloudflareZoneID = cloudflareZoneID {
+            updated.cloudflareZoneID = cloudflareZoneID
+        }
+        if let autoPurgeCDNCache = autoPurgeCDNCache {
+            updated.autoPurgeCDNCache = autoPurgeCDNCache
         }
         updated.updatedAt = Date()
         return updated
@@ -271,10 +298,13 @@ extension R2Account {
     
     /// UserDefaults 中存储账户配置的键
     static let userDefaultsKey = "stored_r2_accounts"
-    
+
     /// Keychain 中存储 Secret Access Key 的服务名
     static let keychainServiceName = "OwlUploader.R2Account"
-    
+
+    /// Keychain 中存储 Cloudflare API Token 的服务名
+    static let cloudflareAPITokenServiceName = "OwlUploader.CloudflareAPIToken"
+
     /// 为当前账户生成 Keychain 账户标识符
     var keychainAccountIdentifier: String {
         return "\(accountID)_\(accessKeyID)"

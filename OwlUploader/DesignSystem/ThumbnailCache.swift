@@ -55,7 +55,9 @@ class ThumbnailCache: ObservableObject {
 
     /// 异步加载缩略图
     func loadThumbnail(from urlString: String, maxSize: CGFloat = 128) async -> NSImage? {
-        let cacheKey = "\(urlString)_\(Int(maxSize))"
+        // 缓存 key 使用不带查询参数的 base URL，使 invalidateCache 能正确匹配
+        let baseURL = urlString.components(separatedBy: "?").first ?? urlString
+        let cacheKey = "\(baseURL)_\(Int(maxSize))"
 
         // 检查缓存
         if let cached = getCachedThumbnail(for: cacheKey) {
@@ -157,6 +159,22 @@ class ThumbnailCache: ObservableObject {
     func clearCache() {
         cache.removeAllObjects()
     }
+
+    /// 清除指定 URL 的缓存（所有尺寸）
+    /// - Parameter urlString: 文件 URL（不带版本参数的基础 URL）
+    ///
+    /// 说明：当文件被覆盖上传后，调用此方法清除旧缓存。
+    /// 由于缓存 key 格式为 "URL_尺寸"，需要清除所有可能的尺寸。
+    func invalidateCache(for urlString: String) {
+        // 覆盖 UI 中实际使用的尺寸及其 Retina 2x 变体
+        // Table: 20 (2x=40), Grid: 64 (2x=128), 及其他常见尺寸
+        let sizes = [20, 40, 64, 128, 256, 512]
+        for size in sizes {
+            let cacheKey = "\(urlString)_\(size)" as NSString
+            cache.removeObject(forKey: cacheKey)
+        }
+    }
+
 }
 
 // MARK: - SwiftUI Thumbnail View
@@ -197,8 +215,10 @@ struct AsyncThumbnailView: View {
     private func loadThumbnail() async {
         guard let urlString = urlString, !urlString.isEmpty else { return }
 
-        // 先检查缓存
-        if let cached = ThumbnailCache.shared.getCachedThumbnail(for: "\(urlString)_\(Int(size))") {
+        // 先检查缓存（key 使用 base URL + Retina 2x 尺寸，与 ThumbnailCache 内部保持一致）
+        let baseURL = urlString.components(separatedBy: "?").first ?? urlString
+        let retinaSize = Int(size * 2)
+        if let cached = ThumbnailCache.shared.getCachedThumbnail(for: "\(baseURL)_\(retinaSize)") {
             self.thumbnail = cached
             return
         }

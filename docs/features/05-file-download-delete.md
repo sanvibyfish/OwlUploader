@@ -41,6 +41,7 @@
 ## 已知问题 / 改进方向
 
 - **下载内存占用**：当前 `downloadObject` 会将对象一次性读入内存再写入磁盘，大文件可能导致内存飙升。后续需要改为流式读取/写入，逐块落盘。
+- ✅ **目录占位符冲突**：已修复。下载 R2 文件夹时，不带尾斜杠的目录占位符对象会被自动过滤，避免与实际目录路径冲突（v1.0.1+）。
 
 ## 文件预览
 
@@ -112,8 +113,9 @@
 1. 右键点击文件夹，选择「下载」
 2. 选择本地保存位置
 3. 系统扫描文件夹内所有文件
-4. 自动创建本地目录结构
-5. 批量下载所有文件到对应子目录
+4. **自动过滤目录占位符对象**（防止与实际目录冲突）
+5. 自动创建本地目录结构
+6. 批量下载所有文件到对应子目录
 
 **目录结构保持**:
 
@@ -126,6 +128,30 @@ screenshots/                        ~/Downloads/screenshots/
 │   │   └── thumb.png               │   │   └── thumb.png
 │   └── assets/                     │   └── assets/
 │       └── logo.svg                │       └── logo.svg
+```
+
+**目录占位符过滤机制**:
+
+某些 S3/R2 客户端工具会创建不带尾斜杠的目录占位符对象（如 `t1`、`t1/t2`），这些对象的 key 恰好等于其他文件路径中的目录前缀。下载时如果不过滤，会与实际目录路径冲突导致失败。
+
+系统通过**两层防御机制**确保下载成功：
+
+1. **列表阶段过滤**（`listAllFilesInFolder`）
+   - 扫描完文件夹后，从所有文件的 relativePath 中提取目录前缀
+   - 过滤掉 relativePath 恰好等于某个目录前缀的条目（即目录占位符）
+   - 仅保留真正的文件对象
+
+2. **下载阶段防御性检查**（`DownloadQueueManager`）
+   - 下载前检查 localURL 是否已作为目录存在
+   - 如果已存在同名目录，跳过下载（避免文件-目录冲突）
+
+**示例**:
+
+```
+R2 对象列表（含占位符）:          过滤后（仅保留文件）:
+vowels/t1 (0 bytes)  ← 占位符      vowels/t1/t2/carrier.mp3
+vowels/t1/t2 (0 bytes) ← 占位符
+vowels/t1/t2/carrier.mp3 (1024 bytes)
 ```
 
 ### 下载 API
@@ -146,6 +172,17 @@ func downloadObjectChunked(
     fileSize: Int64,
     progress: @escaping (Int64, Int64) -> Void
 ) async throws
+
+// 列出文件夹内所有文件（自动过滤目录占位符）
+func listAllFilesInFolder(
+    bucket: String,
+    folderPrefix: String
+) async throws -> [(key: String, size: Int64, relativePath: String)]
+
+// 过滤目录占位符对象（静态工具方法）
+static func filterDirectoryPlaceholders(
+    from files: [(key: String, size: Int64, relativePath: String)]
+) -> [(key: String, size: Int64, relativePath: String)]
 ```
 
 ### 目录自动创建
@@ -412,6 +449,41 @@ func renameObject(
 | `renameFailed` | 重命名请求失败 | 显示错误消息 |
 | `copyFailed` | 复制对象失败 | 显示错误消息 |
 | `networkError` | 网络连接错误 | 建议重试 |
+
+## 测试覆盖
+
+### 目录占位符过滤测试 (`R2ServiceTests.swift`)
+
+| 测试用例 | 描述 |
+|---------|------|
+| `testFilterDirectoryPlaceholders_removesPlaceholdersWithoutTrailingSlash` | 验证过滤掉不带尾斜杠的目录占位符（如 `t1`、`t1/t2`） |
+| `testFilterDirectoryPlaceholders_preservesLegitimateFiles` | 验证保留所有真实文件 |
+| `testFilterDirectoryPlaceholders_emptyList` | 验证空列表处理 |
+| `testFilterDirectoryPlaceholders_singleFile` | 验证单文件场景 |
+| `testFilterDirectoryPlaceholders_deepNestedPlaceholderChain` | 验证深层嵌套的占位符链 |
+| `testFilterDirectoryPlaceholders_similarNameNotFalselyFiltered` | 验证相似名称文件不会被误过滤（如 `t1.txt` vs `t1`） |
+| `testFilterDirectoryPlaceholders_multipleSubdirectories` | 验证多个子目录各自的占位符处理 |
+
+### 下载目录创建测试 (`R2ServiceTests.swift`)
+
+| 测试用例 | 描述 |
+|---------|------|
+| `testDownloadDirectoryCreation_parentDirectoryCreatedWhenNeeded` | 验证下载前自动创建嵌套目录 |
+| `testDownloadDirectoryCreation_existingDirectoryNotAffected` | 验证已存在目录不受影响 |
+| `testDownloadDirectoryCreation_multiLevelNestedPath` | 验证多层嵌套路径创建 |
+| `testDownloadDirectoryCreation_fileCanBeCreatedAfterDirectorySetup` | 验证目录创建后文件能正确写入 |
+
+**运行测试**:
+
+```bash
+# 运行所有 R2Service 相关测试
+xcodebuild test -scheme OwlUploader -destination 'platform=macOS' \
+  -only-testing:OwlUploaderTests/R2ServiceTests
+
+# 运行目录占位符过滤测试
+xcodebuild test -scheme OwlUploader -destination 'platform=macOS' \
+  -only-testing:OwlUploaderTests/R2ServiceTests/testFilterDirectoryPlaceholders_removesPlaceholdersWithoutTrailingSlash
+```
 
 ## 相关链接
 

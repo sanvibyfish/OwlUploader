@@ -850,8 +850,44 @@ class R2Service: ObservableObject {
             continuationToken = response.nextContinuationToken
         } while continuationToken != nil
 
-        print("📂 文件夹扫描完成，共 \(allFiles.count) 个文件")
-        return allFiles
+        // 过滤不带尾斜杠的目录占位符对象
+        let filteredFiles = R2Service.filterDirectoryPlaceholders(from: allFiles)
+
+        print("📂 文件夹扫描完成，共 \(filteredFiles.count) 个文件（原始 \(allFiles.count) 个）")
+        return filteredFiles
+    }
+
+    /// 从文件列表中过滤掉目录占位符对象
+    /// R2/S3 中某些工具会创建不带尾斜杠的目录占位符（如 `t1`、`t1/t2`），
+    /// 这些对象的 key 恰好等于其他文件路径中的目录前缀，下载时会与实际目录冲突。
+    /// - Parameter files: 原始文件列表
+    /// - Returns: 过滤掉目录占位符后的文件列表
+    nonisolated static func filterDirectoryPlaceholders(from files: [(key: String, size: Int64, relativePath: String)]) -> [(key: String, size: Int64, relativePath: String)] {
+        // 收集所有 relativePath 中出现的目录前缀
+        var directoryPrefixes = Set<String>()
+        for file in files {
+            let components = file.relativePath.split(separator: "/")
+            // 只有多段路径才会产生目录前缀（如 "a/b/c.txt" → "a", "a/b"）
+            if components.count > 1 {
+                var prefix = ""
+                for component in components.dropLast() {
+                    if !prefix.isEmpty { prefix += "/" }
+                    prefix += String(component)
+                    directoryPrefixes.insert(prefix)
+                }
+            }
+        }
+
+        guard !directoryPrefixes.isEmpty else { return files }
+
+        let filtered = files.filter { !directoryPrefixes.contains($0.relativePath) }
+
+        let removedCount = files.count - filtered.count
+        if removedCount > 0 {
+            print("🗂️ 过滤了 \(removedCount) 个目录占位符对象")
+        }
+
+        return filtered
     }
 
     /// 创建文件夹
@@ -2222,7 +2258,7 @@ class R2Service: ObservableObject {
         return (isReady, issues, suggestions)
     }
     
-    /// 生成文件的公共访问URL
+    /// 生成文件的公共访问URL（不带版本参数，用于分享链接）
     /// - Parameters:
     ///   - fileObject: 文件对象
     ///   - bucketName: 存储桶名称
@@ -2232,10 +2268,10 @@ class R2Service: ObservableObject {
             print("❌ 无法生成文件URL：账户未配置")
             return nil
         }
-        
+
         // 构建文件路径
         let filePath = fileObject.key
-        
+
         // 如果配置了公共域名，使用默认公共域名
         if let publicDomain = account.defaultPublicDomain, !publicDomain.isEmpty {
             // 确保域名格式正确
@@ -2246,6 +2282,156 @@ class R2Service: ObservableObject {
             // 格式：https://账户ID.r2.cloudflarestorage.com/存储桶名/文件路径
             return "https://\(account.accountID).r2.cloudflarestorage.com/\(bucketName)/\(filePath)"
         }
+    }
+
+    /// 根据文件 key 生成基础 URL（不带版本参数）
+    /// - Parameters:
+    ///   - key: 文件的 object key（路径）
+    ///   - bucketName: 存储桶名称
+    /// - Returns: 文件的公共访问URL字符串
+    ///
+    /// 说明：此方法用于在上传完成后清除缩略图缓存，不需要完整的 FileObject。
+    func generateBaseURL(for key: String, in bucketName: String) -> String? {
+        guard let account = currentAccount else {
+            return nil
+        }
+
+        if let publicDomain = account.defaultPublicDomain, !publicDomain.isEmpty {
+            let domain = publicDomain.hasPrefix("http") ? publicDomain : "https://\(publicDomain)"
+            return "\(domain)/\(key)"
+        } else {
+            return "https://\(account.accountID).r2.cloudflarestorage.com/\(bucketName)/\(key)"
+        }
+    }
+
+    /// 清除指定文件的缩略图缓存（用于上传覆盖后刷新）
+    /// - Parameters:
+    ///   - key: 文件的 object key（路径）
+    ///   - bucketName: 存储桶名称
+    ///
+    /// 说明：当文件被覆盖上传后，调用此方法清除旧的内存缓存。
+    /// 由于新文件会使用新的版本参数（基于修改时间），CDN 缓存会自动失效。
+    /// 这里主要清除内存中的旧缓存，确保下次加载时使用新 URL。
+    func invalidateThumbnailCache(for key: String, in bucketName: String) {
+        guard let baseURL = generateBaseURL(for: key, in: bucketName) else {
+            print("⚠️ 无法生成缓存清除 URL：\(key)")
+            return
+        }
+        ThumbnailCache.shared.invalidateCache(for: baseURL)
+    }
+
+    // MARK: - CDN Cache Purge
+
+    /// 清除指定 URL 的 CDN 缓存（通过 Cloudflare Purge Cache API）
+    /// - Parameter urls: 要清除缓存的 URL 列表
+    ///
+    /// 说明：当启用了自动清除 CDN 缓存且配置了 Zone ID 和 API Token 时，
+    /// 此方法会调用 Cloudflare API 主动清除 CDN 缓存，确保公开链接立即返回新内容。
+    /// 如果未配置或调用失败，会静默跳过，不影响上传流程。
+    @discardableResult
+    func purgeCDNCache(for urls: [String], force: Bool = false) async -> Bool {
+        guard let account = currentAccount else {
+            print("⚠️ [CDN Purge] 跳过：无当前账户")
+            return false
+        }
+
+        // 非强制模式下检查是否启用了自动清除
+        if !force {
+            guard account.autoPurgeCDNCache else {
+                print("⚠️ [CDN Purge] 跳过：未启用自动清除 CDN 缓存")
+                return false
+            }
+        }
+
+        // 检查 Zone ID
+        guard let zoneID = account.cloudflareZoneID, !zoneID.isEmpty else {
+            print("⚠️ [CDN Purge] 跳过：未配置 Cloudflare Zone ID")
+            return false
+        }
+
+        // 从 Keychain 获取 API Token
+        guard let apiToken = KeychainService.shared.retrieveCloudflareAPIToken(for: account),
+              !apiToken.isEmpty else {
+            print("⚠️ [CDN Purge] 跳过：未配置 Cloudflare API Token")
+            return false
+        }
+
+        // 构建请求
+        let endpoint = "https://api.cloudflare.com/client/v4/zones/\(zoneID)/purge_cache"
+        guard let url = URL(string: endpoint) else {
+            print("❌ [CDN Purge] 无效的 API 端点 URL")
+            return false
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(apiToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = ["files": urls]
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        } catch {
+            print("❌ [CDN Purge] JSON 序列化失败: \(error.localizedDescription)")
+            return false
+        }
+
+        // 发送请求
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ [CDN Purge] 无效的响应类型")
+                return false
+            }
+
+            if httpResponse.statusCode == 200 {
+                print("✅ [CDN Purge] 缓存已清除: \(urls)")
+                return true
+            } else {
+                // 尝试解析错误信息
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let errors = json["errors"] as? [[String: Any]] {
+                    let errorMessages = errors.compactMap { $0["message"] as? String }.joined(separator: ", ")
+                    print("❌ [CDN Purge] API 错误 (\(httpResponse.statusCode)): \(errorMessages)")
+                } else {
+                    print("❌ [CDN Purge] API 请求失败，状态码: \(httpResponse.statusCode)")
+                }
+                return false
+            }
+        } catch {
+            print("❌ [CDN Purge] 网络请求失败: \(error.localizedDescription)")
+            return false
+        }
+    }
+
+    /// 生成缩略图专用URL（带版本参数，用于绕过 CDN 缓存）
+    /// - Parameters:
+    ///   - fileObject: 文件对象
+    ///   - bucketName: 存储桶名称
+    /// - Returns: 带版本参数的缩略图URL字符串
+    ///
+    /// 说明：通过在 URL 后添加 `?v=时间戳` 参数，当文件被覆盖上传时，
+    /// CDN 会认为是不同的 URL，从而获取新内容而非返回旧缓存。
+    func generateThumbnailURL(for fileObject: FileObject, in bucketName: String) -> String? {
+        guard let baseURL = generateFileURL(for: fileObject, in: bucketName) else {
+            return nil
+        }
+
+        // 使用文件修改时间作为版本号
+        if let modDate = fileObject.lastModifiedDate {
+            let timestamp = Int(modDate.timeIntervalSince1970)
+            return "\(baseURL)?v=\(timestamp)"
+        }
+
+        // 如果没有修改时间，使用 ETag 作为版本号（去掉引号）
+        if let eTag = fileObject.eTag {
+            let cleanETag = eTag.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+            return "\(baseURL)?v=\(cleanETag)"
+        }
+
+        // 都没有时返回原 URL
+        return baseURL
     }
     
     // MARK: - Private Methods

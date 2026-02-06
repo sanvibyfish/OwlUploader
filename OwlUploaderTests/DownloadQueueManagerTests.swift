@@ -405,6 +405,115 @@ final class DownloadQueueManagerTests: XCTestCase {
         }
     }
 
+    // MARK: - Batch Download with Folders Tests
+
+    /// 模拟 batchDownloadSelectedFiles 中"文件+文件夹"混合选中的场景
+    func testAddDownloads_batchWithFolderContents_createsCorrectPaths() {
+        // Given - 模拟选中 1 个普通文件 + 1 个文件夹（含 2 个子文件）
+        let manager = DownloadQueueManager()
+        let destinationFolder = URL(fileURLWithPath: "/tmp/downloads")
+
+        // 构建与 batchDownloadSelectedFiles 相同格式的下载列表
+        var allDownloadFiles: [(key: String, name: String, size: Int64)] = []
+
+        // 普通文件：name = file.name
+        allDownloadFiles.append((key: "readme.md", name: "readme.md", size: 512))
+
+        // 文件夹 "photos/" 的子文件：name = folderName/relativePath
+        let folderName = "photos"
+        let folderFiles: [(key: String, relativePath: String, size: Int64)] = [
+            (key: "photos/cat.jpg", relativePath: "cat.jpg", size: 1024),
+            (key: "photos/sub/dog.png", relativePath: "sub/dog.png", size: 2048),
+        ]
+        for file in folderFiles {
+            allDownloadFiles.append((key: file.key, name: "\(folderName)/\(file.relativePath)", size: file.size))
+        }
+
+        // When
+        manager.addDownloads(allDownloadFiles, to: destinationFolder)
+
+        // Then
+        XCTAssertEqual(manager.tasks.count, 3)
+
+        let readmeTask = manager.tasks.first { $0.fileKey == "readme.md" }
+        XCTAssertEqual(readmeTask?.localURL.path, "/tmp/downloads/readme.md")
+
+        let catTask = manager.tasks.first { $0.fileKey == "photos/cat.jpg" }
+        XCTAssertEqual(catTask?.localURL.path, "/tmp/downloads/photos/cat.jpg")
+
+        let dogTask = manager.tasks.first { $0.fileKey == "photos/sub/dog.png" }
+        XCTAssertEqual(dogTask?.localURL.path, "/tmp/downloads/photos/sub/dog.png")
+    }
+
+    /// 模拟只选中文件夹（无普通文件）的场景
+    func testAddDownloads_onlyFolderContents_createsCorrectPaths() {
+        // Given - 模拟选中 2 个文件夹
+        let manager = DownloadQueueManager()
+        let destinationFolder = URL(fileURLWithPath: "/tmp/downloads")
+
+        var allDownloadFiles: [(key: String, name: String, size: Int64)] = []
+
+        // 文件夹 "docs/" 的子文件
+        allDownloadFiles.append((key: "docs/guide.pdf", name: "docs/guide.pdf", size: 4096))
+
+        // 文件夹 "assets/" 的子文件（含嵌套）
+        allDownloadFiles.append((key: "assets/css/style.css", name: "assets/css/style.css", size: 256))
+        allDownloadFiles.append((key: "assets/img/logo.png", name: "assets/img/logo.png", size: 8192))
+
+        // When
+        manager.addDownloads(allDownloadFiles, to: destinationFolder)
+
+        // Then
+        XCTAssertEqual(manager.tasks.count, 3)
+
+        let guideTask = manager.tasks.first { $0.fileKey == "docs/guide.pdf" }
+        XCTAssertEqual(guideTask?.localURL.path, "/tmp/downloads/docs/guide.pdf")
+
+        let cssTask = manager.tasks.first { $0.fileKey == "assets/css/style.css" }
+        XCTAssertEqual(cssTask?.localURL.path, "/tmp/downloads/assets/css/style.css")
+
+        let logoTask = manager.tasks.first { $0.fileKey == "assets/img/logo.png" }
+        XCTAssertEqual(logoTask?.localURL.path, "/tmp/downloads/assets/img/logo.png")
+    }
+
+    /// 模拟选中空文件夹（递归列出 0 个文件）时列表为空的场景
+    func testAddDownloads_emptyList_createsNoTasks() {
+        // Given - 空下载列表（模拟所有选中文件夹为空）
+        let manager = DownloadQueueManager()
+        let destinationFolder = URL(fileURLWithPath: "/tmp/downloads")
+        let emptyFiles: [(key: String, name: String, size: Int64)] = []
+
+        // When
+        manager.addDownloads(emptyFiles, to: destinationFolder)
+
+        // Then
+        XCTAssertTrue(manager.tasks.isEmpty)
+    }
+
+    /// 验证文件夹名末尾 / 已去除后的路径正确性
+    func testAddDownloads_folderNameWithoutTrailingSlash_correctPath() {
+        // Given - 模拟 batchDownloadSelectedFiles 中 folderName 去掉末尾 / 的逻辑
+        let manager = DownloadQueueManager()
+        let destinationFolder = URL(fileURLWithPath: "/tmp/downloads")
+
+        // folder.name = "backup/"，去掉末尾 / 后为 "backup"
+        let rawFolderName = "backup/"
+        let folderName = rawFolderName.hasSuffix("/") ? String(rawFolderName.dropLast()) : rawFolderName
+
+        let files: [(key: String, name: String, size: Int64)] = [
+            (key: "data/backup/db.sql", name: "\(folderName)/db.sql", size: 10240),
+        ]
+
+        // When
+        manager.addDownloads(files, to: destinationFolder)
+
+        // Then - 路径中不应出现双斜杠或末尾斜杠异常
+        XCTAssertEqual(manager.tasks.count, 1)
+        XCTAssertEqual(manager.tasks.first?.localURL.path, "/tmp/downloads/backup/db.sql")
+        XCTAssertFalse(manager.tasks.first?.localURL.path.contains("//") ?? true,
+                       "路径中不应包含双斜杠")
+    }
+
     // MARK: - Helper Methods
 
     private func createTestTask(

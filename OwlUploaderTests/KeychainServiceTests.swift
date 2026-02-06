@@ -346,6 +346,130 @@ final class KeychainServiceTests: XCTestCase {
         XCTAssertNotEqual(error1, error3)
     }
 
+    // MARK: - Cloudflare API Token Tests (v1.0.1)
+
+    func testStoreCloudflareAPIToken_savesForAccount() async throws {
+        // Given
+        let account = createTestR2Account()
+        let apiToken = "cf-test-api-token-12345"
+
+        // When
+        try await storeCloudflareAPITokenOnBackground(apiToken, for: account)
+
+        // Then
+        let retrieved = retrieveCloudflareAPITokenOnBackground(for: account)
+        XCTAssertEqual(retrieved, apiToken)
+
+        // Cleanup
+        try? await deleteCloudflareAPITokenOnBackground(for: account)
+    }
+
+    func testRetrieveCloudflareAPIToken_returnsNilWhenNotExists() async {
+        // Given
+        let account = createTestR2Account()
+
+        // When
+        let retrieved = retrieveCloudflareAPITokenOnBackground(for: account)
+
+        // Then
+        XCTAssertNil(retrieved)
+    }
+
+    func testUpdateCloudflareAPIToken_updatesExisting() async throws {
+        // Given
+        let account = createTestR2Account()
+        try await storeCloudflareAPITokenOnBackground("original-token", for: account)
+
+        // When
+        try await updateCloudflareAPITokenOnBackground("updated-token", for: account)
+
+        // Then
+        let retrieved = retrieveCloudflareAPITokenOnBackground(for: account)
+        XCTAssertEqual(retrieved, "updated-token")
+
+        // Cleanup
+        try? await deleteCloudflareAPITokenOnBackground(for: account)
+    }
+
+    func testUpdateCloudflareAPIToken_createsWhenNotExists() async throws {
+        // Given
+        let account = createTestR2Account()
+
+        // When — updateCloudflareAPIToken 应该在不存在时自动 store
+        try await updateCloudflareAPITokenOnBackground("new-token", for: account)
+
+        // Then
+        let retrieved = retrieveCloudflareAPITokenOnBackground(for: account)
+        XCTAssertEqual(retrieved, "new-token")
+
+        // Cleanup
+        try? await deleteCloudflareAPITokenOnBackground(for: account)
+    }
+
+    func testDeleteCloudflareAPIToken_removesToken() async throws {
+        // Given
+        let account = createTestR2Account()
+        try await storeCloudflareAPITokenOnBackground("to-delete", for: account)
+        let hasBefore = await hasCloudflareAPITokenOnBackground(for: account)
+        XCTAssertTrue(hasBefore)
+
+        // When
+        try await deleteCloudflareAPITokenOnBackground(for: account)
+
+        // Then
+        let hasAfter = await hasCloudflareAPITokenOnBackground(for: account)
+        XCTAssertFalse(hasAfter)
+    }
+
+    func testHasCloudflareAPIToken_returnsTrueWhenExists() async throws {
+        // Given
+        let account = createTestR2Account()
+        try await storeCloudflareAPITokenOnBackground("exists", for: account)
+
+        // When
+        let has = await hasCloudflareAPITokenOnBackground(for: account)
+
+        // Then
+        XCTAssertTrue(has)
+
+        // Cleanup
+        try? await deleteCloudflareAPITokenOnBackground(for: account)
+    }
+
+    func testHasCloudflareAPIToken_returnsFalseWhenNotExists() async {
+        // Given
+        let account = createTestR2Account()
+
+        // When
+        let has = await hasCloudflareAPITokenOnBackground(for: account)
+
+        // Then
+        XCTAssertFalse(has)
+    }
+
+    func testCloudflareAPIToken_isolatedFromSecretAccessKey() async throws {
+        // Given — 同一个账户存储两种不同的凭据
+        let account = createTestR2Account()
+        let secretKey = "my-secret-access-key"
+        let apiToken = "my-cloudflare-api-token"
+
+        // When
+        try await storeSecretAccessKeyOnBackground(secretKey, for: account)
+        try await storeCloudflareAPITokenOnBackground(apiToken, for: account)
+
+        // Then — 两种凭据互不影响
+        let retrievedSecret = try await retrieveSecretAccessKeyOnBackground(for: account)
+        let retrievedToken = retrieveCloudflareAPITokenOnBackground(for: account)
+
+        XCTAssertEqual(retrievedSecret, secretKey)
+        XCTAssertEqual(retrievedToken, apiToken)
+        XCTAssertNotEqual(retrievedSecret, retrievedToken)
+
+        // Cleanup
+        try? await deleteSecretAccessKeyOnBackground(for: account)
+        try? await deleteCloudflareAPITokenOnBackground(for: account)
+    }
+
     // MARK: - Helper Methods
 
     private func createTestR2Account() -> R2Account {
@@ -426,6 +550,36 @@ final class KeychainServiceTests: XCTestCase {
     private func hasSecretAccessKeyOnBackground(for account: R2Account) async -> Bool {
         await Task.detached(priority: .background) {
             self.keychainService.hasSecretAccessKey(for: account)
+        }.value
+    }
+
+    // MARK: - Cloudflare API Token Background Helpers
+
+    private func storeCloudflareAPITokenOnBackground(_ token: String, for account: R2Account) async throws {
+        try await Task.detached(priority: .background) {
+            try self.keychainService.storeCloudflareAPIToken(token, for: account)
+        }.value
+    }
+
+    private func retrieveCloudflareAPITokenOnBackground(for account: R2Account) -> String? {
+        keychainService.retrieveCloudflareAPIToken(for: account)
+    }
+
+    private func updateCloudflareAPITokenOnBackground(_ token: String, for account: R2Account) async throws {
+        try await Task.detached(priority: .background) {
+            try self.keychainService.updateCloudflareAPIToken(token, for: account)
+        }.value
+    }
+
+    private func deleteCloudflareAPITokenOnBackground(for account: R2Account) async throws {
+        try await Task.detached(priority: .background) {
+            try self.keychainService.deleteCloudflareAPIToken(for: account)
+        }.value
+    }
+
+    private func hasCloudflareAPITokenOnBackground(for account: R2Account) async -> Bool {
+        await Task.detached(priority: .background) {
+            self.keychainService.hasCloudflareAPIToken(for: account)
         }.value
     }
 }

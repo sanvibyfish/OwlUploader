@@ -403,13 +403,128 @@ AsyncThumbnailView(urlString: url, size: 64) {
 | `PathBar.swift` | 路径导航栏 |
 | `FileGridView.swift` | 图标网格视图 |
 | `FileGridItemView.swift` | 网格项组件 |
-| `FileTableView.swift` | 表格视图 |
+| `FileTableView.swift` | 表格视图（支持列头排序） |
 
 ---
 
-## 12. 快捷键
+## 12. 表格视图排序 (Table Column Sorting)
 
-### 12.1 导航快捷键
+### 12.1 功能概述
+
+表格视图 (`FileTableView`) 支持点击列头进行排序，提供直观的多列排序体验。用户可以点击任意列头切换升序/降序排序。
+
+### 12.2 支持的排序列
+
+| 列名 | 排序字段 | 说明 |
+|------|---------|------|
+| **名称** | `name` | 按文件名字母顺序排序 |
+| **修改日期** | `sortableDate` | 按最后修改时间排序 |
+| **大小** | `sortableSize` | 按文件大小排序（文件夹视为 0） |
+| **类型** | `sortableKind` | 按文件类型排序（文件夹优先，然后按扩展名） |
+
+### 12.3 实现架构
+
+#### 计算型 Binding 模式
+
+排序实现采用 **计算型 Binding** 模式，避免了传统的三态循环同步问题。核心思想是：
+
+- 使用 `@Binding var sortOrder: FileSortOrder` 和 `@Binding var sortAscending: Bool` 存储排序状态
+- 通过计算型 Binding 实时转换为 `Table` 所需的 `[KeyPathComparator<FileObject>]`
+- 列头点击时，SwiftUI 自动更新 Binding，无需手动同步
+
+```swift
+private var sortComparatorBinding: Binding<[KeyPathComparator<FileObject>]> {
+    Binding(
+        get: { Self.comparators(from: sortOrder, ascending: sortAscending) },
+        set: { newValue in
+            let (order, ascending) = Self.sortOrder(from: newValue)
+            sortOrder = order
+            sortAscending = ascending
+        }
+    )
+}
+```
+
+#### 双向映射逻辑
+
+| 方法 | 功能 | 参数 | 返回值 |
+|------|------|------|--------|
+| `comparators(from:ascending:)` | 正向映射 | `FileSortOrder + Bool` | `[KeyPathComparator<FileObject>]` |
+| `sortOrder(from:)` | 反向映射 | `[KeyPathComparator<FileObject>]` | `(FileSortOrder, Bool)` |
+
+**正向映射示例**:
+```swift
+// .name + true → [KeyPathComparator(\.name, order: .forward)]
+// .size + false → [KeyPathComparator(\.sortableSize, order: .reverse)]
+```
+
+**反向映射示例**:
+```swift
+// 通过 KeyPath 字符串匹配识别排序字段
+// "sortableSize" → .size
+// "sortableDate" → .dateModified
+// "sortableKind" → .kind
+// 其他 → .name（默认）
+```
+
+### 12.4 测试覆盖
+
+排序逻辑通过 **18 个单元测试** 完全覆盖（`FileTableSortTests.swift`）：
+
+| 测试类型 | 测试数量 | 覆盖范围 |
+|---------|:--------:|----------|
+| 正向映射测试 | 6 | 所有 `FileSortOrder` × 升降序组合 |
+| 反向映射测试 | 5 | 从 `KeyPathComparator` 还原排序状态 |
+| 双向一致性测试 | 1 | 验证 `A → B → A` 映射一致性 |
+| 功能排序测试 | 6 | 验证实际排序结果正确性 |
+
+测试示例：
+```swift
+func testRoundTrip_allCases() {
+    // 验证每种排序 + 方向组合经过 comparators → sortOrder 后还原
+    for sortCase in FileSortOrder.allCases {
+        for ascending in [true, false] {
+            let comparators = FileTableView.comparators(from: sortCase, ascending: ascending)
+            let (resultOrder, resultAscending) = FileTableView.sortOrder(from: comparators)
+
+            XCTAssertEqual(resultOrder, sortCase)
+            XCTAssertEqual(resultAscending, ascending)
+        }
+    }
+}
+```
+
+### 12.5 技术优势
+
+| 优势 | 说明 |
+|------|------|
+| **无循环依赖** | 不使用 `onChange` 监听器，避免状态同步死循环 |
+| **单向数据流** | 状态变化路径清晰：用户点击 → SwiftUI 更新 Binding → 计算新值 |
+| **可测试性高** | 映射逻辑为静态纯函数，易于单元测试 |
+| **性能优化** | 计算型 Binding 按需求值，无冗余计算 |
+
+### 12.6 Bug 修复历史
+
+**问题**: 在 v1.0.0 及之前版本，列头点击排序时存在状态同步问题：
+- 使用 `@State sortComparators` + `@Binding sortOrder` + `@Binding sortAscending` 三方同步
+- 三个 `onChange` 监听器形成循环依赖，导致排序状态被旧值覆盖
+- 用户点击列头后，排序瞬间生效但立即被还原
+
+**修复方案** (v1.0.1):
+1. 移除 `@State sortComparators` 状态变量
+2. 移除所有 `onChange` 监听器
+3. 使用计算型 Binding 实现双向映射
+4. 添加 18 个单元测试验证映射正确性
+
+**相关文件**:
+- `OwlUploader/Views/FileTableView.swift` - 实现
+- `OwlUploaderTests/FileTableSortTests.swift` - 单元测试
+
+---
+
+## 13. 快捷键
+
+### 13.1 导航快捷键
 
 | 快捷键 | 功能 |
 |--------|------|
@@ -419,7 +534,7 @@ AsyncThumbnailView(urlString: url, size: 64) {
 | `Cmd+R` | 刷新列表 |
 | `Cmd+F` | 聚焦搜索框 |
 
-### 12.2 视图快捷键
+### 13.2 视图快捷键
 
 | 快捷键 | 功能 |
 |--------|------|
@@ -428,7 +543,7 @@ AsyncThumbnailView(urlString: url, size: 64) {
 | `Cmd++` | 放大图标 |
 | `Cmd+-` | 缩小图标 |
 
-### 12.3 选择快捷键
+### 13.3 选择快捷键
 
 | 快捷键 | 功能 |
 |--------|------|
@@ -439,7 +554,7 @@ AsyncThumbnailView(urlString: url, size: 64) {
 
 ---
 
-## 13. 深色模式
+## 14. 深色模式
 
 所有颜色使用 `NSColor` 系统语义颜色，自动适配深色模式：
 
@@ -460,6 +575,7 @@ AsyncThumbnailView(urlString: url, size: 64) {
 
 ---
 
-**文档版本**: 1.0
+**文档版本**: 1.1
 **创建日期**: 2026-01-02
+**最后更新**: 2026-02-06 (新增表格视图排序技术文档)
 **维护者**: OwlUploader Team

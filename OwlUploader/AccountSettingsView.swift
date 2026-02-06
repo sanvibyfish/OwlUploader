@@ -388,6 +388,9 @@ struct EditAccountSheet: View {
     @State private var publicDomains: [String] = []
     @State private var newDomain: String = ""
     @State private var defaultDomainIndex: Int = 0
+    @State private var autoPurgeCDNCache: Bool = false
+    @State private var cloudflareZoneID: String = ""
+    @State private var cloudflareAPIToken: String = ""
     @State private var isSaving: Bool = false
     @State private var saveError: String?
 
@@ -465,6 +468,21 @@ struct EditAccountSheet: View {
                     Text(L.Account.Domain.hint)
                 }
 
+                // CDN 缓存设置（可选）
+                Section {
+                    Toggle(L.Account.CDN.autoPurge, isOn: $autoPurgeCDNCache)
+
+                    if autoPurgeCDNCache {
+                        TextField(L.Account.CDN.zoneID, text: $cloudflareZoneID)
+                            .textContentType(.none)
+                        SecureField(L.Account.CDN.apiToken, text: $cloudflareAPIToken)
+                    }
+                } header: {
+                    Text(L.Account.CDN.title)
+                } footer: {
+                    Text(L.Account.CDN.hint)
+                }
+
                 if let error = saveError {
                     Section {
                         Label(error, systemImage: "exclamationmark.triangle")
@@ -503,7 +521,7 @@ struct EditAccountSheet: View {
             }
             .padding()
         }
-        .frame(width: 450, height: 480)
+        .frame(width: 450, height: 560)
         .onAppear {
             accountID = account.accountID
             accessKeyID = account.accessKeyID
@@ -512,9 +530,18 @@ struct EditAccountSheet: View {
             publicDomains = account.publicDomains
             defaultDomainIndex = account.defaultPublicDomainIndex
 
+            // CDN 缓存配置
+            autoPurgeCDNCache = account.autoPurgeCDNCache
+            cloudflareZoneID = account.cloudflareZoneID ?? ""
+
             // 从 Keychain 加载 Secret Access Key
             if let credentials = try? accountManager.getCompleteCredentials(for: account) {
                 secretAccessKey = credentials.secretAccessKey
+            }
+
+            // 从 Keychain 加载 Cloudflare API Token
+            if let token = KeychainService.shared.retrieveCloudflareAPIToken(for: account) {
+                cloudflareAPIToken = token
             }
         }
     }
@@ -537,6 +564,8 @@ struct EditAccountSheet: View {
         let trimmedSecretKey = secretAccessKey.trimmingCharacters(in: .whitespaces)
         let trimmedDisplayName = displayName.trimmingCharacters(in: .whitespaces)
         let trimmedEndpoint = endpointURL.trimmingCharacters(in: .whitespaces)
+        let trimmedZoneID = cloudflareZoneID.trimmingCharacters(in: .whitespaces)
+        let trimmedAPIToken = cloudflareAPIToken.trimmingCharacters(in: .whitespaces)
 
         let updatedAccount = account.updated(
             accountID: trimmedAccountID,
@@ -544,7 +573,9 @@ struct EditAccountSheet: View {
             endpointURL: trimmedEndpoint.isEmpty ? nil : trimmedEndpoint,
             displayName: trimmedDisplayName.isEmpty ? nil : trimmedDisplayName,
             publicDomains: publicDomains,
-            defaultPublicDomainIndex: defaultDomainIndex
+            defaultPublicDomainIndex: defaultDomainIndex,
+            cloudflareZoneID: trimmedZoneID.isEmpty ? nil : trimmedZoneID,
+            autoPurgeCDNCache: autoPurgeCDNCache
         )
 
         Task {
@@ -553,6 +584,13 @@ struct EditAccountSheet: View {
                     try accountManager.updateAccount(updatedAccount, secretAccessKey: trimmedSecretKey)
                 } else {
                     try accountManager.updateAccount(updatedAccount)
+                }
+
+                // 保存或删除 Cloudflare API Token
+                if !trimmedAPIToken.isEmpty {
+                    try KeychainService.shared.updateCloudflareAPIToken(trimmedAPIToken, for: updatedAccount)
+                } else {
+                    try? KeychainService.shared.deleteCloudflareAPIToken(for: updatedAccount)
                 }
 
                 if accountManager.currentAccount?.id == account.id && !trimmedSecretKey.isEmpty {

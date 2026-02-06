@@ -263,6 +263,20 @@ class DownloadQueueManager: ObservableObject, TaskQueueManagerProtocol {
             return
         }
 
+        // 防御性检查：如果 localURL 已作为目录存在，跳过下载（避免目录占位符冲突）
+        var isDirectory: ObjCBool = false
+        if FileManager.default.fileExists(atPath: task.localURL.path, isDirectory: &isDirectory), isDirectory.boolValue {
+            print("⚠️ [Download] 跳过目录占位符: \(task.fileName)（路径已是目录）")
+            await MainActor.run {
+                if let idx = tasks.firstIndex(where: { $0.id == taskId }) {
+                    tasks[idx].status = .completed
+                }
+                activeDownloadCount -= 1
+                activeTasks[taskId] = nil
+            }
+            return
+        }
+
         do {
             // 使用分段下载
             try await r2Service.downloadObjectChunked(

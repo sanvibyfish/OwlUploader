@@ -92,9 +92,17 @@ struct FileListView: View {
     
     /// 拖拽目标状态
     @State private var isTargeted: Bool = false
-    
+
     /// 上次成功加载的路径（用于空状态显示，防止导航时闪烁）
     @State private var lastLoadedPrefix: String = ""
+
+    // MARK: - 上传冲突状态
+
+    /// 当前检测到的上传冲突（使用 item 方式显示 sheet，确保数据传递正确）
+    @State private var uploadConflictData: UploadConflictData?
+
+    /// 冲突处理回调（用户选择后调用）
+    @State private var conflictResolutionHandler: (([UUID: ConflictAction]) -> Void)?
 
     /// 文件来源枚举
     private enum FileSource {
@@ -148,6 +156,11 @@ struct FileListView: View {
             moveQueueManager.onQueueComplete = {
                 loadFileList()
             }
+            // 设置上传冲突检测回调
+            uploadQueueManager.onConflictsDetected = { conflicts, handler in
+                conflictResolutionHandler = handler
+                uploadConflictData = UploadConflictData(conflicts: conflicts)
+            }
         }
         .onChange(of: r2Service.selectedBucket) { _ in
             currentPrefix = ""
@@ -183,6 +196,17 @@ struct FileListView: View {
         )
         .sheet(isPresented: $showingDiagnostics) {
             DiagnosticsView(r2Service: r2Service)
+        }
+        // 上传冲突处理弹窗（使用 item 方式确保数据正确传递）
+        .sheet(item: $uploadConflictData) { data in
+            UploadConflictSheet(
+                conflicts: data.conflicts,
+                onResolution: { resolutions in
+                    uploadConflictData = nil
+                    conflictResolutionHandler?(resolutions)
+                    conflictResolutionHandler = nil
+                }
+            )
         }
         // 删除确认对话框（支持单文件和多文件）
         .alert(L.Alert.Delete.title, isPresented: $showingDeleteConfirmation) {
@@ -754,6 +778,9 @@ struct FileListView: View {
                         print("📝 [Rename] Triggered for file: \(file.name)")
                         fileToRename = file
                     },
+                    onPurgeCDNCache: { file in
+                        handlePurgeCDNCache(file: file)
+                    },
                     currentFolders: filteredFiles.filter { $0.isDirectory },
                     currentPrefix: currentPrefix
                 )
@@ -792,6 +819,9 @@ struct FileListView: View {
                     onRename: { file in
                         print("📝 [Rename] Triggered for file: \(file.name)")
                         fileToRename = file
+                    },
+                    onPurgeCDNCache: { file in
+                        handlePurgeCDNCache(file: file)
                     },
                     currentFolders: filteredFiles.filter { $0.isDirectory },
                     currentPrefix: currentPrefix
@@ -1157,12 +1187,16 @@ struct FileListView: View {
     /// 批量下载选中的文件
     private func batchDownloadSelectedFiles() {
         let selectedKeys = selectionManager.getSelectedKeys()
-        let selectedFiles = fileObjects.filter { selectedKeys.contains($0.key) && !$0.isDirectory }
+        let selectedItems = fileObjects.filter { selectedKeys.contains($0.key) }
 
-        guard !selectedFiles.isEmpty else {
+        guard !selectedItems.isEmpty else {
             messageManager.showWarning(L.Message.Warning.noFilesSelected, description: L.Message.Warning.selectFilesToDownload)
             return
         }
+
+        // 分离普通文件和文件夹
+        let selectedFiles = selectedItems.filter { !$0.isDirectory }
+        let selectedFolders = selectedItems.filter { $0.isDirectory }
 
         // 选择保存目录
         let openPanel = NSOpenPanel()
@@ -1176,6 +1210,52 @@ struct FileListView: View {
 
             Task { @MainActor in
                 guard let bucket = r2Service.selectedBucket else { return }
+
+                // 构建下载任务列表：先加入普通文件
+                var allDownloadFiles: [(key: String, name: String, size: Int64)] = selectedFiles.map { file in
+                    (key: file.key, name: file.name, size: file.size ?? 0)
+                }
+
+                // 对选中的文件夹递归获取子文件
+                if !selectedFolders.isEmpty {
+                    self.messageManager.showInfo(
+                        L.Message.Info.scanningFolders,
+                        description: L.Message.Info.scanningFoldersDescription(selectedFolders.count)
+                    )
+
+                    for folder in selectedFolders {
+                        do {
+                            let files = try await self.r2Service.listAllFilesInFolder(
+                                bucket: bucket.name,
+                                folderPrefix: folder.key
+                            )
+
+                            // 文件夹名去除末尾 /
+                            let folderName = folder.name.hasSuffix("/")
+                                ? String(folder.name.dropLast())
+                                : folder.name
+
+                            // 使用 folderName/relativePath 保持目录结构
+                            let folderFiles: [(key: String, name: String, size: Int64)] = files.map { file in
+                                (key: file.key, name: "\(folderName)/\(file.relativePath)", size: file.size)
+                            }
+                            allDownloadFiles.append(contentsOf: folderFiles)
+                        } catch {
+                            self.messageManager.showError(
+                                L.Message.BatchDownload.scanFolderFailed,
+                                description: L.Message.BatchDownload.scanFolderFailedDescription(folder.name, error.localizedDescription)
+                            )
+                        }
+                    }
+                }
+
+                guard !allDownloadFiles.isEmpty else {
+                    self.messageManager.showWarning(
+                        L.Message.Warning.noFilesSelected,
+                        description: L.Message.BatchDownload.selectedFoldersEmpty
+                    )
+                    return
+                }
 
                 // 配置下载队列管理器
                 downloadQueueManager.configure(r2Service: r2Service, bucketName: bucket.name)
@@ -1198,13 +1278,8 @@ struct FileListView: View {
                     }
                 }
 
-                // 构建下载任务列表
-                let downloadFiles: [(key: String, name: String, size: Int64)] = selectedFiles.map { file in
-                    (key: file.key, name: file.name, size: file.size ?? 0)
-                }
-
                 // 添加到下载队列
-                downloadQueueManager.addDownloads(downloadFiles, to: folderURL)
+                downloadQueueManager.addDownloads(allDownloadFiles, to: folderURL)
             }
         }
     }
@@ -1602,6 +1677,55 @@ struct FileListView: View {
     }
 
     // MARK: - 移动文件
+
+    /// 处理刷新 CDN 缓存
+    /// 如果文件是多选的一部分，则刷新所有选中文件的缓存
+    private func handlePurgeCDNCache(file: FileObject) {
+        guard let bucket = r2Service.selectedBucket else {
+            messageManager.showError(L.Message.Error.noBucketSelected)
+            return
+        }
+
+        let selectedKeys = selectionManager.getSelectedKeys()
+        let filesToPurge: [FileObject]
+
+        if selectedKeys.contains(file.key) && selectedKeys.count > 1 {
+            filesToPurge = fileObjects.filter { selectedKeys.contains($0.key) && !$0.isDirectory }
+        } else {
+            filesToPurge = file.isDirectory ? [] : [file]
+        }
+
+        guard !filesToPurge.isEmpty else {
+            messageManager.showInfo(L.Message.Info.noFilesToPurge)
+            return
+        }
+
+        // 收集所有需要清除缓存的 URL
+        let urls = filesToPurge.compactMap { r2Service.generateBaseURL(for: $0.key, in: bucket.name) }
+
+        guard !urls.isEmpty else {
+            messageManager.showError(L.Message.Error.noPublicDomain)
+            return
+        }
+
+        // 调用 CDN 缓存清除 API（手动触发使用 force 模式，绕过自动清除开关）
+        Task {
+            let success = await r2Service.purgeCDNCache(for: urls, force: true)
+            await MainActor.run {
+                if success {
+                    messageManager.showSuccess(
+                        L.Message.Success.cdnCachePurged,
+                        description: L.Message.Success.cdnCachePurgedDescription(filesToPurge.count)
+                    )
+                } else {
+                    messageManager.showError(
+                        L.Message.Error.cdnPurgeFailed,
+                        description: L.Message.Error.cdnPurgeFailedDescription
+                    )
+                }
+            }
+        }
+    }
 
     /// 处理右键菜单移动文件到指定路径
     /// 如果文件是多选的一部分，则移动所有选中的文件
