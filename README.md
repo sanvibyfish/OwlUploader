@@ -10,8 +10,8 @@
 </p>
 
 <p align="center">
-  <a href="https://apps.apple.com/cn/app/owluploader/id6746383161?l=en-GB&mt=12">
-    <img src="https://developer.apple.com/assets/elements/badges/download-on-the-mac-app-store.svg" alt="Download on the Mac App Store" height="48">
+  <a href="https://github.com/sanvibyfish/OwlUploader/releases/latest">
+    <img src="https://img.shields.io/github/v/release/sanvibyfish/OwlUploader?style=for-the-badge&logo=github&label=Download" alt="Download Latest Release" height="32">
   </a>
 </p>
 
