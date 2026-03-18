@@ -16,10 +16,20 @@
 </p>
 
 <p align="center">
+  <a href="#功能特性">功能</a> &bull;
+  <a href="#截图">截图</a> &bull;
+  <a href="#从源码构建">构建</a> &bull;
   <a href="README.md">English</a>
 </p>
 
 ---
+
+## 截图
+
+### 文件浏览
+Finder 风格表格视图，多账户侧边栏，列排序，面包屑导航。
+
+![文件浏览](docs/screenshots/main.png)
 
 ## 功能特性
 

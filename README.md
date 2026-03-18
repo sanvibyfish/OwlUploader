@@ -16,10 +16,20 @@
 </p>
 
 <p align="center">
+  <a href="#features">Features</a> &bull;
+  <a href="#screenshots">Screenshots</a> &bull;
+  <a href="#build-from-source">Building</a> &bull;
   <a href="README_ZH.md">中文文档</a>
 </p>
 
 ---
+
+## Screenshots
+
+### File Browser
+Finder-style table view with multi-account sidebar, column sorting, and breadcrumb navigation.
+
+![File Browser](docs/screenshots/main.png)
 
 ## Features
 
