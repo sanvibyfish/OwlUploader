@@ -51,6 +51,9 @@ struct FilePreviewView: View {
     
     /// 本地临时文件 URL
     @State private var localFileURL: URL?
+
+    /// 媒体播放器（音频/视频共用，存入 @State 避免重复创建导致 crash）
+    @State private var player: AVPlayer?
     
     /// 当前文件索引
     private var currentIndex: Int? {
@@ -219,13 +222,7 @@ struct FilePreviewView: View {
             
             // 复制链接按钮
             if !fileObject.isDirectory {
-                Button(action: copyFileURL) {
-                    Image(systemName: "link")
-                        .font(.system(size: 18))
-                        .foregroundColor(Color(nsColor: .controlAccentColor))
-                }
-                .buttonStyle(.plain)
-                .help(L.Help.copyLink)
+                copyLinkButton
             }
             
             // 删除按钮
@@ -345,8 +342,8 @@ struct FilePreviewView: View {
     /// 视频预览
     private var videoPreview: some View {
         Group {
-            if let url = localFileURL {
-                VideoPlayer(player: AVPlayer(url: url))
+            if let player = player {
+                VideoPlayer(player: player)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(40)
             } else {
@@ -361,16 +358,16 @@ struct FilePreviewView: View {
             Image(systemName: "music.note.list")
                 .font(.system(size: 72))
                 .foregroundColor(Color(nsColor: .secondaryLabelColor))
-            
+
             Text(fileObject.name)
                 .font(.system(size: 16, weight: .medium))
                 .foregroundColor(Color(nsColor: .labelColor))
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
-            
-            if let url = localFileURL {
-                VideoPlayer(player: AVPlayer(url: url))
+
+            if let player = player {
+                VideoPlayer(player: player)
                     .frame(height: 60)
                     .frame(maxWidth: 400)
             }
@@ -519,19 +516,51 @@ struct FilePreviewView: View {
         }
     }
     
-    /// 复制文件URL
-    private func copyFileURL() {
-        guard let fileURL = r2Service.generateFileURL(for: fileObject, in: bucketName) else {
-            return
+    /// 复制链接按钮：单域名直接复制，多域名弹出菜单选择
+    @ViewBuilder
+    private var copyLinkButton: some View {
+        let domains = r2Service.publicDomains
+        if domains.count > 1 {
+            Menu {
+                ForEach(domains, id: \.self) { domain in
+                    Button(action: {
+                        let url = r2Service.generateFileURL(for: fileObject, in: bucketName, domain: domain)
+                        copyToClipboard(url)
+                    }) {
+                        Text(domain)
+                    }
+                }
+            } label: {
+                Image(systemName: "link")
+                    .font(.system(size: 18))
+                    .foregroundColor(Color(nsColor: .controlAccentColor))
+            }
+            .menuStyle(.borderlessButton)
+            .help(L.Help.copyLink)
+        } else {
+            Button(action: {
+                guard let url = r2Service.generateFileURL(for: fileObject, in: bucketName) else { return }
+                copyToClipboard(url)
+            }) {
+                Image(systemName: "link")
+                    .font(.system(size: 18))
+                    .foregroundColor(Color(nsColor: .controlAccentColor))
+            }
+            .buttonStyle(.plain)
+            .help(L.Help.copyLink)
         }
-        
+    }
+
+    private func copyToClipboard(_ text: String) {
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(fileURL, forType: .string)
+        NSPasteboard.general.setString(text, forType: .string)
         messageManager?.showSuccess(L.Message.Success.linkCopied, description: L.Message.Success.linkCopiedDescription)
     }
     
     /// 重置状态
     private func resetState() {
+        player?.pause()
+        player = nil
         previewData = nil
         localFileURL = nil
         isLoading = true
@@ -540,6 +569,8 @@ struct FilePreviewView: View {
     
     /// 清理临时文件
     private func cleanupTempFile() {
+        player?.pause()
+        player = nil
         if let url = localFileURL {
             try? FileManager.default.removeItem(at: url)
             localFileURL = nil
@@ -568,6 +599,9 @@ struct FilePreviewView: View {
                 await MainActor.run {
                     self.previewData = data
                     self.localFileURL = tempURL
+                    if self.fileType == .audio || self.fileType == .video {
+                        self.player = AVPlayer(url: tempURL)
+                    }
                     self.isLoading = false
                 }
                 

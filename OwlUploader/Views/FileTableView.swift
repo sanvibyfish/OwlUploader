@@ -167,9 +167,7 @@ struct FileTableView: View {
 
                 // 复制链接（仅文件显示）
                 if !file.isDirectory {
-                    Button(action: { copyFileURL(file) }) {
-                        Label(L.Files.ContextMenu.copyLink, systemImage: "link")
-                    }
+                    copyLinkMenu(for: file)
 
                     // 刷新 CDN 缓存
                     Button(action: { onPurgeCDNCache?(file) }) {
@@ -230,15 +228,39 @@ struct FileTableView: View {
         selectionManager.setSelection(selectedFiles)
     }
 
-    /// 复制文件 URL
-    private func copyFileURL(_ file: FileObject) {
-        guard let r2Service = r2Service,
-              let bucketName = bucketName else { return }
+    /// 复制链接菜单：单域名直接复制，多域名展开子菜单
+    @ViewBuilder
+    private func copyLinkMenu(for file: FileObject) -> some View {
+        let domains = r2Service?.publicDomains ?? []
+        if domains.count > 1, let r2Service = r2Service, let bucketName = bucketName {
+            Menu {
+                ForEach(domains, id: \.self) { domain in
+                    Button(action: {
+                        let url = r2Service.generateFileURL(for: file, in: bucketName, domain: domain)
+                        copyToClipboard(url)
+                    }) {
+                        Text(domain)
+                    }
+                }
+            } label: {
+                Label(L.Files.ContextMenu.copyLink, systemImage: "link")
+            }
+        } else {
+            Button(action: {
+                guard let r2Service = r2Service,
+                      let bucketName = bucketName,
+                      let url = r2Service.generateFileURL(for: file, in: bucketName) else { return }
+                copyToClipboard(url)
+            }) {
+                Label(L.Files.ContextMenu.copyLink, systemImage: "link")
+            }
+        }
+    }
 
-        guard let fileURL = r2Service.generateFileURL(for: file, in: bucketName) else { return }
-
+    /// 复制文本到剪贴板
+    private func copyToClipboard(_ text: String) {
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(fileURL, forType: .string)
+        NSPasteboard.general.setString(text, forType: .string)
         messageManager?.showSuccess(L.Message.Success.linkCopied, description: L.Message.Success.linkCopiedDescription)
     }
 

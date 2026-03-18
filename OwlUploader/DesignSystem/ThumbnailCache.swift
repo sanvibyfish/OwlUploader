@@ -34,6 +34,9 @@ class ThumbnailCache: ObservableObject {
     /// 内存缓存
     private let cache = NSCache<NSString, NSImage>()
 
+    /// 缓存版本号（递增时通知视图重新加载缩略图）
+    @Published var cacheVersion: Int = 0
+
     /// 加载任务管理器
     private let taskManager = LoadingTaskManager()
 
@@ -155,9 +158,10 @@ class ThumbnailCache: ObservableObject {
         return thumbnail
     }
 
-    /// 清空缓存
+    /// 清空缓存并通知视图刷新
     func clearCache() {
         cache.removeAllObjects()
+        cacheVersion += 1
     }
 
     /// 清除指定 URL 的缓存（所有尺寸）
@@ -185,6 +189,7 @@ struct AsyncThumbnailView: View {
     let size: CGFloat
     let placeholder: AnyView
 
+    @ObservedObject private var thumbnailCache = ThumbnailCache.shared
     @State private var thumbnail: NSImage?
     @State private var isLoading = false
 
@@ -207,7 +212,7 @@ struct AsyncThumbnailView: View {
                 placeholder
             }
         }
-        .task(id: urlString) {
+        .task(id: "\(urlString ?? "")_\(thumbnailCache.cacheVersion)") {
             await loadThumbnail()
         }
     }

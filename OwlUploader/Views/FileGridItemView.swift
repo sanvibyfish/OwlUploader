@@ -121,9 +121,7 @@ struct FileGridItemView: View {
 
         // 复制链接（仅文件显示）
         if !fileObject.isDirectory {
-            Button(action: copyFileURL) {
-                Label(L.Files.ContextMenu.copyLink, systemImage: "link")
-            }
+            copyLinkMenu
 
             // 刷新 CDN 缓存
             Button(action: { onPurgeCDNCache?(fileObject) }) {
@@ -276,14 +274,38 @@ struct FileGridItemView: View {
         }
     }
 
-    private func copyFileURL() {
-        guard let r2Service = r2Service,
-              let bucketName = bucketName else { return }
+    /// 复制链接菜单：单域名直接复制，多域名展开子菜单
+    @ViewBuilder
+    private var copyLinkMenu: some View {
+        let domains = r2Service?.publicDomains ?? []
+        if domains.count > 1, let r2Service = r2Service, let bucketName = bucketName {
+            Menu {
+                ForEach(domains, id: \.self) { domain in
+                    Button(action: {
+                        let url = r2Service.generateFileURL(for: fileObject, in: bucketName, domain: domain)
+                        copyToClipboard(url)
+                    }) {
+                        Text(domain)
+                    }
+                }
+            } label: {
+                Label(L.Files.ContextMenu.copyLink, systemImage: "link")
+            }
+        } else {
+            Button(action: {
+                guard let r2Service = r2Service,
+                      let bucketName = bucketName,
+                      let url = r2Service.generateFileURL(for: fileObject, in: bucketName) else { return }
+                copyToClipboard(url)
+            }) {
+                Label(L.Files.ContextMenu.copyLink, systemImage: "link")
+            }
+        }
+    }
 
-        guard let fileURL = r2Service.generateFileURL(for: fileObject, in: bucketName) else { return }
-
+    private func copyToClipboard(_ text: String) {
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(fileURL, forType: .string)
+        NSPasteboard.general.setString(text, forType: .string)
         messageManager?.showSuccess(L.Message.Success.linkCopied, description: L.Message.Success.linkCopiedDescription)
     }
 }

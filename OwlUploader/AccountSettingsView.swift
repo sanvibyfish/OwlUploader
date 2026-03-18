@@ -453,7 +453,7 @@ struct EditAccountSheet: View {
                     }
 
                     HStack {
-                        TextField(L.Account.Domain.placeholder, text: $newDomain)
+                        TextField("", text: $newDomain, prompt: Text(L.Account.Domain.placeholder))
                             .onSubmit { addDomain() }
                         Button {
                             addDomain()
@@ -559,6 +559,16 @@ struct EditAccountSheet: View {
     private func saveAccount() {
         withAnimation { isSaving = true; saveError = nil }
 
+        // 自动收割未提交的域名输入
+        let pendingDomain = newDomain.trimmingCharacters(in: .whitespaces)
+        if !pendingDomain.isEmpty, !publicDomains.contains(pendingDomain) {
+            publicDomains.append(pendingDomain)
+            if publicDomains.count == 1 {
+                defaultDomainIndex = 0
+            }
+            newDomain = ""
+        }
+
         let trimmedAccountID = accountID.trimmingCharacters(in: .whitespaces)
         let trimmedAccessKeyID = accessKeyID.trimmingCharacters(in: .whitespaces)
         let trimmedSecretKey = secretAccessKey.trimmingCharacters(in: .whitespaces)
@@ -593,8 +603,14 @@ struct EditAccountSheet: View {
                     try? KeychainService.shared.deleteCloudflareAPIToken(for: updatedAccount)
                 }
 
-                if accountManager.currentAccount?.id == account.id && !trimmedSecretKey.isEmpty {
-                    try? await r2Service.initialize(with: updatedAccount, secretAccessKey: trimmedSecretKey)
+                if accountManager.currentAccount?.id == account.id {
+                    if !trimmedSecretKey.isEmpty {
+                        // 密钥变更，需要重建 S3 客户端
+                        try? await r2Service.initialize(with: updatedAccount, secretAccessKey: trimmedSecretKey)
+                    } else {
+                        // 仅非凭证字段变更（如 publicDomains），同步 account 即可
+                        r2Service.updateCurrentAccount(updatedAccount)
+                    }
                 }
 
                 await MainActor.run {

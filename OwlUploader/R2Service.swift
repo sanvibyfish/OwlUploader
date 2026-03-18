@@ -2177,6 +2177,13 @@ class R2Service: ObservableObject {
         }
     }
 
+    /// 更新当前账户信息（不重建 S3 客户端）
+    /// 用于 publicDomains、displayName 等非凭证字段变更后同步到 R2Service
+    func updateCurrentAccount(_ account: R2Account) {
+        guard currentAccount?.id == account.id else { return }
+        currentAccount = account
+    }
+
     /// 断开连接
     func disconnect() {
         // 清理 S3 客户端和账户信息
@@ -2282,6 +2289,17 @@ class R2Service: ObservableObject {
             // 格式：https://账户ID.r2.cloudflarestorage.com/存储桶名/文件路径
             return "https://\(account.accountID).r2.cloudflarestorage.com/\(bucketName)/\(filePath)"
         }
+    }
+
+    /// 生成文件在指定域名下的公共访问URL
+    func generateFileURL(for fileObject: FileObject, in bucketName: String, domain: String) -> String {
+        let normalizedDomain = domain.hasPrefix("http") ? domain : "https://\(domain)"
+        return "\(normalizedDomain)/\(fileObject.key)"
+    }
+
+    /// 获取当前账户配置的所有公共域名
+    var publicDomains: [String] {
+        currentAccount?.publicDomains ?? []
     }
 
     /// 根据文件 key 生成基础 URL（不带版本参数）

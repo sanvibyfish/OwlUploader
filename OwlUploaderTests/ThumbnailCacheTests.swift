@@ -94,6 +94,65 @@ final class ThumbnailCacheTests: XCTestCase {
         XCTAssertNil(cache.getCachedThumbnail(for: "test_key_2"))
     }
 
+    // MARK: - cacheVersion Tests
+
+    func testClearCache_incrementsCacheVersion() {
+        // Given
+        let cache = ThumbnailCache.shared
+        let versionBefore = cache.cacheVersion
+
+        // When
+        cache.clearCache()
+
+        // Then
+        XCTAssertEqual(cache.cacheVersion, versionBefore + 1,
+            "clearCache 应递增 cacheVersion 以通知视图刷新")
+    }
+
+    func testClearCache_multipleCalls_incrementsEachTime() {
+        // Given
+        let cache = ThumbnailCache.shared
+        let versionBefore = cache.cacheVersion
+
+        // When
+        cache.clearCache()
+        cache.clearCache()
+        cache.clearCache()
+
+        // Then
+        XCTAssertEqual(cache.cacheVersion, versionBefore + 3,
+            "每次 clearCache 都应递增 cacheVersion")
+    }
+
+    func testInvalidateCache_doesNotIncrementCacheVersion() {
+        // Given — invalidateCache 不递增版本号，因为 URL 变更已能触发视图刷新
+        let cache = ThumbnailCache.shared
+        let versionBefore = cache.cacheVersion
+
+        // When
+        cache.invalidateCache(for: "https://cdn.example.com/test.jpg")
+
+        // Then
+        XCTAssertEqual(cache.cacheVersion, versionBefore,
+            "invalidateCache 不应递增 cacheVersion")
+    }
+
+    func testClearCache_bothClearsEntriesAndIncrementsVersion() {
+        // Given — clearCache 需同时清除数据和通知视图
+        let cache = ThumbnailCache.shared
+        let testImage = NSImage(size: NSSize(width: 10, height: 10))
+        cache.cacheThumbnail(testImage, for: "version_test_key")
+        let versionBefore = cache.cacheVersion
+
+        // When
+        cache.clearCache()
+
+        // Then — 缓存被清除
+        XCTAssertNil(cache.getCachedThumbnail(for: "version_test_key"))
+        // 版本号递增
+        XCTAssertEqual(cache.cacheVersion, versionBefore + 1)
+    }
+
     // MARK: - Cache Key Format Tests
 
     func testCacheKeyFormat_includesURLAndSize() {

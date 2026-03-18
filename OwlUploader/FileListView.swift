@@ -90,6 +90,9 @@ struct FileListView: View {
     /// 要重命名的文件对象
     @State private var fileToRename: FileObject?
     
+    /// 缓存的过滤+排序结果，仅在输入变化时重新计算
+    @State private var filteredFiles: [FileObject] = []
+
     /// 拖拽目标状态
     @State private var isTargeted: Bool = false
 
@@ -172,6 +175,11 @@ struct FileListView: View {
                 loadFileList()
             }
         }
+        .onChange(of: fileObjects) { _ in updateFilteredFiles() }
+        .onChange(of: searchText) { _ in updateFilteredFiles() }
+        .onChange(of: filterType) { _ in updateFilteredFiles() }
+        .onChange(of: sortOrder) { _ in updateFilteredFiles() }
+        .onChange(of: sortAscending) { _ in updateFilteredFiles() }
         .sheet(isPresented: $showingCreateFolderSheet) {
             CreateFolderSheet(
                 isPresented: $showingCreateFolderSheet,
@@ -255,7 +263,6 @@ struct FileListView: View {
         // 键盘快捷键支持
         .focusedValue(\.fileActions, FileActions(
             selectAll: {
-                let filteredFiles = SearchFilterBar.filterAndSort(files: fileObjects, searchText: searchText, filterType: filterType, sortOrder: sortOrder, ascending: sortAscending)
                 selectionManager.selectAll(filteredFiles.map { $0.key })
             },
             deselectAll: {
@@ -705,9 +712,7 @@ struct FileListView: View {
     
     /// 文件列表视图
     private var fileListView: some View {
-        let filteredFiles = SearchFilterBar.filterAndSort(files: fileObjects, searchText: searchText, filterType: filterType, sortOrder: sortOrder, ascending: sortAscending)
-
-        return ZStack {
+        ZStack {
             // 拖拽区域背景
             FileDropView(
                 isEnabled: canLoadFiles && !r2Service.isLoading,
@@ -832,8 +837,6 @@ struct FileListView: View {
             // 移除阻塞式 loading 覆盖层，改为在工具栏显示加载状态
             // 用户可以在加载过程中继续交互
             .sheet(item: $fileToPreview) { file in
-                let filteredFiles = SearchFilterBar.filterAndSort(files: fileObjects, searchText: searchText, filterType: filterType, sortOrder: sortOrder, ascending: sortAscending)
-
                 FilePreviewView(
                     r2Service: r2Service,
                     fileObject: file,
@@ -860,6 +863,17 @@ struct FileListView: View {
                 return .handled
             }
         }
+    }
+
+    /// 重新计算过滤+排序结果（仅在输入变化时调用）
+    private func updateFilteredFiles() {
+        filteredFiles = SearchFilterBar.filterAndSort(
+            files: fileObjects,
+            searchText: searchText,
+            filterType: filterType,
+            sortOrder: sortOrder,
+            ascending: sortAscending
+        )
     }
 
     /// 切换预览状态（空格键）
@@ -1713,6 +1727,8 @@ struct FileListView: View {
             let success = await r2Service.purgeCDNCache(for: urls, force: true)
             await MainActor.run {
                 if success {
+                    // 同步清理本地缩略图缓存，使视图重新加载
+                    ThumbnailCache.shared.clearCache()
                     messageManager.showSuccess(
                         L.Message.Success.cdnCachePurged,
                         description: L.Message.Success.cdnCachePurgedDescription(filesToPurge.count)
