@@ -180,8 +180,16 @@ class R2Service: ObservableObject {
     
     /// 发布的状态属性
     @Published var isConnected: Bool = false
-    @Published var isLoading: Bool = false
     @Published var lastError: R2ServiceError?
+
+    /// 引用计数式 loading 状态，避免多个并发操作互相踩踏
+    private var loadingCount: Int = 0 {
+        didSet { isLoading = loadingCount > 0 }
+    }
+    @Published private(set) var isLoading: Bool = false
+
+    /// 是否正在执行文件夹级操作（重命名/移动），用于防止重叠执行
+    private var isFolderOperationInProgress = false
     
     /// 当前选中的存储桶
     @Published var selectedBucket: BucketItem?
@@ -208,7 +216,7 @@ class R2Service: ObservableObject {
     ///   - account: R2 账户基础信息
     ///   - secretAccessKey: Secret Access Key
     func initialize(with account: R2Account, secretAccessKey: String) async throws {
-        isLoading = true
+        loadingCount += 1
         lastError = nil
         
         do {
@@ -216,10 +224,10 @@ class R2Service: ObservableObject {
             currentSecretAccessKey = secretAccessKey
             try await createS3Client()
             isConnected = true
-            isLoading = false
+            loadingCount -= 1
         } catch {
             isConnected = false
-            isLoading = false
+            loadingCount -= 1
             let serviceError = mapError(error)
             lastError = serviceError
             throw serviceError
@@ -233,7 +241,7 @@ class R2Service: ObservableObject {
             throw R2ServiceError.accountNotConfigured
         }
         
-        isLoading = true
+        loadingCount += 1
         lastError = nil
         
         // 先执行网络连接诊断
@@ -241,11 +249,11 @@ class R2Service: ObservableObject {
         
         do {
 //            let _ = try await s3Client.listBuckets(input: ListBucketsInput())
-//            isLoading = false
+//            loadingCount -= 1
             print("✅ R2 连接测试成功")
             return true
         } catch {
-            isLoading = false
+            loadingCount -= 1
             
             // 添加详细的错误诊断信息
             print("🔍 连接测试失败 - 详细诊断信息：")
@@ -436,7 +444,7 @@ class R2Service: ObservableObject {
         print("   当前账户: \(currentAccount?.accountID ?? "未知")")
         print("   端点 URL: \(currentAccount?.endpointURL ?? "未知")")
         
-        isLoading = true
+        loadingCount += 1
         lastError = nil
         
         do {
@@ -458,7 +466,7 @@ class R2Service: ObservableObject {
             } ?? []
             
             print("✅ 成功解析 \(buckets.count) 个存储桶")
-            isLoading = false
+            loadingCount -= 1
             return buckets
             
         } catch {
@@ -477,7 +485,7 @@ class R2Service: ObservableObject {
                 print("     3. 确保在 Cloudflare 控制台中为 API Token 配置了正确的权限")
                 
                 // 抛出更具体的权限错误
-                isLoading = false
+                loadingCount -= 1
                 let permissionError = R2ServiceError.permissionDenied("列出存储桶")
                 lastError = permissionError
                 throw permissionError
@@ -498,7 +506,7 @@ class R2Service: ObservableObject {
                 }
             }
             
-            isLoading = false
+            loadingCount -= 1
             let serviceError = mapError(error)
             lastError = serviceError
             throw serviceError
@@ -530,11 +538,11 @@ class R2Service: ObservableObject {
             throw R2ServiceError.accountNotConfigured
         }
         
-        // 验证存储桶名称格式
+        // 验证存储桶名称格式（R2 和 OSS 的规则略有不同，取并集兼容两者）
         guard !bucketName.isEmpty,
               bucketName.count >= 3,
               bucketName.count <= 63,
-              bucketName.allSatisfy({ $0.isLowercase || $0.isNumber || $0 == "-" || $0 == "." }),
+              bucketName.allSatisfy({ $0.isLowercase || $0.isNumber || $0 == "-" }),
               !bucketName.hasPrefix("-"),
               !bucketName.hasSuffix("-") else {
             throw R2ServiceError.invalidFileName(bucketName)
@@ -542,7 +550,7 @@ class R2Service: ObservableObject {
         
         print("🎯 尝试直接访问存储桶: \(bucketName)")
         
-        isLoading = true
+        loadingCount += 1
         lastError = nil
         
         do {
@@ -565,13 +573,13 @@ class R2Service: ObservableObject {
             )
             
             selectedBucket = bucketItem
-            isLoading = false
+            loadingCount -= 1
             
             print("✅ 存储桶 '\(bucketName)' 访问验证成功")
             return bucketItem
             
         } catch {
-            isLoading = false
+            loadingCount -= 1
             
             print("❌ 存储桶 '\(bucketName)' 访问验证失败: \(error.localizedDescription)")
             
@@ -677,7 +685,7 @@ class R2Service: ObservableObject {
             throw R2ServiceError.accountNotConfigured
         }
 
-        isLoading = true
+        loadingCount += 1
         lastError = nil
 
         do {
@@ -793,11 +801,11 @@ class R2Service: ObservableObject {
                 }
             }
 
-            isLoading = false
+            loadingCount -= 1
             return fileObjects
 
         } catch {
-            isLoading = false
+            loadingCount -= 1
             let serviceError = mapError(error)
             lastError = serviceError
             throw serviceError
@@ -915,7 +923,7 @@ class R2Service: ObservableObject {
             throw R2ServiceError.invalidFileName(folderName)
         }
         
-        isLoading = true
+        loadingCount += 1
         lastError = nil
         
         do {
@@ -945,10 +953,10 @@ class R2Service: ObservableObject {
             print("🐛 调试 S3 PutObject 响应:")
             print("   ETag: \(result.eTag ?? "nil")")
             print("   创建成功")
-            isLoading = false
+            loadingCount -= 1
             
         } catch {
-            isLoading = false
+            loadingCount -= 1
             let serviceError = mapCreateFolderError(error, folderName: folderName)
             lastError = serviceError
             throw serviceError
@@ -972,7 +980,7 @@ class R2Service: ObservableObject {
         print("   目标键: \(key)")
         print("   本地文件: \(localFilePath.path)")
         
-        isLoading = true
+        loadingCount += 1
         lastError = nil
         
         do {
@@ -1022,11 +1030,11 @@ class R2Service: ObservableObject {
             print("🚀 开始执行上传...")
             let _ = try await s3Client.putObject(input: input)
             
-            isLoading = false
+            loadingCount -= 1
             print("✅ 文件上传成功完成")
             
         } catch {
-            isLoading = false
+            loadingCount -= 1
             print("❌ 上传过程中发生错误:")
             print("   错误类型: \(type(of: error))")
             print("   错误描述: \(error.localizedDescription)")
@@ -1063,7 +1071,7 @@ class R2Service: ObservableObject {
         print("   数据大小: \(data.count) bytes")
         print("   内容类型: \(contentType)")
         
-        isLoading = true
+        loadingCount += 1
         lastError = nil
         
         do {
@@ -1098,11 +1106,11 @@ class R2Service: ObservableObject {
             print("🚀 开始执行数据上传...")
             let _ = try await s3Client.putObject(input: input)
             
-            isLoading = false
+            loadingCount -= 1
             print("✅ 数据上传成功完成")
             
         } catch {
-            isLoading = false
+            loadingCount -= 1
             print("❌ 数据上传过程中发生错误:")
             print("   错误类型: \(type(of: error))")
             print("   错误描述: \(error.localizedDescription)")
@@ -1229,7 +1237,7 @@ class R2Service: ObservableObject {
         }
 
         let fileName = fileURL.lastPathComponent
-        isLoading = true
+        loadingCount += 1
         lastError = nil
 
         do {
@@ -1256,11 +1264,11 @@ class R2Service: ObservableObject {
                 progress(1.0)
             }
 
-            isLoading = false
+            loadingCount -= 1
             print("✅ 上传成功完成")
 
         } catch {
-            isLoading = false
+            loadingCount -= 1
             let serviceError = mapUploadError(error, fileName: fileName)
             lastError = serviceError
             throw serviceError
@@ -1282,7 +1290,7 @@ class R2Service: ObservableObject {
         }
 
         let fileName = fileURL.lastPathComponent
-        isLoading = true
+        loadingCount += 1
         lastError = nil
 
         // 根据文件大小计算最佳分片大小
@@ -1413,11 +1421,11 @@ class R2Service: ObservableObject {
                 progress(1.0)
             }
 
-            isLoading = false
+            loadingCount -= 1
             print("✅ 并发分片上传成功完成")
 
         } catch {
-            isLoading = false
+            loadingCount -= 1
 
             // 如果上传失败且有上传ID，尝试中止上传
             if let id = uploadId {
@@ -1460,7 +1468,7 @@ class R2Service: ObservableObject {
         print("   存储桶: \(bucket)")
         print("   目标路径: \(localURL.path)")
 
-        isLoading = true
+        loadingCount += 1
         lastError = nil
 
         do {
@@ -1522,11 +1530,11 @@ class R2Service: ObservableObject {
             let fileSizeString = formatter.string(fromByteCount: totalBytesWritten)
             print("📏 文件大小: \(fileSizeString)")
 
-            isLoading = false
+            loadingCount -= 1
             print("✅ 文件下载完成: \(localURL.path)")
 
         } catch {
-            isLoading = false
+            loadingCount -= 1
             print("❌ 下载过程中发生错误:")
             print("   错误类型: \(type(of: error))")
             print("   错误描述: \(error.localizedDescription)")
@@ -1748,7 +1756,7 @@ class R2Service: ObservableObject {
         print("   对象键: \(key)")
         print("   文件名: \(fileName)")
         
-        isLoading = true
+        loadingCount += 1
         lastError = nil
         
         do {
@@ -1762,11 +1770,11 @@ class R2Service: ObservableObject {
             print("🚀 开始执行文件删除...")
             let _ = try await s3Client.deleteObject(input: input)
             
-            isLoading = false
+            loadingCount -= 1
             print("✅ 文件删除成功完成")
             
         } catch {
-            isLoading = false
+            loadingCount -= 1
             print("❌ 文件删除过程中发生错误:")
             print("   错误类型: \(type(of: error))")
             print("   错误描述: \(error.localizedDescription)")
@@ -1797,7 +1805,7 @@ class R2Service: ObservableObject {
         
         print("🗑️ 开始批量删除 \(keys.count) 个文件...")
         
-        isLoading = true
+        loadingCount += 1
         lastError = nil
         
         var failedKeys: [String] = []
@@ -1846,7 +1854,7 @@ class R2Service: ObservableObject {
             }
         }
         
-        isLoading = false
+        loadingCount -= 1
         return failedKeys
     }
 
@@ -1866,7 +1874,7 @@ class R2Service: ObservableObject {
         print("📁 开始删除文件夹: \(prefix)")
         print("   存储桶: \(bucket)")
 
-        isLoading = true
+        loadingCount += 1
         lastError = nil
 
         var allKeys: [String] = []
@@ -1911,7 +1919,7 @@ class R2Service: ObservableObject {
             // 2. 批量删除所有对象（包括文件夹标记）
             let failedKeys = try await deleteObjects(bucket: bucket, keys: allKeys)
 
-            isLoading = false
+            loadingCount -= 1
 
             let deletedCount = allKeys.count - failedKeys.count
             print("✅ 文件夹删除完成，删除 \(deletedCount) 个对象，失败 \(failedKeys.count) 个")
@@ -1919,7 +1927,7 @@ class R2Service: ObservableObject {
             return (deletedCount, failedKeys)
 
         } catch {
-            isLoading = false
+            loadingCount -= 1
             print("❌ 删除文件夹失败: \(error.localizedDescription)")
             let serviceError = mapError(error)
             lastError = serviceError
@@ -1927,51 +1935,147 @@ class R2Service: ObservableObject {
         }
     }
 
-    /// 重命名文件（通过复制后删除实现）
+    /// 重命名文件或文件夹（通过复制后删除实现）
     /// - Parameters:
     ///   - bucket: 存储桶名称
-    ///   - oldKey: 原对象键
+    ///   - oldKey: 原对象键（文件夹以 `/` 结尾）
     ///   - newKey: 新对象键
     func renameObject(bucket: String, oldKey: String, newKey: String) async throws {
         guard let s3Client = s3Client else {
             throw R2ServiceError.accountNotConfigured
         }
-        
-        print("✏️ 重命名文件: \(oldKey) -> \(newKey)")
-        
-        isLoading = true
-        lastError = nil
-        
-        do {
-            // 1. 复制对象到新位置
-            let copySource = "\(bucket)/\(oldKey)"
-            let copyInput = CopyObjectInput(
-                bucket: bucket,
-                copySource: copySource,
-                key: newKey
-            )
-            
-            print("📋 步骤 1/2: 复制对象...")
-            let _ = try await s3Client.copyObject(input: copyInput)
-            
-            // 2. 删除原对象
-            print("🗑️ 步骤 2/2: 删除原对象...")
-            let deleteInput = DeleteObjectInput(
-                bucket: bucket,
-                key: oldKey
-            )
-            let _ = try await s3Client.deleteObject(input: deleteInput)
-            
-            isLoading = false
-            print("✅ 重命名完成")
 
+        // 文件夹重命名需要处理所有子对象
+        if oldKey.hasSuffix("/") {
+            try await renameFolder(bucket: bucket, oldPrefix: oldKey, newPrefix: newKey)
+            return
+        }
+
+        print("✏️ 重命名文件: \(oldKey) -> \(newKey)")
+        loadingCount += 1
+        lastError = nil
+
+        do {
+            try await copySingleObject(s3Client: s3Client, bucket: bucket, sourceKey: oldKey, destKey: newKey)
+
+            let deleteInput = DeleteObjectInput(bucket: bucket, key: oldKey)
+            let _ = try await s3Client.deleteObject(input: deleteInput)
+
+            loadingCount -= 1
+            print("✅ 重命名完成")
         } catch {
-            isLoading = false
+            loadingCount -= 1
             print("❌ 重命名失败: \(error.localizedDescription)")
-            let fileName = (oldKey as NSString).lastPathComponent
             let serviceError = mapError(error)
             lastError = serviceError
             throw serviceError
+        }
+    }
+
+    /// 重命名文件夹及其所有内容
+    private func renameFolder(bucket: String, oldPrefix: String, newPrefix: String) async throws {
+        guard let s3Client = s3Client else {
+            throw R2ServiceError.accountNotConfigured
+        }
+
+        guard !isFolderOperationInProgress else {
+            throw R2ServiceError.invalidOperation("另一个文件夹操作正在进行中")
+        }
+
+        let srcPrefix = oldPrefix.hasSuffix("/") ? oldPrefix : oldPrefix + "/"
+        let dstPrefix = newPrefix.hasSuffix("/") ? newPrefix : newPrefix + "/"
+
+        print("✏️ 重命名文件夹: \(srcPrefix) -> \(dstPrefix)")
+        isFolderOperationInProgress = true
+        loadingCount += 1
+        lastError = nil
+
+        defer {
+            isFolderOperationInProgress = false
+            loadingCount -= 1
+        }
+
+        do {
+            var allKeys: [String] = []
+            var continuationToken: String? = nil
+
+            repeat {
+                let input = ListObjectsV2Input(
+                    bucket: bucket,
+                    continuationToken: continuationToken,
+                    prefix: srcPrefix
+                )
+                let response = try await s3Client.listObjectsV2(input: input)
+                if let contents = response.contents {
+                    allKeys.append(contentsOf: contents.compactMap { $0.key })
+                }
+                continuationToken = response.nextContinuationToken
+            } while continuationToken != nil
+
+            print("📋 找到 \(allKeys.count) 个子对象需要重命名")
+
+            var failedKeys: [String] = []
+            for sourceKey in allKeys {
+                try Task.checkCancellation()
+                let relativePath = String(sourceKey.dropFirst(srcPrefix.count))
+                let destKey = dstPrefix + relativePath
+
+                do {
+                    try await copySingleObject(s3Client: s3Client, bucket: bucket, sourceKey: sourceKey, destKey: destKey)
+
+                    let deleteInput = DeleteObjectInput(bucket: bucket, key: sourceKey)
+                    let _ = try await s3Client.deleteObject(input: deleteInput)
+                    print("  ✅ \(sourceKey) -> \(destKey)")
+                } catch is CancellationError {
+                    throw CancellationError()
+                } catch {
+                    failedKeys.append(sourceKey)
+                    print("  ❌ \(sourceKey): \(error.localizedDescription)")
+                }
+            }
+
+            if failedKeys.isEmpty {
+                let putInput = PutObjectInput(body: .noStream, bucket: bucket, contentLength: 0, key: dstPrefix)
+                let _ = try await s3Client.putObject(input: putInput)
+
+                let deleteMarker = DeleteObjectInput(bucket: bucket, key: srcPrefix)
+                let _ = try? await s3Client.deleteObject(input: deleteMarker)
+                let markerWithoutSlash = String(srcPrefix.dropLast())
+                let deleteMarker2 = DeleteObjectInput(bucket: bucket, key: markerWithoutSlash)
+                let _ = try? await s3Client.deleteObject(input: deleteMarker2)
+
+                print("✅ 文件夹重命名完成")
+            } else {
+                print("⚠️ 文件夹重命名部分失败，\(failedKeys.count) 个文件未移动，旧文件夹标记已保留")
+                throw R2ServiceError.invalidOperation("部分文件重命名失败: \(failedKeys.joined(separator: ", "))")
+            }
+        } catch is CancellationError {
+            print("⚠️ 文件夹重命名已取消")
+            throw CancellationError()
+        } catch {
+            if error is R2ServiceError { throw error }
+            print("❌ 文件夹重命名失败: \(error.localizedDescription)")
+            let serviceError = mapError(error)
+            lastError = serviceError
+            throw serviceError
+        }
+    }
+
+    /// 复制单个对象到新位置
+    /// - 文件夹标记（key 以 `/` 结尾）：用 PutObject 创建空对象，避免 OSS CopyObject 不兼容
+    /// - 普通文件：用 CopyObject + URL 编码
+    private func copySingleObject(s3Client: S3Client, bucket: String, sourceKey: String, destKey: String) async throws {
+        if sourceKey.hasSuffix("/") {
+            // 文件夹标记：直接创建空对象，避免 OSS CopyObject 不兼容
+            let putInput = PutObjectInput(body: .noStream, bucket: bucket, contentLength: 0, key: destKey)
+            let _ = try await s3Client.putObject(input: putInput)
+        } else {
+            guard let encodedKey = sourceKey.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else {
+                throw R2ServiceError.invalidOperation("无法编码源文件名: \(sourceKey)")
+            }
+            let copySource = "\(bucket)/\(encodedKey)"
+            let copyInput = CopyObjectInput(bucket: bucket, copySource: copySource, key: destKey)
+            let _ = try await s3Client.copyObject(input: copyInput)
         }
     }
     
@@ -2021,31 +2125,14 @@ class R2Service: ObservableObject {
         print("📦 移动文件: \(sourceKey) -> \(destinationKey)")
 
         do {
-            // 1. 复制对象到新位置
-            // copySource 需要 URL 编码以支持特殊字符（包括泰语、中文等）
-            guard let encodedSourceKey = sourceKey.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else {
-                throw R2ServiceError.invalidOperation("无法编码源文件名")
-            }
-            let copySource = "\(bucket)/\(encodedSourceKey)"
-            let copyInput = CopyObjectInput(
-                bucket: bucket,
-                copySource: copySource,
-                key: destinationKey
-            )
-            
             print("📋 步骤 1/2: 复制对象...")
-            let _ = try await s3Client.copyObject(input: copyInput)
-            
-            // 2. 删除原对象
+            try await copySingleObject(s3Client: s3Client, bucket: bucket, sourceKey: sourceKey, destKey: destinationKey)
+
             print("🗑️ 步骤 2/2: 删除原对象...")
-            let deleteInput = DeleteObjectInput(
-                bucket: bucket,
-                key: sourceKey
-            )
+            let deleteInput = DeleteObjectInput(bucket: bucket, key: sourceKey)
             let _ = try await s3Client.deleteObject(input: deleteInput)
-            
+
             print("✅ 移动完成")
-            
         } catch {
             print("❌ 移动失败: \(error.localizedDescription)")
             throw mapError(error)
@@ -2062,18 +2149,19 @@ class R2Service: ObservableObject {
         guard let s3Client = s3Client else {
             throw R2ServiceError.accountNotConfigured
         }
+
+        guard !isFolderOperationInProgress else {
+            throw R2ServiceError.invalidOperation("另一个文件夹操作正在进行中")
+        }
         
-        // 确保路径以 / 结尾
         let sourcePrefix = sourceFolderKey.hasSuffix("/") ? sourceFolderKey : sourceFolderKey + "/"
         let destPrefix = destinationFolderKey.hasSuffix("/") ? destinationFolderKey : destinationFolderKey + "/"
         
-        // 检查是否试图移动到自身的子目录
         if destPrefix.hasPrefix(sourcePrefix) {
             print("❌ 不能移动文件夹到自身的子目录")
             throw R2ServiceError.invalidOperation("不能移动文件夹到自身的子目录")
         }
         
-        // 如果源和目标相同，不需要移动
         if sourcePrefix == destPrefix {
             print("⚠️ 源和目标相同，跳过移动")
             return (0, [])
@@ -2082,8 +2170,14 @@ class R2Service: ObservableObject {
         print("📁 开始移动文件夹: \(sourcePrefix) -> \(destPrefix)")
         print("   存储桶: \(bucket)")
         
-        isLoading = true
+        isFolderOperationInProgress = true
+        loadingCount += 1
         lastError = nil
+
+        defer {
+            isFolderOperationInProgress = false
+            loadingCount -= 1
+        }
         
         var allKeys: [String] = []
         var continuationToken: String? = nil
@@ -2126,50 +2220,29 @@ class R2Service: ObservableObject {
                 let destKey = destPrefix + relativePath
                 
                 do {
-                    // 复制对象（copySource 需要 URL 编码）
-                    guard let encodedSourceKey = sourceKey.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else {
-                        print("⚠️ 无法编码文件名，跳过: \(sourceKey)")
-                        failedKeys.append(sourceKey)
-                        continue
-                    }
-                    let copySource = "\(bucket)/\(encodedSourceKey)"
-                    let copyInput = CopyObjectInput(
-                        bucket: bucket,
-                        copySource: copySource,
-                        key: destKey
-                    )
-                    let _ = try await s3Client.copyObject(input: copyInput)
-                    
-                    // 删除原对象
-                    let deleteInput = DeleteObjectInput(
-                        bucket: bucket,
-                        key: sourceKey
-                    )
+                    try await copySingleObject(s3Client: s3Client, bucket: bucket, sourceKey: sourceKey, destKey: destKey)
+
+                    let deleteInput = DeleteObjectInput(bucket: bucket, key: sourceKey)
                     let _ = try await s3Client.deleteObject(input: deleteInput)
-                    
+
                     movedCount += 1
                     print("✅ 移动: \(sourceKey) -> \(destKey)")
-                    
+                } catch is CancellationError {
+                    throw CancellationError()
                 } catch {
                     failedKeys.append(sourceKey)
                     print("❌ 移动失败: \(sourceKey) - \(error.localizedDescription)")
                 }
             }
             
-            isLoading = false
             print("✅ 文件夹移动完成，成功 \(movedCount) 个，失败 \(failedKeys.count) 个")
-            
             return (movedCount, failedKeys)
             
+        } catch is CancellationError {
+            print("🛑 文件夹移动被取消，已移动 \(movedCount) 个文件")
+            throw CancellationError()
         } catch {
-            isLoading = false
-
-            // 如果是取消操作，直接重新抛出（已移动的文件保留）
-            if error is CancellationError {
-                print("🛑 文件夹移动被取消，已移动 \(movedCount) 个文件")
-                throw error
-            }
-
+            if error is R2ServiceError { throw error }
             print("❌ 移动文件夹失败: \(error.localizedDescription)")
             let serviceError = mapError(error)
             lastError = serviceError
@@ -2248,11 +2321,16 @@ class R2Service: ObservableObject {
             suggestions.append("请在账户设置中填写正确的 Secret Access Key")
         }
         
-        // 检查端点 URL
-        let endpointValidation = validateR2Endpoint(account.endpointURL)
+        // 检查端点 URL（按供应商验证）
+        let endpointValidation = validateEndpoint(account.endpointURL, provider: account.provider)
         if !endpointValidation.isValid {
             issues.append("端点 URL 格式错误：\(endpointValidation.message)")
-            suggestions.append("请使用正确的 R2 端点格式：https://您的账户ID.r2.cloudflarestorage.com")
+            switch account.provider {
+            case .r2:
+                suggestions.append("请使用正确的 R2 端点格式：https://您的账户ID.r2.cloudflarestorage.com")
+            case .oss:
+                suggestions.append("请使用正确的 OSS 端点格式：https://oss-<region>.aliyuncs.com")
+            }
         }
         
         let isReady = issues.isEmpty
@@ -2276,18 +2354,13 @@ class R2Service: ObservableObject {
             return nil
         }
 
-        // 构建文件路径
         let filePath = fileObject.key
 
-        // 如果配置了公共域名，使用默认公共域名
         if let publicDomain = account.defaultPublicDomain, !publicDomain.isEmpty {
-            // 确保域名格式正确
             let domain = publicDomain.hasPrefix("http") ? publicDomain : "https://\(publicDomain)"
             return "\(domain)/\(filePath)"
         } else {
-            // 使用默认的 Cloudflare R2 域名
-            // 格式：https://账户ID.r2.cloudflarestorage.com/存储桶名/文件路径
-            return "https://\(account.accountID).r2.cloudflarestorage.com/\(bucketName)/\(filePath)"
+            return buildStorageURL(endpoint: account.endpointURL, bucket: bucketName, key: filePath, usePathStyle: account.provider.usePathStyle)
         }
     }
 
@@ -2295,6 +2368,11 @@ class R2Service: ObservableObject {
     func generateFileURL(for fileObject: FileObject, in bucketName: String, domain: String) -> String {
         let normalizedDomain = domain.hasPrefix("http") ? domain : "https://\(domain)"
         return "\(normalizedDomain)/\(fileObject.key)"
+    }
+
+    /// 当前账户是否支持 CDN 缓存清除（仅 Cloudflare R2）
+    var supportsCDNPurge: Bool {
+        currentAccount?.provider.supportsCDNPurge ?? false
     }
 
     /// 获取当前账户配置的所有公共域名
@@ -2318,7 +2396,7 @@ class R2Service: ObservableObject {
             let domain = publicDomain.hasPrefix("http") ? publicDomain : "https://\(publicDomain)"
             return "\(domain)/\(key)"
         } else {
-            return "https://\(account.accountID).r2.cloudflarestorage.com/\(bucketName)/\(key)"
+            return buildStorageURL(endpoint: account.endpointURL, bucket: bucketName, key: key, usePathStyle: account.provider.usePathStyle)
         }
     }
 
@@ -2350,6 +2428,11 @@ class R2Service: ObservableObject {
     func purgeCDNCache(for urls: [String], force: Bool = false) async -> Bool {
         guard let account = currentAccount else {
             print("⚠️ [CDN Purge] 跳过：无当前账户")
+            return false
+        }
+
+        // CDN Purge 仅支持 Cloudflare R2
+        guard account.provider.supportsCDNPurge else {
             return false
         }
 
@@ -2486,8 +2569,7 @@ class R2Service: ObservableObject {
         }
     }
     
-    /// 创建 S3 客户端
-    /// 基于 AWS SDK for Swift 官方推荐方式实现
+    /// 创建 S3 客户端（支持 R2 和 OSS 等 S3 兼容服务）
     private func createS3Client() async throws {
         guard let account = currentAccount else {
             throw R2ServiceError.accountNotConfigured
@@ -2497,66 +2579,52 @@ class R2Service: ObservableObject {
             throw R2ServiceError.accountNotConfigured
         }
         
-        // 验证账户信息完整性
         guard account.isValid() else {
             throw R2ServiceError.invalidCredentials
         }
         
         do {
-            print("🔧 开始创建 S3 客户端...")
+            print("🔧 开始创建 S3 客户端 [\(account.provider.displayName)]...")
             print("   端点: \(account.endpointURL)")
             print("   Access Key ID: \(account.accessKeyID)")
-            
-            // 使用端点验证方法
-            let validation = validateR2Endpoint(account.endpointURL)
+
+            // 按供应商验证端点
+            let validation = validateEndpoint(account.endpointURL, provider: account.provider)
             if !validation.isValid {
                 print("❌ 端点验证失败: \(validation.message)")
                 throw R2ServiceError.invalidCredentials
             }
             
-            // 验证 Access Key ID 格式（R2 Access Key 通常是32位字符）
-            if account.accessKeyID.count < 20 || account.accessKeyID.count > 128 {
-                print("❌ Access Key ID 格式可能有误，长度: \(account.accessKeyID.count)")
-            }
+            print("✅ 端点验证成功")
+
+            // 按供应商确定 region
+            let region = account.provider.s3Region(ossRegion: account.ossRegion)
             
-            // 验证 Secret Access Key 格式
-            if secretAccessKey.count < 20 || secretAccessKey.count > 128 {
-                print("❌ Secret Access Key 格式可能有误，长度: \(secretAccessKey.count)")
-            }
-            
-            print("✅ 端点验证成功，凭证格式检查完成")
-            
-            // 按照官方文档推荐方式：通过环境变量设置凭证
-            print("📋 使用官方推荐方式创建 S3 配置...")
-            
-            // 设置环境变量（AWS SDK 会自动读取这些环境变量）
+            // 设置环境变量（AWS SDK 会自动读取）
             setenv("AWS_ACCESS_KEY_ID", account.accessKeyID, 1)
             setenv("AWS_SECRET_ACCESS_KEY", secretAccessKey, 1)
-            setenv("AWS_REGION", "auto", 1)  // R2 使用 "auto" 区域
+            setenv("AWS_REGION", region, 1)
             
             // 创建 S3 配置
             var s3Config = try await S3Client.S3ClientConfiguration()
-            s3Config.region = "auto"  // R2 使用 "auto" 区域
+            s3Config.region = region
             s3Config.endpoint = account.endpointURL
+
+            // R2: path-style（endpoint 已含 accountID）
+            // OSS: virtual-hosted-style（bucket 作为子域名，如 bucket.oss-cn-hangzhou.aliyuncs.com）
+            s3Config.forcePathStyle = account.provider.usePathStyle
             
-            print("✅ S3 配置创建成功")
-            
-            // 创建 S3 客户端
             s3Client = S3Client(config: s3Config)
             
-            // 验证客户端是否创建成功
             guard s3Client != nil else {
                 print("❌ S3 客户端创建失败：客户端实例为 nil")
                 throw R2ServiceError.authenticationError
             }
             
-            print("✅ S3 客户端创建成功")
+            print("✅ S3 客户端创建成功 [\(account.provider.displayName)]")
             
         } catch {
             print("❌ S3 客户端创建失败：\(error.localizedDescription)")
-            print("   错误类型: \(type(of: error))")
-            
-            // 根据错误类型进行映射
             if error is R2ServiceError {
                 throw error
             } else {
@@ -2564,7 +2632,71 @@ class R2Service: ObservableObject {
             }
         }
     }
+
+    /// 按供应商验证端点 URL
+    /// - Parameters:
+    ///   - endpointURL: 端点 URL 字符串
+    ///   - provider: 云存储供应商类型
+    /// - Returns: 验证结果
+    func validateEndpoint(_ endpointURL: String, provider: CloudProvider) -> (isValid: Bool, message: String) {
+        switch provider {
+        case .r2:
+            return validateR2Endpoint(endpointURL)
+        case .oss:
+            return validateOSSEndpoint(endpointURL)
+        }
+    }
+
+    /// 验证阿里云 OSS 端点配置
+    private func validateOSSEndpoint(_ endpointURL: String) -> (isValid: Bool, message: String) {
+        guard let url = URL(string: endpointURL) else {
+            return (false, "端点 URL 格式无效")
+        }
+
+        guard url.scheme?.lowercased() == "https" || url.scheme?.lowercased() == "http" else {
+            return (false, "端点 URL 必须使用 HTTP 或 HTTPS 协议")
+        }
+
+        guard let host = url.host, !host.isEmpty else {
+            return (false, "端点 URL 缺少有效的主机名")
+        }
+
+        // OSS 端点常见格式：oss-<region>.aliyuncs.com 或自定义域名
+        let ossPattern = "^oss-[a-z0-9-]+\\.aliyuncs\\.com$"
+        let regex = try? NSRegularExpression(pattern: ossPattern, options: .caseInsensitive)
+        let range = NSRange(location: 0, length: host.count)
+        let isStandardOSS = regex?.firstMatch(in: host, options: [], range: range) != nil
+
+        // 也允许内网端点和自定义域名
+        let internalPattern = "^oss-[a-z0-9-]+-internal\\.aliyuncs\\.com$"
+        let internalRegex = try? NSRegularExpression(pattern: internalPattern, options: .caseInsensitive)
+        let isInternalOSS = internalRegex?.firstMatch(in: host, options: [], range: range) != nil
+
+        if !isStandardOSS && !isInternalOSS {
+            // 非标准格式时给出警告但不阻断（支持自定义域名）
+            return (true, "⚠️ 非标准 OSS 端点格式，请确认配置正确。标准格式：https://oss-<region>.aliyuncs.com")
+        }
+
+        return (true, "端点 URL 格式正确 ✅")
+    }
     
+    /// 按供应商寻址方式拼接对象访问 URL
+    /// - path-style: `https://endpoint/bucket/key`（R2）
+    /// - virtual-hosted-style: `https://bucket.host/key`（OSS）
+    private func buildStorageURL(endpoint: String, bucket: String, key: String, usePathStyle: Bool) -> String {
+        let base = endpoint.hasSuffix("/") ? String(endpoint.dropLast()) : endpoint
+        let encodedKey = key.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? key
+
+        if usePathStyle {
+            return "\(base)/\(bucket)/\(encodedKey)"
+        }
+        guard let url = URL(string: base), let host = url.host else {
+            return "\(base)/\(bucket)/\(encodedKey)"
+        }
+        let scheme = url.scheme ?? "https"
+        return "\(scheme)://\(bucket).\(host)/\(encodedKey)"
+    }
+
     /// 根据文件扩展名推断 MIME 类型
     /// - Parameter fileURL: 文件 URL
     /// - Returns: MIME 类型字符串

@@ -7,26 +7,32 @@
 
 import Foundation
 
-/// R2 账户配置数据模型
-/// 用于存储和管理用户的 Cloudflare R2 或 S3 兼容服务的账户信息
+/// 账户配置数据模型
+/// 用于存储和管理用户的 Cloudflare R2、阿里云 OSS 等 S3 兼容服务的账户信息
 struct R2Account: Codable, Identifiable {
     
     // MARK: - 属性
     
     /// 唯一标识符
     let id: UUID
+
+    /// 云存储供应商类型（默认 R2，向后兼容）
+    var provider: CloudProvider
     
-    /// 账户 ID（Cloudflare R2 账户 ID）
+    /// 账户 ID（R2 特有，OSS 可为空）
     var accountID: String
     
     /// Access Key ID（用于 API 认证）
     var accessKeyID: String
     
-    /// 服务端点 URL（默认为 Cloudflare R2 端点）
+    /// 服务端点 URL
     var endpointURL: String
     
     /// 账户名称（用户自定义，便于识别）
     var displayName: String
+
+    /// OSS Region ID（OSS 特有，如 "cn-hangzhou"）
+    var ossRegion: String?
     
     /// 默认存储桶名称（已废弃，使用 bucketNames 代替）
     @available(*, deprecated, message: "使用 bucketNames 代替")
@@ -74,23 +80,49 @@ struct R2Account: Codable, Identifiable {
     
     // MARK: - 初始化方法
     
-    /// 创建新的 R2 账户配置
+    /// 创建新的账户配置
     /// - Parameters:
-    ///   - accountID: R2 账户 ID
+    ///   - provider: 云存储供应商类型
+    ///   - accountID: R2 账户 ID（OSS 可传空字符串）
     ///   - accessKeyID: Access Key ID
-    ///   - endpointURL: 服务端点 URL，如果为空则使用默认的 Cloudflare R2 端点
-    ///   - displayName: 显示名称，如果为空则使用 Account ID 的前8位字符
+    ///   - endpointURL: 服务端点 URL，为空时按 provider 自动生成
+    ///   - displayName: 显示名称，为空时使用 Access Key ID 前缀
+    ///   - ossRegion: OSS Region ID（仅 OSS 需要，如 "cn-hangzhou"）
     ///   - bucketNames: 存储桶名称列表
     ///   - publicDomains: 公共域名列表
     ///   - defaultPublicDomainIndex: 默认域名索引
-    ///   - cloudflareZoneID: Cloudflare Zone ID（可选）
-    ///   - autoPurgeCDNCache: 是否自动清除 CDN 缓存
-    init(accountID: String, accessKeyID: String, endpointURL: String? = nil, displayName: String? = nil, bucketNames: [String] = [], publicDomains: [String] = [], defaultPublicDomainIndex: Int = 0, cloudflareZoneID: String? = nil, autoPurgeCDNCache: Bool = false) {
+    ///   - cloudflareZoneID: Cloudflare Zone ID（仅 R2，可选）
+    ///   - autoPurgeCDNCache: 是否自动清除 CDN 缓存（仅 R2）
+    init(provider: CloudProvider = .r2, accountID: String = "", accessKeyID: String, endpointURL: String? = nil, displayName: String? = nil, ossRegion: String? = nil, bucketNames: [String] = [], publicDomains: [String] = [], defaultPublicDomainIndex: Int = 0, cloudflareZoneID: String? = nil, autoPurgeCDNCache: Bool = false) {
         self.id = UUID()
+        self.provider = provider
         self.accountID = accountID
         self.accessKeyID = accessKeyID
-        self.endpointURL = endpointURL ?? Self.defaultCloudflareR2EndpointURL(for: accountID)
-        self.displayName = displayName ?? String(accountID.prefix(8))
+        self.ossRegion = ossRegion
+
+        // 按供应商生成默认 endpoint
+        if let url = endpointURL, !url.isEmpty {
+            self.endpointURL = url
+        } else {
+            self.endpointURL = provider.defaultEndpointURL(
+                accountID: accountID,
+                region: ossRegion ?? ""
+            )
+        }
+
+        // 默认显示名称：有自定义就用，否则按供应商生成
+        if let name = displayName, !name.isEmpty {
+            self.displayName = name
+        } else {
+            switch provider {
+            case .r2:
+                self.displayName = accountID.isEmpty ? String(accessKeyID.prefix(8)) : String(accountID.prefix(8))
+            case .oss:
+                let regionLabel = OSSRegion.allRegions.first { $0.id == ossRegion }?.displayName ?? (ossRegion ?? "OSS")
+                self.displayName = "OSS-\(regionLabel)"
+            }
+        }
+
         self.bucketNames = bucketNames
         self.publicDomains = publicDomains
         self.defaultPublicDomainIndex = defaultPublicDomainIndex
@@ -103,10 +135,11 @@ struct R2Account: Codable, Identifiable {
     // MARK: - Codable (支持旧数据迁移)
 
     private enum CodingKeys: String, CodingKey {
-        case id, accountID, accessKeyID, endpointURL, displayName
-        case bucketNames, defaultBucketName // 支持两种格式
-        case publicDomain, publicDomains, defaultPublicDomainIndex // 支持两种格式
-        case cloudflareZoneID, autoPurgeCDNCache // CDN 缓存配置
+        case id, provider, accountID, accessKeyID, endpointURL, displayName
+        case ossRegion
+        case bucketNames, defaultBucketName
+        case publicDomain, publicDomains, defaultPublicDomainIndex
+        case cloudflareZoneID, autoPurgeCDNCache
         case createdAt, updatedAt
     }
 
@@ -119,6 +152,10 @@ struct R2Account: Codable, Identifiable {
         displayName = try container.decode(String.self, forKey: .displayName)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+
+        // 向后兼容：旧数据无 provider 字段时默认为 .r2
+        provider = try container.decodeIfPresent(CloudProvider.self, forKey: .provider) ?? .r2
+        ossRegion = try container.decodeIfPresent(String.self, forKey: .ossRegion)
 
         // 迁移逻辑：优先读取 bucketNames，否则从 defaultBucketName 迁移
         if let names = try container.decodeIfPresent([String].self, forKey: .bucketNames) {
@@ -151,10 +188,12 @@ struct R2Account: Codable, Identifiable {
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
+        try container.encode(provider, forKey: .provider)
         try container.encode(accountID, forKey: .accountID)
         try container.encode(accessKeyID, forKey: .accessKeyID)
         try container.encode(endpointURL, forKey: .endpointURL)
         try container.encode(displayName, forKey: .displayName)
+        try container.encodeIfPresent(ossRegion, forKey: .ossRegion)
         try container.encode(bucketNames, forKey: .bucketNames)
         try container.encode(publicDomains, forKey: .publicDomains)
         try container.encode(defaultPublicDomainIndex, forKey: .defaultPublicDomainIndex)
@@ -173,13 +212,20 @@ struct R2Account: Codable, Identifiable {
         return "https://\(accountID).r2.cloudflarestorage.com"
     }
     
-    /// 验证账户配置是否有效
+    /// 验证账户配置是否有效（按供应商分派校验规则）
     /// - Returns: 如果配置有效返回 true，否则返回 false
     func isValid() -> Bool {
-        return !accountID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-               !accessKeyID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-               !endpointURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-               isValidURL(endpointURL)
+        let hasAccessKey = !accessKeyID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasEndpoint = !endpointURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && isValidURL(endpointURL)
+
+        switch provider {
+        case .r2:
+            let hasAccountID = !accountID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            return hasAccountID && hasAccessKey && hasEndpoint
+        case .oss:
+            let hasRegion = ossRegion != nil && !ossRegion!.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            return hasAccessKey && hasEndpoint && hasRegion
+        }
     }
     
     /// 验证 URL 格式是否正确
@@ -193,54 +239,28 @@ struct R2Account: Codable, Identifiable {
     // MARK: - 更新方法
 
     /// 更新账户信息
-    /// - Parameters:
-    ///   - accountID: 新的账户 ID
-    ///   - accessKeyID: 新的 Access Key ID
-    ///   - endpointURL: 新的端点 URL
-    ///   - displayName: 新的显示名称
-    ///   - bucketNames: 新的存储桶名称列表
-    ///   - publicDomains: 新的公共域名列表
-    ///   - defaultPublicDomainIndex: 新的默认域名索引
-    ///   - cloudflareZoneID: 新的 Cloudflare Zone ID
-    ///   - autoPurgeCDNCache: 是否自动清除 CDN 缓存
     /// - Returns: 更新后的账户对象
     func updated(accountID: String? = nil,
                  accessKeyID: String? = nil,
                  endpointURL: String? = nil,
                  displayName: String? = nil,
+                 ossRegion: String?? = nil,
                  bucketNames: [String]? = nil,
                  publicDomains: [String]? = nil,
                  defaultPublicDomainIndex: Int? = nil,
                  cloudflareZoneID: String?? = nil,
                  autoPurgeCDNCache: Bool? = nil) -> R2Account {
         var updated = self
-        if let accountID = accountID {
-            updated.accountID = accountID
-        }
-        if let accessKeyID = accessKeyID {
-            updated.accessKeyID = accessKeyID
-        }
-        if let endpointURL = endpointURL {
-            updated.endpointURL = endpointURL
-        }
-        if let displayName = displayName {
-            updated.displayName = displayName
-        }
-        if let bucketNames = bucketNames {
-            updated.bucketNames = bucketNames
-        }
-        if let publicDomains = publicDomains {
-            updated.publicDomains = publicDomains
-        }
-        if let defaultPublicDomainIndex = defaultPublicDomainIndex {
-            updated.defaultPublicDomainIndex = defaultPublicDomainIndex
-        }
-        if let cloudflareZoneID = cloudflareZoneID {
-            updated.cloudflareZoneID = cloudflareZoneID
-        }
-        if let autoPurgeCDNCache = autoPurgeCDNCache {
-            updated.autoPurgeCDNCache = autoPurgeCDNCache
-        }
+        if let accountID = accountID { updated.accountID = accountID }
+        if let accessKeyID = accessKeyID { updated.accessKeyID = accessKeyID }
+        if let endpointURL = endpointURL { updated.endpointURL = endpointURL }
+        if let displayName = displayName { updated.displayName = displayName }
+        if let ossRegion = ossRegion { updated.ossRegion = ossRegion }
+        if let bucketNames = bucketNames { updated.bucketNames = bucketNames }
+        if let publicDomains = publicDomains { updated.publicDomains = publicDomains }
+        if let idx = defaultPublicDomainIndex { updated.defaultPublicDomainIndex = idx }
+        if let cloudflareZoneID = cloudflareZoneID { updated.cloudflareZoneID = cloudflareZoneID }
+        if let autoPurgeCDNCache = autoPurgeCDNCache { updated.autoPurgeCDNCache = autoPurgeCDNCache }
         updated.updatedAt = Date()
         return updated
     }
@@ -305,8 +325,8 @@ extension R2Account {
     /// Keychain 中存储 Cloudflare API Token 的服务名
     static let cloudflareAPITokenServiceName = "OwlUploader.CloudflareAPIToken"
 
-    /// 为当前账户生成 Keychain 账户标识符
+    /// Keychain 账户标识符，使用不可变的 UUID 避免编辑字段后标识脱节
     var keychainAccountIdentifier: String {
-        return "\(accountID)_\(accessKeyID)"
+        return id.uuidString
     }
 } 

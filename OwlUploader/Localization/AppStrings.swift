@@ -334,9 +334,11 @@ enum L {
         enum Add {
             static let title = String(localized: "account.add.title", defaultValue: "Add Account")
             static let accountInfo = String(localized: "account.add.accountInfo", defaultValue: "Account Info")
+            static let cloudflareAccountSection = String(localized: "account.add.cloudflareAccountSection", defaultValue: "Cloudflare Account")
             static let credentials = String(localized: "account.add.credentials", defaultValue: "Credentials")
             static let endpoint = String(localized: "account.add.endpoint", defaultValue: "Endpoint")
             static let publicDomains = String(localized: "account.add.publicDomains", defaultValue: "Public Domains")
+            static let regionInfo = String(localized: "account.add.regionInfo", defaultValue: "Region")
             static let testingConnection = String(localized: "account.add.testingConnection", defaultValue: "Testing connection...")
         }
 
@@ -346,6 +348,7 @@ enum L {
         }
 
         enum Field {
+            static let provider = String(localized: "account.field.provider", defaultValue: "Cloud Provider")
             static let displayName = String(localized: "account.field.displayName", defaultValue: "Display Name")
             static let accountID = String(localized: "account.field.accountID", defaultValue: "Account ID")
             static let accessKeyID = String(localized: "account.field.accessKeyID", defaultValue: "Access Key ID")
@@ -354,6 +357,9 @@ enum L {
             static let endpointURL = String(localized: "account.field.endpointURL", defaultValue: "Endpoint URL")
             static let endpointHint = String(localized: "account.field.endpointHint",
                 defaultValue: "Leave empty for default: https://{accountID}.r2.cloudflarestorage.com")
+            static let ossEndpointHint = String(localized: "account.field.ossEndpointHint",
+                defaultValue: "Leave empty for auto-generation. Format: https://oss-<region>.aliyuncs.com")
+            static let ossRegion = String(localized: "account.field.ossRegion", defaultValue: "OSS Region")
         }
 
         enum Domain {

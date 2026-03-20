@@ -123,9 +123,10 @@ struct FileGridItemView: View {
         if !fileObject.isDirectory {
             copyLinkMenu
 
-            // 刷新 CDN 缓存
-            Button(action: { onPurgeCDNCache?(fileObject) }) {
-                Label(L.Files.ContextMenu.purgeCDNCache, systemImage: "arrow.triangle.2.circlepath")
+            if r2Service?.supportsCDNPurge == true {
+                Button(action: { onPurgeCDNCache?(fileObject) }) {
+                    Label(L.Files.ContextMenu.purgeCDNCache, systemImage: "arrow.triangle.2.circlepath")
+                }
             }
         }
 

@@ -816,8 +816,9 @@ class UploadQueueManager: ObservableObject, TaskQueueManagerProtocol {
                 // 清除旧缩略图缓存（确保覆盖上传后显示新图片）
                 r2Service.invalidateThumbnailCache(for: task.remotePath, in: bucketName)
 
-                // 收集待 purge 的 CDN URL（队列完成时统一批量 purge）
-                if let fileURL = r2Service.generateBaseURL(for: task.remotePath, in: bucketName) {
+                // 收集待 purge 的 CDN URL（仅 Cloudflare R2，队列完成时统一批量 purge）
+                if r2Service.supportsCDNPurge,
+                   let fileURL = r2Service.generateBaseURL(for: task.remotePath, in: bucketName) {
                     self.pendingCDNPurgeURLs.append(fileURL)
                 }
             }

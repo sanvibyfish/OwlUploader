@@ -10,6 +10,26 @@
     "(%@)" : {
 
     },
+    "%@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "%@ (%@)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ (%2$@)"
+          }
+        }
+      }
+    },
     "%lld" : {
 
     },
@@ -91,6 +111,17 @@
         }
       }
     },
+    "account.add.cloudflareAccountSection" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Cloudflare Account"
+          }
+        }
+      }
+    },
     "account.add.credentials" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
@@ -138,6 +169,17 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "公共域名"
+          }
+        }
+      }
+    },
+    "account.add.regionInfo" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Region"
           }
         }
       }
@@ -534,6 +576,39 @@
           "stringUnit" : {
             "state" : "needs_review",
             "value" : "端点 URL"
+          }
+        }
+      }
+    },
+    "account.field.ossEndpointHint" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Leave empty for auto-generation. Format: https://oss-<region>.aliyuncs.com"
+          }
+        }
+      }
+    },
+    "account.field.ossRegion" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "OSS Region"
+          }
+        }
+      }
+    },
+    "account.field.provider" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Cloud Provider"
           }
         }
       }
@@ -1131,6 +1206,9 @@
           }
         }
       }
+    },
+    "Cloudflare Account" : {
+
     },
     "commands.deselectAll" : {
       "extractionState" : "extracted_with_value",

@@ -1816,10 +1816,8 @@ struct FileListView: View {
 }
 
 #Preview("加载中状态") {
-    let service = R2Service.preview
-    service.isLoading = true
-    return FileListView(
-        r2Service: service,
+    FileListView(
+        r2Service: R2Service.preview,
         selectionManager: SelectionManager(),
         viewModeManager: ViewModeManager()
     )
