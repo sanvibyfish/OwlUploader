@@ -2,15 +2,23 @@
 
 ## 功能概述
 
-账户配置模块允许用户配置和管理 Cloudflare R2 账户凭证，包括 Account ID、Access Key ID、Secret Access Key 和 Endpoint URL。
+账户配置模块允许用户配置和管理多云存储账户凭证，当前支持 **Cloudflare R2** 和 **阿里云 OSS**。两者均基于 S3 兼容 API，共享同一 AWS SDK 底层。
+
+## 支持的云存储供应商
+
+| 供应商 | CloudProvider 枚举 | 特有字段 | 特有功能 |
+|--------|-------------------|---------|---------|
+| Cloudflare R2 | `.r2` | Account ID | CDN Cache Purge |
+| 阿里云 OSS | `.oss` | OSS Region | — |
 
 ## 核心组件
 
 | 文件 | 职责 |
 |------|-----|
+| `CloudProvider.swift` | 云存储供应商枚举和 OSS Region 定义 |
 | `AccountSettingsView.swift` | 账户配置 UI 界面（原生 TabView 风格） |
 | `R2AccountManager.swift` | 账户状态管理 |
-| `R2Account.swift` | 账户数据模型 |
+| `R2Account.swift` | 账户数据模型（含 provider 字段） |
 | `KeychainService.swift` | 敏感凭证安全存储 |
 
 ## 设置窗口设计
@@ -76,14 +84,30 @@ var body: some Scene {
 
 ### 📋 配置字段
 
+**通用字段（所有供应商）：**
+
+| 字段 | 必填 | 说明 |
+|------|:----:|------|
+| Cloud Provider | ✓ | 选择供应商类型（R2 / OSS） |
+| Access Key ID | ✓ | API 访问密钥 ID |
+| Secret Access Key | ✓ | API 访问密钥 (Keychain 存储) |
+| Endpoint URL | 自动 | 按供应商和配置自动生成，可手动覆盖 |
+| Display Name | ✗ | 自定义显示名称 |
+| 公共域名 | ✗ | 用于生成公开链接和缩略图 |
+
+**R2 特有字段：**
+
 | 字段 | 必填 | 说明 |
 |------|:----:|------|
 | Account ID | ✓ | Cloudflare 账户 ID |
-| Access Key ID | ✓ | R2 API 访问密钥 ID |
-| Secret Access Key | ✓ | R2 API 访问密钥 (Keychain 存储) |
-| Endpoint URL | ✓ | 格式: `https://[账户ID].r2.cloudflarestorage.com` |
-| Display Name | ✗ | 自定义显示名称 |
-| 公共域名 | ✗ | 用于生成公开链接和缩略图 |
+| Cloudflare Zone ID | ✗ | 用于 CDN Cache Purge |
+| Cloudflare API Token | ✗ | CDN Cache Purge 认证 |
+
+**OSS 特有字段：**
+
+| 字段 | 必填 | 说明 |
+|------|:----:|------|
+| OSS Region | ✓ | 阿里云 OSS 区域（如 cn-hangzhou） |
 
 ## 用户交互流程
 

@@ -127,9 +127,13 @@ class R2AccountManager: ObservableObject {
         // 从数组中移除
         accounts.removeAll { $0.id == account.id }
         
-        // 从 Keychain 中删除 Secret Key 和 Cloudflare API Token
+        // 从 Keychain 中删除 Secret Key
         try? keychainService.deleteSecretAccessKey(for: account)
-        try? keychainService.deleteCloudflareAPIToken(for: account)
+
+        // Cloudflare API Token 仅 R2 供应商有
+        if account.provider.supportsCDNPurge {
+            try? keychainService.deleteCloudflareAPIToken(for: account)
+        }
 
         // 保存到 UserDefaults
         try saveAccountsToUserDefaults()
